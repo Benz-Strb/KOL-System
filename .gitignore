@@ -1,7 +1,10 @@
 node_modules/
 dist/
 .env
-*.env.local
+.env.*
+!.env.example
 .DS_Store
 .claude/settings.local.json
 CLAUDE.md
+.dev.vars
+.wrangler/

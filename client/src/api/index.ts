@@ -25,6 +25,11 @@ export type Brand = { id: number; name: string; active?: boolean };
 export type AppUser = { id: number; supabaseId: string; full_name: string; email: string; role: string; brandIds: number[] };
 export type AdminUser = { id: number; full_name: string; email: string | null; role: string; is_active: boolean; created_at: string; user_brands: { brands: { id: number; name: string } }[] };
 
+// Empty by default so local dev keeps using Vite's '/api' proxy (see vite.config.ts) —
+// set VITE_API_BASE_URL at build time once client/server are deployed on separate origins.
+// Exported because AuthContext.tsx also calls /api/auth/me directly (outside this file's api() wrapper).
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
+
 let _token: string | null = null;
 export function setAuthToken(token: string | null) { _token = token; }
 
@@ -33,7 +38,7 @@ export function setDeactivatedHandler(fn: () => void) { _deactivatedHandler = fn
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: { ...authHeader, ...(init?.headers as Record<string, string> ?? {}) },
   });
@@ -459,7 +464,7 @@ export type ImportCommitResponse = { created: number; branchesCreated: number; f
 export async function downloadImportTemplate(kind: ImportKind, brandId?: number) {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
   const qs = brandId != null ? `?brand_id=${brandId}` : '';
-  const res = await fetch(`/api/placements/import/template/${kind}${qs}`, { headers: authHeader });
+  const res = await fetch(`${API_BASE_URL}/api/placements/import/template/${kind}${qs}`, { headers: authHeader });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'ดาวน์โหลด template ไม่สำเร็จ' }));
     throw new Error(err.error ?? 'ดาวน์โหลด template ไม่สำเร็จ');
@@ -479,7 +484,7 @@ export async function validateImportFile(file: File, kind: ImportKind) {
   const fd = new FormData();
   fd.append('file', file);
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
-  const res = await fetch(`/api/placements/import/validate/${kind}`, { method: 'POST', headers: authHeader, body: fd });
+  const res = await fetch(`${API_BASE_URL}/api/placements/import/validate/${kind}`, { method: 'POST', headers: authHeader, body: fd });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error ?? res.statusText);

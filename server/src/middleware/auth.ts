@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../prisma.js';
-import { supabaseAdmin } from '../lib/supabaseAdmin.js';
+import type { MiddlewareHandler } from 'hono';
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js';
+import type { AppEnv } from '../types.js';
 
 export interface AuthUser {
   id: number;
@@ -9,15 +9,6 @@ export interface AuthUser {
   email: string;
   role: string;
   brandIds: number[];
-}
-
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace -- only way to augment Express's ambient Request type
-  namespace Express {
-    interface Request {
-      user?: AuthUser;
-    }
-  }
 }
 
 const AUTH_CACHE_TTL = 60_000; // 60s — well within Supabase JWT expiry (1h)
@@ -29,36 +20,36 @@ export function invalidateAuthCache(userId: number) {
   }
 }
 
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
+export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing token' });
-    return;
+    return c.json({ error: 'Missing token' }, 401);
   }
 
   const token = authHeader.slice(7);
 
   const cached = authCache.get(token);
   if (cached && cached.exp > Date.now()) {
-    req.user = cached.user;
-    return next();
+    c.set('user', cached.user);
+    await next();
+    return;
   }
 
   try {
+    const supabaseAdmin = getSupabaseAdmin(c.env);
     const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !supaUser?.email) {
-      res.status(401).json({ error: 'Invalid or expired token' });
-      return;
+      return c.json({ error: 'Invalid or expired token' }, 401);
     }
 
+    const prisma = c.get('prisma');
     const dbUser = await prisma.users.findFirst({
       where: { email: supaUser.email, is_active: true },
       select: { id: true, full_name: true, email: true, role: true, user_brands: { select: { brand_id: true } } },
     });
 
     if (!dbUser || !dbUser.email) {
-      res.status(403).json({ error: 'User not found or inactive' });
-      return;
+      return c.json({ error: 'User not found or inactive' }, 403);
     }
 
     const authUser: AuthUser = {
@@ -71,20 +62,20 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     };
 
     authCache.set(token, { user: authUser, exp: Date.now() + AUTH_CACHE_TTL });
-    req.user = authUser;
-    next();
+    c.set('user', authUser);
+    await next();
   } catch (err) {
     console.error('[requireAuth] error:', err instanceof Error ? err.message : err);
-    res.status(500).json({ error: 'Internal server error' });
+    return c.json({ error: 'Internal server error' }, 500);
   }
-}
+};
 
-export function requireRole(...roles: string[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      res.status(403).json({ error: 'Insufficient permissions' });
-      return;
+export function requireRole(...roles: string[]): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    const user = c.get('user');
+    if (!user || !roles.includes(user.role)) {
+      return c.json({ error: 'Insufficient permissions' }, 403);
     }
-    next();
+    await next();
   };
 }

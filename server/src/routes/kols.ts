@@ -1,13 +1,19 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../prisma.js';
+import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
 
 // ─── GET / — KOL Directory ────────────────────────────────
-router.get('/', async (req, res) => {
+app.get('/', async c => {
   try {
-    const { q, platform_id, category_id, page = '1' } = req.query as Record<string, string>;
+    const prisma = c.get('prisma');
+    const q = c.req.query('q');
+    const platform_id = c.req.query('platform_id');
+    const category_id = c.req.query('category_id');
+    const page = c.req.query('page') ?? '1';
     const TAKE = 25;
     const skip = (Number(page) - 1) * TAKE;
 
@@ -55,7 +61,7 @@ router.get('/', async (req, res) => {
       }),
     ]);
 
-    const parseCode = (c: string) => { const [m, d] = c.split('.').map(Number); return [m || 0, d || 0]; };
+    const parseCode = (code: string) => { const [m, d] = code.split('.').map(Number); return [m || 0, d || 0]; };
 
     const rows = kols.map(k => ({
       id: k.id,
@@ -82,18 +88,18 @@ router.get('/', async (req, res) => {
       )].sort(),
     }));
 
-    res.json({ total, page: Number(page), limit: TAKE, rows });
+    return c.json({ total, page: Number(page), limit: TAKE, rows });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load kols' });
+    return c.json({ error: 'failed to load kols' }, 500);
   }
 });
 
 // ─── GET /search ──────────────────────────────────────────
-router.get('/search', async (req, res) => {
+app.get('/search', async c => {
   try {
-    const { q } = req.query as { q?: string };
-    const query = q?.trim() ?? '';
+    const prisma = c.get('prisma');
+    const query = c.req.query('q')?.trim() ?? '';
     const rows = await prisma.kols.findMany({
       where: query ? {
         OR: [
@@ -111,28 +117,30 @@ router.get('/search', async (req, res) => {
       orderBy: { handle: 'asc' },
       take: 10,
     });
-    res.json(rows);
+    return c.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to search kols' });
+    return c.json({ error: 'failed to search kols' }, 500);
   }
 });
 
 // ─── PATCH /terms/:termId — update commercial term ────────
 // Must come BEFORE /:id to avoid "terms" matching as an id
-router.patch('/terms/:termId', async (req, res) => {
+app.patch('/terms/:termId', async c => {
   try {
-    const termId = Number(req.params.termId);
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const termId = Number(c.req.param('termId'));
 
-    if (req.user!.role !== 'admin') {
+    if (user.role !== 'admin') {
       const existing = await prisma.kol_commercial_terms.findUnique({ where: { id: termId }, select: { brand_id: true } });
-      if (!existing) { res.status(404).json({ error: 'ไม่พบเงื่อนไขนี้' }); return; }
-      if (existing.brand_id != null && !req.user!.brandIds.includes(existing.brand_id)) {
-        res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึงเงื่อนไขของแบรนด์นี้' }); return;
+      if (!existing) return c.json({ error: 'ไม่พบเงื่อนไขนี้' }, 404);
+      if (existing.brand_id != null && !user.brandIds.includes(existing.brand_id)) {
+        return c.json({ error: 'ไม่มีสิทธิ์เข้าถึงเงื่อนไขของแบรนด์นี้' }, 403);
       }
     }
 
-    const { pricing_type, single_post_price, package_price, multi_platform_price, is_barter, notes } = req.body;
+    const { pricing_type, single_post_price, package_price, multi_platform_price, is_barter, notes } = await c.req.json();
     const term = await prisma.kol_commercial_terms.update({
       where: { id: termId },
       data: {
@@ -151,67 +159,73 @@ router.patch('/terms/:termId', async (req, res) => {
       },
       include: { brands: { select: { id: true, name: true } } },
     });
-    res.json(term);
+    return c.json(term);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to update term' });
+    return c.json({ error: 'failed to update term' }, 500);
   }
 });
 
 // ─── DELETE /terms/:termId — delete commercial term ───────
-router.delete('/terms/:termId', async (req, res) => {
+app.delete('/terms/:termId', async c => {
   try {
-    const termId = Number(req.params.termId);
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const termId = Number(c.req.param('termId'));
 
-    if (req.user!.role !== 'admin') {
+    if (user.role !== 'admin') {
       const existing = await prisma.kol_commercial_terms.findUnique({ where: { id: termId }, select: { brand_id: true } });
-      if (!existing) { res.status(404).json({ error: 'ไม่พบเงื่อนไขนี้' }); return; }
-      if (existing.brand_id != null && !req.user!.brandIds.includes(existing.brand_id)) {
-        res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึงเงื่อนไขของแบรนด์นี้' }); return;
+      if (!existing) return c.json({ error: 'ไม่พบเงื่อนไขนี้' }, 404);
+      if (existing.brand_id != null && !user.brandIds.includes(existing.brand_id)) {
+        return c.json({ error: 'ไม่มีสิทธิ์เข้าถึงเงื่อนไขของแบรนด์นี้' }, 403);
       }
     }
 
     await prisma.kol_commercial_terms.delete({ where: { id: termId } });
-    res.json({ ok: true });
+    return c.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to delete term' });
+    return c.json({ error: 'failed to delete term' }, 500);
   }
 });
 
 // ─── GET /:id/terms — list commercial terms for a KOL ─────
-router.get('/:id/terms', async (req, res) => {
+app.get('/:id/terms', async c => {
   try {
-    const isAdmin = req.user!.role === 'admin';
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const isAdmin = user.role === 'admin';
     const terms = await prisma.kol_commercial_terms.findMany({
       where: {
-        kol_id: Number(req.params.id),
-        ...(isAdmin ? {} : { OR: [{ brand_id: null }, { brand_id: { in: req.user!.brandIds } }] }),
+        kol_id: Number(c.req.param('id')),
+        ...(isAdmin ? {} : { OR: [{ brand_id: null }, { brand_id: { in: user.brandIds } }] }),
       },
       include: { brands: { select: { id: true, name: true } } },
       orderBy: { created_at: 'desc' },
     });
-    res.json(terms);
+    return c.json(terms);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load terms' });
+    return c.json({ error: 'failed to load terms' }, 500);
   }
 });
 
 // ─── POST /:id/terms — create commercial term ─────────────
-router.post('/:id/terms', async (req, res) => {
+app.post('/:id/terms', async c => {
   try {
-    const { brand_id, pricing_type, single_post_price, package_price, multi_platform_price, is_barter, notes } = req.body;
-    if (!pricing_type) return res.status(400).json({ error: 'pricing_type required' });
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const { brand_id, pricing_type, single_post_price, package_price, multi_platform_price, is_barter, notes } = await c.req.json();
+    if (!pricing_type) return c.json({ error: 'pricing_type required' }, 400);
 
     const bid = brand_id ? Number(brand_id) : null;
-    if (req.user!.role !== 'admin' && bid != null && !req.user!.brandIds.includes(bid)) {
-      return res.status(403).json({ error: 'ไม่มีสิทธิ์สร้างเงื่อนไขให้แบรนด์นี้' });
+    if (user.role !== 'admin' && bid != null && !user.brandIds.includes(bid)) {
+      return c.json({ error: 'ไม่มีสิทธิ์สร้างเงื่อนไขให้แบรนด์นี้' }, 403);
     }
 
     const term = await prisma.kol_commercial_terms.create({
       data: {
-        kol_id: Number(req.params.id),
+        kol_id: Number(c.req.param('id')),
         brand_id: bid,
         pricing_type,
         single_post_price: single_post_price !== '' && single_post_price != null ? String(single_post_price) : null,
@@ -222,19 +236,20 @@ router.post('/:id/terms', async (req, res) => {
       },
       include: { brands: { select: { id: true, name: true } } },
     });
-    res.status(201).json(term);
+    return c.json(term, 201);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to create term' });
+    return c.json({ error: 'failed to create term' }, 500);
   }
 });
 
 // ─── PATCH /:id — update KOL profile fields ───────────────
-router.patch('/:id', async (req, res) => {
+app.patch('/:id', async c => {
   try {
-    const { custom_tags, main_selling_points, contact_info, follower_count } = req.body;
+    const prisma = c.get('prisma');
+    const { custom_tags, main_selling_points, contact_info, follower_count } = await c.req.json();
     const kol = await prisma.kols.update({
-      where: { id: Number(req.params.id) },
+      where: { id: Number(c.req.param('id')) },
       data: {
         ...(custom_tags !== undefined && { custom_tags }),
         ...(main_selling_points !== undefined && { main_selling_points: main_selling_points?.trim() || null }),
@@ -253,23 +268,24 @@ router.patch('/:id', async (req, res) => {
         follower_count: true,
       },
     });
-    res.json(kol);
+    return c.json(kol);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to update kol' });
+    return c.json({ error: 'failed to update kol' }, 500);
   }
 });
 
 // ─── POST / — create KOL ──────────────────────────────────
-router.post('/', async (req, res) => {
+app.post('/', async c => {
   try {
-    const { handle, gen_name, platform_id, content_category_id, follower_count } = req.body;
-    if (!handle?.trim()) return res.status(400).json({ error: 'handle required' });
+    const prisma = c.get('prisma');
+    const { handle, gen_name, platform_id, content_category_id, follower_count } = await c.req.json();
+    if (!handle?.trim()) return c.json({ error: 'handle required' }, 400);
 
     const normalized = handle.trim().toLowerCase().replace(/\s+/g, '');
 
     const existing = await prisma.kols.findUnique({ where: { handle_normalized: normalized } });
-    if (existing) return res.status(409).json({ error: 'KOL นี้มีอยู่แล้ว', kol: existing });
+    if (existing) return c.json({ error: 'KOL นี้มีอยู่แล้ว', kol: existing }, 409);
 
     const kol = await prisma.kols.create({
       data: {
@@ -288,11 +304,11 @@ router.post('/', async (req, res) => {
         platforms: { select: { id: true, name: true } },
       },
     });
-    res.status(201).json(kol);
+    return c.json(kol, 201);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to create kol' });
+    return c.json({ error: 'failed to create kol' }, 500);
   }
 });
 
-export default router;
+export default app;

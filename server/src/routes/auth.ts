@@ -1,10 +1,9 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
 
-router.get('/me', requireAuth, (req, res) => {
-  res.json(req.user);
-});
+app.get('/me', requireAuth, c => c.json(c.get('user')));
 
-export default router;
+export default app;

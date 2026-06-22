@@ -1,13 +1,16 @@
-import { Router } from 'express';
-import { prisma } from '../prisma.js';
+import { Hono } from 'hono';
+import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
 
-router.post('/', async (req, res) => {
+app.post('/', async c => {
   try {
-    const { code, label, year, start_date, end_date } = req.body;
-    if (!code?.trim()) return res.status(400).json({ error: 'code required' });
-    if (!year) return res.status(400).json({ error: 'year required' });
+    const prisma = c.get('prisma');
+    const { code, label, year, start_date, end_date } = await c.req.json();
+    if (!code?.trim()) return c.json({ error: 'code required' }, 400);
+    if (!year) return c.json({ error: 'year required' }, 400);
 
     const campaign = await prisma.campaigns.create({
       data: {
@@ -18,13 +21,13 @@ router.post('/', async (req, res) => {
         end_date: end_date ? new Date(end_date) : null,
       },
     });
-    res.status(201).json(campaign);
+    return c.json(campaign, 201);
   } catch (err: unknown) {
     const e = err as { code?: string };
-    if (e.code === 'P2002') return res.status(409).json({ error: 'แคมเปญนี้มีอยู่แล้ว' });
+    if (e.code === 'P2002') return c.json({ error: 'แคมเปญนี้มีอยู่แล้ว' }, 409);
     console.error(err);
-    res.status(500).json({ error: 'failed to create campaign' });
+    return c.json({ error: 'failed to create campaign' }, 500);
   }
 });
 
-export default router;
+export default app;

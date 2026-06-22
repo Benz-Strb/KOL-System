@@ -1,0 +1,29 @@
+name = "kol-system-server"
+main = "src/index.ts"
+compatibility_date = "2026-06-22"
+compatibility_flags = ["nodejs_compat"]
+
+# Top-level config = local `wrangler dev` only. Named environments below do NOT
+# inherit top-level vars/bindings (Cloudflare requires each env to fully redeclare
+# them) — so [env.production] repeats the hyperdrive block with its own CLIENT_ORIGIN.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "a156856807ba48f6a310a3f08df79509"
+
+[vars]
+CLIENT_ORIGIN = "http://localhost:5173"
+SUPABASE_URL = "https://hdrweioqqqpslsjizkci.supabase.co"
+
+[env.production]
+# Pin the same Worker name — otherwise `wrangler deploy --env production` would
+# create a new Worker called "kol-system-server-production" instead of reusing
+# the one we already deployed (and already holds the SUPABASE_SERVICE_ROLE_KEY secret).
+name = "kol-system-server"
+
+[[env.production.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "a156856807ba48f6a310a3f08df79509"
+
+[env.production.vars]
+CLIENT_ORIGIN = "https://kol-system-client.shd-technology.workers.dev"
+SUPABASE_URL = "https://hdrweioqqqpslsjizkci.supabase.co"

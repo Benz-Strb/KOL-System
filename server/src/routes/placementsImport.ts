@@ -1,11 +1,14 @@
-import { Router, type Request, type Response, type NextFunction } from 'express';
-import multer from 'multer';
+import { Hono } from 'hono';
+import type { PrismaClient } from '@prisma/client';
 import ExcelJS from 'exceljs';
-import { prisma } from '../prisma.js';
+import { requireAuth } from '../middleware/auth.js';
 import type { AuthUser } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const REF_SHEET_NAME = 'รายชื่ออ้างอิง';
 const SHOP_BRANCH_SEP = ' / ';
@@ -85,7 +88,7 @@ interface Lookups {
   kolByNormalized: Map<string, KolLookup>;
 }
 
-async function loadLookups(user: AuthUser): Promise<Lookups> {
+async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookups> {
   const isAdmin = user.role === 'admin';
   const seesAllBrands = isAdmin || user.role === 'manager';
   const currentYear = new Date().getFullYear();
@@ -481,29 +484,30 @@ function styleReferenceSheet(ref: ExcelJS.Worksheet, numCols: number, lastRow: n
 }
 
 // ─── GET /template/:kind — download blank import template (with dropdowns) ──
-router.get('/template/:kind', async (req, res) => {
+app.get('/template/:kind', async c => {
   try {
-    const kind = parseKindParam(String(req.params.kind));
-    if (!kind) { res.status(400).json({ error: 'kind ต้องเป็น online หรือ offline' }); return; }
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const kind = parseKindParam(c.req.param('kind'));
+    if (!kind) return c.json({ error: 'kind ต้องเป็น online หรือ offline' }, 400);
 
-    const lk = await loadLookups(req.user!);
+    const lk = await loadLookups(prisma, user);
 
     // Resolve which single brand this template is for — required up front so the
     // Model dropdown (online) only ever offers that brand's products. Users with
     // exactly one accessible brand don't need to choose; users with several must
     // pick one in the UI before downloading.
     let targetBrandId: number;
-    const { brand_id: rawBrandId } = req.query as Record<string, string>;
+    const rawBrandId = c.req.query('brand_id');
     if (rawBrandId != null) {
       const parsed = Number(rawBrandId);
       const match = lk.brands.find(b => b.id === parsed);
-      if (!match) { res.status(400).json({ error: 'แบรนด์ที่เลือกไม่ถูกต้องหรือไม่มีสิทธิ์เข้าถึง' }); return; }
+      if (!match) return c.json({ error: 'แบรนด์ที่เลือกไม่ถูกต้องหรือไม่มีสิทธิ์เข้าถึง' }, 400);
       targetBrandId = match.id;
     } else if (lk.brands.length === 1) {
       targetBrandId = lk.brands[0].id;
     } else {
-      res.status(400).json({ error: 'กรุณาเลือกแบรนด์ก่อนดาวน์โหลด template' });
-      return;
+      return c.json({ error: 'กรุณาเลือกแบรนด์ก่อนดาวน์โหลด template' }, 400);
     }
 
     const templateLk: Lookups = {
@@ -541,23 +545,23 @@ router.get('/template/:kind', async (req, res) => {
     styleReferenceSheet(wb.getWorksheet(REF_SHEET_NAME)!, 8, ranges.lastRow);
 
     const buf = await wb.xlsx.writeBuffer();
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="placement_import_template_${kind === 'online' ? 'online' : 'offline'}.xlsx"`);
-    res.send(Buffer.from(buf));
+    // Buffer is a view into a possibly-larger pooled ArrayBuffer — passing it straight
+    // to Response would let the body grab the whole backing buffer (ignoring byteOffset),
+    // producing a corrupted .xlsx with extra bytes. Copy into a tightly-sized Uint8Array first.
+    const bytes = Uint8Array.from(buf as unknown as Uint8Array);
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="placement_import_template_${kind === 'online' ? 'online' : 'offline'}.xlsx"`,
+      },
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to generate template' });
+    return c.json({ error: 'failed to generate template' }, 500);
   }
 });
 
 // ─── POST /validate/:kind — parse + resolve, no DB writes ──────────────
-function uploadMiddleware(req: Request, res: Response, next: NextFunction) {
-  upload.single('file')(req, res, (err: unknown) => {
-    if (err) { res.status(400).json({ error: err instanceof Error ? err.message : 'อัปโหลดไฟล์ไม่สำเร็จ' }); return; }
-    next();
-  });
-}
-
 function cellText(row: ExcelJS.Row, idx: number): string {
   const cell = row.getCell(idx);
   const v = cell.value;
@@ -582,20 +586,27 @@ function rowToRaw(row: ExcelJS.Row, keys: (keyof RawRow)[]): RawRow {
   return out;
 }
 
-router.post('/validate/:kind', uploadMiddleware, async (req, res) => {
+app.post('/validate/:kind', async c => {
   try {
-    const kind = parseKindParam(String(req.params.kind));
-    if (!kind) { res.status(400).json({ error: 'kind ต้องเป็น online หรือ offline' }); return; }
-    if (!req.file) { res.status(400).json({ error: 'กรุณาอัปโหลดไฟล์' }); return; }
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const kind = parseKindParam(c.req.param('kind'));
+    if (!kind) return c.json({ error: 'kind ต้องเป็น online หรือ offline' }, 400);
+
+    const formData = await c.req.formData();
+    const file = formData.get('file');
+    if (!(file instanceof File)) return c.json({ error: 'กรุณาอัปโหลดไฟล์' }, 400);
+    if (file.size > MAX_FILE_SIZE) return c.json({ error: 'ไฟล์มีขนาดใหญ่เกินไป (จำกัด 5MB)' }, 400);
 
     const wb = new ExcelJS.Workbook();
+    const buf = Buffer.from(await file.arrayBuffer());
     // exceljs's Buffer param type vs @types/node's generic Buffer<ArrayBufferLike> don't unify cleanly — known ecosystem typing clash
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await wb.xlsx.load(req.file.buffer as any);
+    await wb.xlsx.load(buf as any);
     const ws = wb.getWorksheet(SHEET_NAME[kind]) ?? wb.worksheets[0];
-    if (!ws) { res.status(400).json({ error: 'ไม่พบชีตข้อมูลในไฟล์' }); return; }
+    if (!ws) return c.json({ error: 'ไม่พบชีตข้อมูลในไฟล์' }, 400);
 
-    const lk = await loadLookups(req.user!);
+    const lk = await loadLookups(prisma, user);
     const ctx: ResolveCtx = { newStoreKeys: new Set() };
     const keys = kind === 'online' ? ONLINE_RAW_KEYS : OFFLINE_RAW_KEYS;
 
@@ -610,22 +621,24 @@ router.post('/validate/:kind', uploadMiddleware, async (req, res) => {
     });
 
     const valid = rows.filter(r => r.errors.length === 0).length;
-    res.json({ summary: { total: rows.length, valid, withErrors: rows.length - valid }, rows });
+    return c.json({ summary: { total: rows.length, valid, withErrors: rows.length - valid }, rows });
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: 'ไม่สามารถอ่านไฟล์ได้ — ตรวจสอบว่าเป็นไฟล์ template ที่ถูกต้อง (.xlsx)' });
+    return c.json({ error: 'ไม่สามารถอ่านไฟล์ได้ — ตรวจสอบว่าเป็นไฟล์ template ที่ถูกต้อง (.xlsx)' }, 400);
   }
 });
 
 // ─── POST /commit — re-validate + create only error-free rows ─────────
-router.post('/commit', async (req, res) => {
+app.post('/commit', async c => {
   try {
-    const body = req.body as { kind?: string; rows?: { rowNumber: number; raw: RawRow }[] };
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const body = await c.req.json() as { kind?: string; rows?: { rowNumber: number; raw: RawRow }[] };
     const kind: PlacementKind = body.kind === 'offline' || body.kind === 'offline_shop' ? 'offline_shop' : 'online';
     const inputRows = Array.isArray(body.rows) ? body.rows : [];
-    if (inputRows.length === 0) { res.status(400).json({ error: 'ไม่มีแถวที่จะบันทึก' }); return; }
+    if (inputRows.length === 0) return c.json({ error: 'ไม่มีแถวที่จะบันทึก' }, 400);
 
-    const lk = await loadLookups(req.user!);
+    const lk = await loadLookups(prisma, user);
     const ctx: ResolveCtx = { newStoreKeys: new Set() };
 
     let created = 0, branchesCreated = 0;
@@ -667,8 +680,8 @@ router.post('/commit', async (req, res) => {
             product_id: data.placement_type === 'online' ? data.product_id : null,
             store_id: data.placement_type === 'offline_shop' ? storeId : null,
             campaign_id: data.campaign_id,
-            person_in_charge_id: req.user!.id,
-            created_by_id: req.user!.id,
+            person_in_charge_id: user.id,
+            created_by_id: user.id,
             payment_type: data.payment_type,
             ...priceFields,
             ads_cost: data.ads_cost,
@@ -685,11 +698,11 @@ router.post('/commit', async (req, res) => {
       }
     }
 
-    res.json({ created, branchesCreated, failed });
+    return c.json({ created, branchesCreated, failed });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to commit import' });
+    return c.json({ error: 'failed to commit import' }, 500);
   }
 });
 
-export default router;
+export default app;

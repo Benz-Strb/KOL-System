@@ -1,44 +1,47 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
 import { requireAuth, requireRole, invalidateAuthCache } from '../middleware/auth.js';
-import { supabaseAdmin } from '../lib/supabaseAdmin.js';
-import { prisma } from '../prisma.js';
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
-router.use(requireAuth, requireRole('admin'));
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth, requireRole('admin'));
 
-router.get('/brands', async (_req, res) => {
+app.get('/brands', async c => {
   try {
+    const prisma = c.get('prisma');
     const brands = await prisma.brands.findMany({
       orderBy: { name: 'asc' },
       select: { id: true, name: true, active: true },
     });
-    res.json(brands);
+    return c.json(brands);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Database error' });
+    return c.json({ error: 'Database error' }, 500);
   }
 });
 
-router.post('/brands', async (req, res) => {
-  const { name } = req.body as { name: string };
-  if (!name?.trim()) { res.status(400).json({ error: 'name จำเป็น' }); return; }
+app.post('/brands', async c => {
+  const prisma = c.get('prisma');
+  const { name } = await c.req.json() as { name: string };
+  if (!name?.trim()) return c.json({ error: 'name จำเป็น' }, 400);
   try {
     const brand = await prisma.brands.create({
       data: { name: name.trim() },
       select: { id: true, name: true, active: true },
     });
-    res.status(201).json(brand);
+    return c.json(brand, 201);
   } catch (err: unknown) {
     const e = err as { code?: string };
-    if (e.code === 'P2002') { res.status(409).json({ error: 'ชื่อแบรนด์นี้มีอยู่แล้ว' }); return; }
+    if (e.code === 'P2002') return c.json({ error: 'ชื่อแบรนด์นี้มีอยู่แล้ว' }, 409);
     console.error(err);
-    res.status(500).json({ error: 'Database error' });
+    return c.json({ error: 'Database error' }, 500);
   }
 });
 
-router.patch('/brands/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const { name, active } = req.body as { name?: string; active?: boolean };
+app.patch('/brands/:id', async c => {
+  const prisma = c.get('prisma');
+  const id = Number(c.req.param('id'));
+  const { name, active } = await c.req.json() as { name?: string; active?: boolean };
   try {
     const brand = await prisma.brands.update({
       where: { id },
@@ -48,17 +51,18 @@ router.patch('/brands/:id', async (req, res) => {
       },
       select: { id: true, name: true, active: true },
     });
-    res.json(brand);
+    return c.json(brand);
   } catch (err: unknown) {
     const e = err as { code?: string };
-    if (e.code === 'P2002') { res.status(409).json({ error: 'ชื่อแบรนด์นี้มีอยู่แล้ว' }); return; }
+    if (e.code === 'P2002') return c.json({ error: 'ชื่อแบรนด์นี้มีอยู่แล้ว' }, 409);
     console.error(err);
-    res.status(500).json({ error: 'Database error' });
+    return c.json({ error: 'Database error' }, 500);
   }
 });
 
-router.get('/users', async (_req, res) => {
+app.get('/users', async c => {
   try {
+    const prisma = c.get('prisma');
     const users = await prisma.users.findMany({
       orderBy: { created_at: 'asc' },
       select: {
@@ -66,27 +70,27 @@ router.get('/users', async (_req, res) => {
         user_brands: { select: { brands: { select: { id: true, name: true } } } },
       },
     });
-    res.json(users);
+    return c.json(users);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Database error' });
+    return c.json({ error: 'Database error' }, 500);
   }
 });
 
-router.post('/users', async (req, res) => {
-  const { email, full_name, role, password, brand_ids } = req.body as {
+app.post('/users', async c => {
+  const prisma = c.get('prisma');
+  const { email, full_name, role, password, brand_ids } = await c.req.json() as {
     email: string; full_name: string; role: string; password: string; brand_ids?: number[];
   };
 
   if (!email || !full_name || !role || !password) {
-    res.status(400).json({ error: 'email, full_name, role, password จำเป็นทั้งหมด' });
-    return;
+    return c.json({ error: 'email, full_name, role, password จำเป็นทั้งหมด' }, 400);
   }
   if (password.length < 6) {
-    res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
-    return;
+    return c.json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' }, 400);
   }
 
+  const supabaseAdmin = getSupabaseAdmin(c.env);
   const { error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -95,8 +99,7 @@ router.post('/users', async (req, res) => {
   });
 
   if (authError) {
-    res.status(400).json({ error: authError.message });
-    return;
+    return c.json({ error: authError.message }, 400);
   }
 
   try {
@@ -113,16 +116,17 @@ router.post('/users', async (req, res) => {
       skipDuplicates: true,
     });
 
-    res.json(user);
+    return c.json(user);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Database error' });
+    return c.json({ error: 'Database error' }, 500);
   }
 });
 
-router.patch('/users/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const { role, is_active, brand_ids } = req.body as { role?: string; is_active?: boolean; brand_ids?: number[] };
+app.patch('/users/:id', async c => {
+  const prisma = c.get('prisma');
+  const id = Number(c.req.param('id'));
+  const { role, is_active, brand_ids } = await c.req.json() as { role?: string; is_active?: boolean; brand_ids?: number[] };
 
   try {
     const user = await prisma.users.update({
@@ -152,43 +156,40 @@ router.patch('/users/:id', async (req, res) => {
         },
       });
       if (is_active === false) invalidateAuthCache(id);
-      res.json(refreshed);
-      return;
+      return c.json(refreshed);
     }
 
     if (is_active === false) invalidateAuthCache(id);
-    res.json(user);
+    return c.json(user);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Database error' });
+    return c.json({ error: 'Database error' }, 500);
   }
 });
 
-router.post('/users/:id/reset-password', async (req, res) => {
-  const id = Number(req.params.id);
-  const { password } = req.body as { password: string };
+app.post('/users/:id/reset-password', async c => {
+  const prisma = c.get('prisma');
+  const id = Number(c.req.param('id'));
+  const { password } = await c.req.json() as { password: string };
 
   if (!password || password.length < 6) {
-    res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
-    return;
+    return c.json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' }, 400);
   }
 
   const dbUser = await prisma.users.findUnique({ where: { id }, select: { email: true } });
   if (!dbUser?.email) {
-    res.status(404).json({ error: 'ไม่พบผู้ใช้' });
-    return;
+    return c.json({ error: 'ไม่พบผู้ใช้' }, 404);
   }
 
+  const supabaseAdmin = getSupabaseAdmin(c.env);
   const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
   if (listError) {
-    res.status(500).json({ error: listError.message });
-    return;
+    return c.json({ error: listError.message }, 500);
   }
 
   const supaUser = data.users.find(u => u.email === dbUser.email);
   if (!supaUser) {
-    res.status(404).json({ error: 'ไม่พบ auth user สำหรับอีเมลนี้' });
-    return;
+    return c.json({ error: 'ไม่พบ auth user สำหรับอีเมลนี้' }, 404);
   }
 
   const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(supaUser.id, {
@@ -197,11 +198,10 @@ router.post('/users/:id/reset-password', async (req, res) => {
   });
 
   if (updateError) {
-    res.status(400).json({ error: updateError.message });
-    return;
+    return c.json({ error: updateError.message }, 400);
   }
 
-  res.json({ ok: true });
+  return c.json({ ok: true });
 });
 
-export default router;
+export default app;

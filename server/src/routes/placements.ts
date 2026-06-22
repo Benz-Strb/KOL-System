@@ -1,8 +1,10 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../prisma.js';
+import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
 
 function buildBrandFilter(isAdmin: boolean, userBrandIds: number[], brand_id?: string) {
   const bid = brand_id ? Number(brand_id) : null;
@@ -10,19 +12,22 @@ function buildBrandFilter(isAdmin: boolean, userBrandIds: number[], brand_id?: s
   return { brand_id: bid && userBrandIds.includes(bid) ? bid : { in: userBrandIds } };
 }
 
-router.get('/kol-gmv', async (req, res) => {
+app.get('/kol-gmv', async c => {
   try {
-    const { status, placement_type, q, product_id, campaign_id, payment_type, price_min, price_max, person_in_charge_id, brand_id } = req.query as Record<string, string>;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const q = c.req.query();
+    const { status, placement_type, q: search, product_id, campaign_id, payment_type, price_min, price_max, person_in_charge_id, brand_id } = q;
 
-    const isAdmin = req.user!.role === 'admin';
-    const brandFilter = buildBrandFilter(isAdmin, req.user!.brandIds, brand_id);
+    const isAdmin = user.role === 'admin';
+    const brandFilter = buildBrandFilter(isAdmin, user.brandIds, brand_id);
 
     const where = {
       ...brandFilter,
       ...(status && status !== 'all' ? { status } : {}),
       ...(placement_type && placement_type !== 'all' ? { placement_type } : {}),
       ...(payment_type && payment_type !== 'all' ? { payment_type } : {}),
-      ...(q ? { kols: { handle: { contains: q, mode: 'insensitive' as const } } } : {}),
+      ...(search ? { kols: { handle: { contains: search, mode: 'insensitive' as const } } } : {}),
       ...(product_id ? { product_id: Number(product_id) } : {}),
       ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
       ...(price_min || price_max ? {
@@ -35,7 +40,7 @@ router.get('/kol-gmv', async (req, res) => {
     };
 
     const matched = await prisma.placements.findMany({ where, select: { id: true } });
-    if (matched.length === 0) { res.json([]); return; }
+    if (matched.length === 0) return c.json([]);
 
     const ids = matched.map(p => p.id);
 
@@ -73,47 +78,52 @@ router.get('/kol-gmv', async (req, res) => {
       ORDER BY total_gmv DESC
     `;
 
-    res.json(rows);
+    return c.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load KOL GMV' });
+    return c.json({ error: 'failed to load KOL GMV' }, 500);
   }
 });
 
-router.get('/:id/metrics', async (req, res) => {
+app.get('/:id/metrics', async c => {
   try {
-    const id = Number(req.params.id);
-    if (req.user!.role !== 'admin') {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
+    if (user.role !== 'admin') {
       const existing = await prisma.placements.findUnique({ where: { id }, select: { brand_id: true } });
-      if (!existing) { res.status(404).json({ error: 'Placement not found' }); return; }
-      if (!req.user!.brandIds.includes(existing.brand_id)) {
-        res.status(403).json({ error: 'No access to this placement' }); return;
+      if (!existing) return c.json({ error: 'Placement not found' }, 404);
+      if (!user.brandIds.includes(existing.brand_id)) {
+        return c.json({ error: 'No access to this placement' }, 403);
       }
     }
     const metrics = await prisma.placement_metrics.findMany({
       where: { placement_id: id },
       orderBy: { channel: 'asc' },
     });
-    res.json(metrics);
+    return c.json(metrics);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load metrics' });
+    return c.json({ error: 'failed to load metrics' }, 500);
   }
 });
 
-router.get('/', async (req, res) => {
+app.get('/', async c => {
   try {
-    const { status, placement_type, q, product_id, campaign_id, payment_type, price_min, price_max, person_in_charge_id, brand_id, page = '1', limit = '20' } = req.query as Record<string, string>;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const q = c.req.query();
+    const { status, placement_type, q: search, product_id, campaign_id, payment_type, price_min, price_max, person_in_charge_id, brand_id, page = '1', limit = '20' } = q;
 
-    const isAdmin = req.user!.role === 'admin';
-    const brandFilter = buildBrandFilter(isAdmin, req.user!.brandIds, brand_id);
+    const isAdmin = user.role === 'admin';
+    const brandFilter = buildBrandFilter(isAdmin, user.brandIds, brand_id);
 
     const where = {
       ...brandFilter,
       ...(status && status !== 'all' ? { status } : {}),
       ...(placement_type && placement_type !== 'all' ? { placement_type } : {}),
       ...(payment_type && payment_type !== 'all' ? { payment_type } : {}),
-      ...(q ? { kols: { handle: { contains: q, mode: 'insensitive' as const } } } : {}),
+      ...(search ? { kols: { handle: { contains: search, mode: 'insensitive' as const } } } : {}),
       ...(product_id ? { product_id: Number(product_id) } : {}),
       ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
       ...(price_min || price_max ? {
@@ -146,27 +156,29 @@ router.get('/', async (req, res) => {
       }),
     ]);
 
-    res.json({ total, page: Number(page), limit: take, rows });
+    return c.json({ total, page: Number(page), limit: take, rows });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load placements' });
+    return c.json({ error: 'failed to load placements' }, 500);
   }
 });
 
-router.patch('/:id/performance', async (req, res) => {
+app.patch('/:id/performance', async c => {
   try {
-    const id = Number(req.params.id);
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
 
     // Non-admin: check brand access before updating
-    if (req.user!.role !== 'admin') {
+    if (user.role !== 'admin') {
       const existing = await prisma.placements.findUnique({ where: { id }, select: { brand_id: true } });
-      if (!existing) { res.status(404).json({ error: 'Placement not found' }); return; }
-      if (!req.user!.brandIds.includes(existing.brand_id)) {
-        res.status(403).json({ error: 'No access to this placement' }); return;
+      if (!existing) return c.json({ error: 'Placement not found' }, 404);
+      if (!user.brandIds.includes(existing.brand_id)) {
+        return c.json({ error: 'No access to this placement' }, 403);
       }
     }
 
-    const { publication_date, post_url, pay_amount, metrics } = req.body;
+    const { publication_date, post_url, pay_amount, metrics } = await c.req.json();
 
     await prisma.placements.update({
       where: { id },
@@ -223,26 +235,28 @@ router.patch('/:id/performance', async (req, res) => {
       }
     }
 
-    res.json({ ok: true });
+    return c.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to update performance' });
+    return c.json({ error: 'failed to update performance' }, 500);
   }
 });
 
-router.post('/', async (req, res) => {
+app.post('/', async c => {
   try {
-    const b = req.body;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const b = await c.req.json();
 
-    if (!b.placement_type) return res.status(400).json({ error: 'placement_type required' });
+    if (!b.placement_type) return c.json({ error: 'placement_type required' }, 400);
 
     // Resolve brand_id: use body value or auto-select if user has exactly one brand
-    const brand_id = b.brand_id ? Number(b.brand_id) : req.user!.brandIds[0];
-    if (!brand_id) return res.status(400).json({ error: 'brand_id required' });
+    const brand_id = b.brand_id ? Number(b.brand_id) : user.brandIds[0];
+    if (!brand_id) return c.json({ error: 'brand_id required' }, 400);
 
     // Non-admin must own the brand
-    if (req.user!.role !== 'admin' && !req.user!.brandIds.includes(brand_id)) {
-      return res.status(403).json({ error: 'No access to this brand' });
+    if (user.role !== 'admin' && !user.brandIds.includes(brand_id)) {
+      return c.json({ error: 'No access to this brand' }, 403);
     }
 
     const priceFields =
@@ -262,8 +276,8 @@ router.post('/', async (req, res) => {
         product_id: b.placement_type === 'online' && b.product_id ? Number(b.product_id) : null,
         store_id: b.placement_type === 'offline_shop' && b.store_id ? Number(b.store_id) : null,
         campaign_id: b.campaign_id ? Number(b.campaign_id) : null,
-        person_in_charge_id: req.user!.id,
-        created_by_id: req.user!.id,
+        person_in_charge_id: user.id,
+        created_by_id: user.id,
         payment_type: b.payment_type ?? 'paid',
         ...priceFields,
         ads_cost: b.ads_cost !== '' && b.ads_cost != null ? String(b.ads_cost) : null,
@@ -274,11 +288,11 @@ router.post('/', async (req, res) => {
       },
     });
 
-    res.status(201).json(placement);
+    return c.json(placement, 201);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to create placement' });
+    return c.json({ error: 'failed to create placement' }, 500);
   }
 });
 
-export default router;
+export default app;

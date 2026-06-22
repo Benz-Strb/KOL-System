@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase.js';
-import { setAuthToken, setDeactivatedHandler, type AppUser } from '../api/index.js';
+import { setAuthToken, setDeactivatedHandler, API_BASE_URL, type AppUser } from '../api/index.js';
 
 interface AuthContextType {
   session: Session | null;
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!session?.user.id) { setAppUser(null); return; }
-    fetch('/api/auth/me', {
+    fetch(`${API_BASE_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(async r => {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       // ตรวจสอบสถานะ active ก่อนให้เข้าระบบ
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${data.session!.access_token}` },
       });
       if (res.status === 403) {

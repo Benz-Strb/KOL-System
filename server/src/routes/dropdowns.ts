@@ -1,13 +1,17 @@
-import { Router } from 'express';
-import { prisma } from '../prisma.js';
+import { Hono } from 'hono';
+import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
 
-router.get('/', async (req, res) => {
+app.get('/', async c => {
   try {
-    const isAdmin = req.user!.role === 'admin';
-    const seesAllBrands = isAdmin || req.user!.role === 'manager';
-    const userBrandIds = req.user!.brandIds;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const isAdmin = user.role === 'admin';
+    const seesAllBrands = isAdmin || user.role === 'manager';
+    const userBrandIds = user.brandIds;
 
     const [platforms, contentCategories, users, campaigns, brands] = await Promise.all([
       prisma.platforms.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
@@ -34,11 +38,11 @@ router.get('/', async (req, res) => {
       }),
     ]);
 
-    res.json({ platforms, contentCategories, users, campaigns, brands });
+    return c.json({ platforms, contentCategories, users, campaigns, brands });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load dropdowns' });
+    return c.json({ error: 'failed to load dropdowns' }, 500);
   }
 });
 
-export default router;
+export default app;

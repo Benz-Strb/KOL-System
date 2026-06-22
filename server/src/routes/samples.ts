@@ -1,16 +1,24 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../prisma.js';
+import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
 
-router.get('/', async (req, res) => {
+app.get('/', async c => {
   try {
-    const { kol_id, brand_id, product_id, status, page = '1' } = req.query as Record<string, string>;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const kol_id = c.req.query('kol_id');
+    const brand_id = c.req.query('brand_id');
+    const product_id = c.req.query('product_id');
+    const status = c.req.query('status');
+    const page = c.req.query('page') ?? '1';
     const TAKE = 25;
     const skip = (Number(page) - 1) * TAKE;
 
-    const isAdmin = req.user!.role === 'admin';
+    const isAdmin = user.role === 'admin';
     const where: Prisma.kol_samplesWhereInput = {};
 
     if (kol_id) where.kol_id = Number(kol_id);
@@ -19,9 +27,9 @@ router.get('/', async (req, res) => {
 
     if (brand_id) {
       const bid = Number(brand_id);
-      where.brand_id = isAdmin || req.user!.brandIds.includes(bid) ? bid : { in: req.user!.brandIds };
+      where.brand_id = isAdmin || user.brandIds.includes(bid) ? bid : { in: user.brandIds };
     } else if (!isAdmin) {
-      where.brand_id = { in: req.user!.brandIds };
+      where.brand_id = { in: user.brandIds };
     }
 
     const [total, rows] = await Promise.all([
@@ -39,23 +47,25 @@ router.get('/', async (req, res) => {
       }),
     ]);
 
-    res.json({ total, page: Number(page), limit: TAKE, rows });
+    return c.json({ total, page: Number(page), limit: TAKE, rows });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load samples' });
+    return c.json({ error: 'failed to load samples' }, 500);
   }
 });
 
-router.post('/', async (req, res) => {
+app.post('/', async c => {
   try {
-    const { kol_id, placement_id, brand_id, product_id, sample_status, return_policy, notes } = req.body;
-    if (!kol_id) return res.status(400).json({ error: 'kol_id required' });
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const { kol_id, placement_id, brand_id, product_id, sample_status, return_policy, notes } = await c.req.json();
+    if (!kol_id) return c.json({ error: 'kol_id required' }, 400);
 
-    const isAdmin = req.user!.role === 'admin';
-    const bid = brand_id ? Number(brand_id) : req.user!.brandIds[0];
-    if (!bid && !isAdmin) return res.status(400).json({ error: 'brand_id required' });
-    if (!isAdmin && bid && !req.user!.brandIds.includes(bid)) {
-      return res.status(403).json({ error: 'No access to this brand' });
+    const isAdmin = user.role === 'admin';
+    const bid = brand_id ? Number(brand_id) : user.brandIds[0];
+    if (!bid && !isAdmin) return c.json({ error: 'brand_id required' }, 400);
+    if (!isAdmin && bid && !user.brandIds.includes(bid)) {
+      return c.json({ error: 'No access to this brand' }, 403);
     }
 
     const sample = await prisma.kol_samples.create({
@@ -74,26 +84,28 @@ router.post('/', async (req, res) => {
         products: { select: { id: true, model_code: true } },
       },
     });
-    res.status(201).json(sample);
+    return c.json(sample, 201);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to create sample' });
+    return c.json({ error: 'failed to create sample' }, 500);
   }
 });
 
-router.patch('/:id', async (req, res) => {
+app.patch('/:id', async c => {
   try {
-    const id = Number(req.params.id);
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
 
-    if (req.user!.role !== 'admin') {
+    if (user.role !== 'admin') {
       const existing = await prisma.kol_samples.findUnique({ where: { id }, select: { brand_id: true } });
-      if (!existing) return res.status(404).json({ error: 'not found' });
-      if (existing.brand_id != null && !req.user!.brandIds.includes(existing.brand_id)) {
-        return res.status(403).json({ error: 'No access' });
+      if (!existing) return c.json({ error: 'not found' }, 404);
+      if (existing.brand_id != null && !user.brandIds.includes(existing.brand_id)) {
+        return c.json({ error: 'No access' }, 403);
       }
     }
 
-    const { sample_status, return_policy, shipped_at, signed_at, notes } = req.body;
+    const { sample_status, return_policy, shipped_at, signed_at, notes } = await c.req.json();
 
     const sample = await prisma.kol_samples.update({
       where: { id },
@@ -110,29 +122,31 @@ router.patch('/:id', async (req, res) => {
         products: { select: { id: true, model_code: true } },
       },
     });
-    res.json(sample);
+    return c.json(sample);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to update sample' });
+    return c.json({ error: 'failed to update sample' }, 500);
   }
 });
 
-router.delete('/:id', async (req, res) => {
+app.delete('/:id', async c => {
   try {
-    const id = Number(req.params.id);
-    if (req.user!.role !== 'admin') {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
+    if (user.role !== 'admin') {
       const existing = await prisma.kol_samples.findUnique({ where: { id }, select: { brand_id: true } });
-      if (!existing) return res.status(404).json({ error: 'not found' });
-      if (existing.brand_id != null && !req.user!.brandIds.includes(existing.brand_id)) {
-        return res.status(403).json({ error: 'No access' });
+      if (!existing) return c.json({ error: 'not found' }, 404);
+      if (existing.brand_id != null && !user.brandIds.includes(existing.brand_id)) {
+        return c.json({ error: 'No access' }, 403);
       }
     }
     await prisma.kol_samples.delete({ where: { id } });
-    res.json({ ok: true });
+    return c.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to delete sample' });
+    return c.json({ error: 'failed to delete sample' }, 500);
   }
 });
 
-export default router;
+export default app;

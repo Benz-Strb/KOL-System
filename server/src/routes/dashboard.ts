@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import { Hono } from 'hono';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../prisma.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
-router.use(requireAuth, requireRole('admin', 'manager'));
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth, requireRole('admin', 'manager'));
 
 function buildDashboardBrandFilter(role: string, brandIds: number[], brand_id?: string) {
   const bid = brand_id ? Number(brand_id) : null;
@@ -55,11 +55,16 @@ type KolRankRow = {
   roi: number | null;
 };
 
-router.get('/', async (req, res) => {
+app.get('/', async c => {
   try {
-    const { brand_id, campaign_id, date_from, date_to } = req.query as Record<string, string>;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const brand_id = c.req.query('brand_id');
+    const campaign_id = c.req.query('campaign_id');
+    const date_from = c.req.query('date_from');
+    const date_to = c.req.query('date_to');
 
-    const brandFilter = buildDashboardBrandFilter(req.user!.role, req.user!.brandIds, brand_id);
+    const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
 
     const where = {
       ...brandFilter,
@@ -78,8 +83,7 @@ router.get('/', async (req, res) => {
     });
 
     if (matched.length === 0) {
-      res.json(EMPTY_RESPONSE);
-      return;
+      return c.json(EMPTY_RESPONSE);
     }
 
     const ids = matched.map(p => p.id);
@@ -144,9 +148,9 @@ router.get('/', async (req, res) => {
       arr.push({ campaign_id: row.campaign_id, code: row.code, label: row.label, gmv: row.gmv });
       byCampaignMap.set(row.channel, arr);
     }
-    const channelBreakdownWithCampaigns = channelBreakdown.map(c => ({
-      ...c,
-      byCampaign: byCampaignMap.get(c.channel) ?? [],
+    const channelBreakdownWithCampaigns = channelBreakdown.map(ch => ({
+      ...ch,
+      byCampaign: byCampaignMap.get(ch.channel) ?? [],
     }));
 
     // per-KOL aggregate (spend computed from placements directly to avoid
@@ -232,7 +236,7 @@ router.get('/', async (req, res) => {
 
     const totalSpendWithAds = totalSpend + totalAdsCost;
 
-    res.json({
+    return c.json({
       summary: {
         total_placements: matched.length,
         posted_count: postedCount,
@@ -251,15 +255,17 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load dashboard overview' });
+    return c.json({ error: 'failed to load dashboard overview' }, 500);
   }
 });
 
 // ─── GET /kol/:id — per-KOL campaign trend + delivery reliability ───
-router.get('/kol/:id', async (req, res) => {
+app.get('/kol/:id', async c => {
   try {
-    const kolId = Number(req.params.id);
-    const { brand_id } = req.query as Record<string, string>;
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const kolId = Number(c.req.param('id'));
+    const brand_id = c.req.query('brand_id');
 
     const kol = await prisma.kols.findUnique({
       where: { id: kolId },
@@ -269,11 +275,10 @@ router.get('/kol/:id', async (req, res) => {
       },
     });
     if (!kol) {
-      res.status(404).json({ error: 'KOL not found' });
-      return;
+      return c.json({ error: 'KOL not found' }, 404);
     }
 
-    const brandFilter = buildDashboardBrandFilter(req.user!.role, req.user!.brandIds, brand_id);
+    const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
     const placements = await prisma.placements.findMany({
       where: { kol_id: kolId, ...brandFilter },
       select: {
@@ -323,7 +328,7 @@ router.get('/kol/:id', async (req, res) => {
     }
 
     const trend = [...byCampaign.values()]
-      .map(c => ({ ...c, roi: c.spend > 0 ? c.gmv / c.spend : null }))
+      .map(entry => ({ ...entry, roi: entry.spend > 0 ? entry.gmv / entry.spend : null }))
       .sort((a, b) => {
         if (!a.start_date && !b.start_date) return 0;
         if (!a.start_date) return 1;
@@ -331,10 +336,10 @@ router.get('/kol/:id', async (req, res) => {
         return a.start_date.localeCompare(b.start_date);
       });
 
-    const totalGmv = trend.reduce((sum, c) => sum + c.gmv, 0);
-    const totalSpend = trend.reduce((sum, c) => sum + c.spend, 0);
+    const totalGmv = trend.reduce((sum, entry) => sum + entry.gmv, 0);
+    const totalSpend = trend.reduce((sum, entry) => sum + entry.spend, 0);
 
-    res.json({
+    return c.json({
       kol: {
         id: kol.id, handle: kol.handle, gen_name: kol.gen_name, profile_url: kol.profile_url,
         avatar_url: kol.avatar_url, follower_count: kol.follower_count, platform: kol.platforms,
@@ -355,8 +360,8 @@ router.get('/kol/:id', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load kol trend' });
+    return c.json({ error: 'failed to load kol trend' }, 500);
   }
 });
 
-export default router;
+export default app;

@@ -1,11 +1,14 @@
-import { Router } from 'express';
-import { prisma } from '../prisma.js';
+import { Hono } from 'hono';
+import { requireAuth } from '../middleware/auth.js';
+import type { AppEnv } from '../types.js';
 
-const router = Router();
+const app = new Hono<AppEnv>();
+app.use('*', requireAuth);
 
-router.get('/', async (req, res) => {
+app.get('/', async c => {
   try {
-    const { brand_id } = req.query as { brand_id?: string };
+    const prisma = c.get('prisma');
+    const brand_id = c.req.query('brand_id');
     const rows = brand_id
       ? await prisma.$queryRaw<{ id: number; model_code: string }[]>`
           SELECT DISTINCT pd.id, pd.model_code
@@ -15,11 +18,11 @@ router.get('/', async (req, res) => {
           ORDER BY pd.model_code`
       : await prisma.$queryRaw<{ id: number; model_code: string }[]>`
           SELECT id, model_code FROM products_dropdown ORDER BY model_code`;
-    res.json(rows);
+    return c.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'failed to load products' });
+    return c.json({ error: 'failed to load products' }, 500);
   }
 });
 
-export default router;
+export default app;
