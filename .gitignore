@@ -3,6 +3,9 @@ dist/
 .env
 .env.*
 !.env.example
+# Not secret (just a public Worker URL) — committed so Cloudflare Workers Builds
+# has it during `npm run build` on a fresh checkout (no local-only files survive that).
+!client/.env.production
 .DS_Store
 .claude/settings.local.json
 CLAUDE.md
