@@ -1,0 +1,689 @@
+Total KOL rows: 825
+
+=== A1) Same profile_url, looks like intentional content-format split (main/VDO/Kit/Photo) — 40 groups ===
+(probably NOT a bug — separate KOL row per content format on the same page. Listed for confirmation only.)
+
+[tiktok.com/@benzbyl]
+  id=5     platform=TikTok     handle='@benzbyl'                     gen_name='benzbyl'                      followers=101200
+  id=69    platform=TikTok     handle='benzbyl'                      gen_name='benzbyl'                      followers=82700
+
+[tiktok.com/@bombie.cats]
+  id=6     platform=TikTok     handle='@bombie.cats'                 gen_name='bombie.cats'                  followers=None
+  id=72    platform=TikTok     handle='bombie.cats'                  gen_name=None                           followers=138000
+
+[tiktok.com/@downittayaa]
+  id=8     platform=TikTok     handle='@downittayaa'                 gen_name='downittayaa'                  followers=None
+  id=111   platform=TikTok     handle='downittayaa'                  gen_name='downittayaa'                  followers=206400
+
+[tiktok.com/@eyesonyou.u]
+  id=9     platform=TikTok     handle='@eyesonyou.u'                 gen_name='eyesonyou.u'                  followers=None
+  id=122   platform=TikTok     handle='eyesonyou.u'                  gen_name='eyesonyouu'                   followers=53500
+
+[facebook.com/adaywithgatoon]
+  id=27    platform=Facebook   handle='A day with Gatoon'            gen_name='AdaywithGatoon'               followers=13000
+  id=28    platform=Facebook   handle='A day with Gatoon VDO'        gen_name='AdaywithGatoonVDO'            followers=11000
+
+[facebook.com/always.aom]
+  id=34    platform=Facebook   handle='Always AOM'                   gen_name=None                           followers=34000
+  id=35    platform=Facebook   handle='always.aom'                   gen_name='alwaysaom'                    followers=35000
+
+[tiktok.com/@around.32.sqm]
+  id=44    platform=TikTok     handle='around 32 sqm.'               gen_name='around32sqm'                  followers=8984
+  id=46    platform=TikTok     handle='around.32.sqm'                gen_name='around32sqm'                  followers=8000
+
+[facebook.com/p/BaansuanPimsook-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99%E0%B8%AA%E0%B8%A7%E0%B8%99%E0%B8%9E%E0%B8%B4%E0%B8%A1%E0%B8%9E%E0%B9%8C%E0%B8%AA%E0%B8%B8%E0%B8%82-100095227421134]
+  id=54    platform=Facebook   handle='BaansuanPimsook'              gen_name='BaansuanPimsook'              followers=147000
+  id=56    platform=Facebook   handle='BaansuanPimsook VDO'          gen_name='BaansuanPimsookVDO'           followers=147000
+
+[facebook.com/bksatapn]
+  id=60    platform=Facebook   handle='Bank.sata'                    gen_name='Banksata'                     followers=88000
+  id=61    platform=Facebook   handle='Bank.sata VDO'                gen_name=None                           followers=269
+
+[tiktok.com/@crepeyenishere]
+  id=99    platform=YouTube    handle='Crepeyen is here'             gen_name=None                           followers=39
+  id=100   platform=TikTok     handle='crepeyenishere'               gen_name='crepeyenishere'               followers=91900
+
+[facebook.com/fernypony]
+  id=128   platform=Facebook   handle='Ferny pony'                   gen_name='Fernypony'                    followers=57000
+  id=129   platform=Facebook   handle='fernypony'                    gen_name='fernypony'                    followers=57000
+
+[facebook.com/mom.homemories]
+  id=152   platform=Facebook   handle='Homemories'                   gen_name='Homemories'                   followers=29000
+  id=153   platform=Facebook   handle='Homemories VDO'               gen_name='HomemoriesVDO'                followers=23000
+
+[tiktok.com/@milinlittlewonders]
+  id=254   platform=Facebook   handle='Milin little wonders'         gen_name=None                           followers=53000
+  id=257   platform=TikTok     handle='milinlittlewonders'           gen_name=None                           followers=3100
+
+[facebook.com/mommymademenu]
+  id=277   platform=Facebook   handle='Mommy Made'                   gen_name='MommyMade'                    followers=44000
+  id=278   platform=Facebook   handle='Mommy Made VDO'               gen_name='MommyMadeVDO'                 followers=44000
+
+[facebook.com/profile.php?id=100075482367732]
+  id=292   platform=Facebook   handle='My cat story'                 gen_name='Mycatstory'                   followers=51000
+  id=293   platform=Facebook   handle='My cat story VDO'             gen_name='MycatstoryVDO'                followers=51000
+  id=294   platform=Facebook   handle='My cat story-Photo'           gen_name='MycatstoryPhoto'              followers=53000
+  id=295   platform=Facebook   handle='My cat story-VDO'             gen_name='MycatstoryVDO'                followers=53000
+  id=296   platform=TikTok     handle='My Catstory'                  gen_name=None                           followers=63500
+
+[tiktok.com/@nonthi.home]
+  id=321   platform=TikTok     handle='nonthi.home'                  gen_name='nonthihome'                   followers=8722
+  id=820   platform=TikTok     handle='𝙉𝙤𝙣𝙩𝙝𝙞.𝙝𝙤𝙢𝙚🏡'                 gen_name='Nonthihome'                   followers=8077
+
+[facebook.com/ohmommyco]
+  id=327   platform=Facebook   handle='Oh Mommy'                     gen_name='OhMommy'                      followers=600000
+  id=328   platform=Facebook   handle='Oh.Mommy'                     gen_name=None                           followers=605000
+
+[facebook.com/pimpa.kaokrua]
+  id=359   platform=Facebook   handle='Pimpa Family'                 gen_name='PimpaFamily'                  followers=231000
+  id=360   platform=Facebook   handle='Pimpa Family VDO'             gen_name='PimpaFamilyVDO'               followers=231000
+
+[facebook.com/ToeyStoryChannel]
+  id=475   platform=Facebook   handle='Toey Story'                   gen_name='ToeyStory'                    followers=132000
+  id=476   platform=Facebook   handle='Toey Story VDO'               gen_name='ToeyStoryVDO'                 followers=129000
+
+[facebook.com/unclestory23]
+  id=485   platform=Facebook   handle='Uncle Story'                  gen_name='UncleStory'                   followers=16000
+  id=486   platform=Facebook   handle='Uncle Story VDO'              gen_name='UncleStoryVDO'                followers=15000
+
+[facebook.com/profile.php?id=100094465490930]
+  id=541   platform=Facebook   handle='ชีวิตปริญชีวา'                gen_name='ChiwitParinchiva'             followers=40000
+  id=542   platform=Facebook   handle='ชีวิตปริญชีวา VDO'            gen_name='ChivitPrincheewaVDO'          followers=40000
+
+[facebook.com/TingITOfficial]
+  id=552   platform=Facebook   handle='ติ่งไอที'                     gen_name='TingIT'                       followers=250000
+  id=553   platform=Facebook   handle='ติ่งไอที-Kit'                 gen_name='TingITKit'                    followers=250000
+
+[facebook.com/profile.php?id=100086000409473]
+  id=557   platform=Facebook   handle='ธิชาสาวน้อยหน้าหมวย'          gen_name='Thichasaonoynamuay'           followers=30000
+  id=558   platform=Facebook   handle='ธิชาสาวน้อยหน้าหมวย VDO'      gen_name='ThichasaonoynamuayVDO'        followers=26000
+
+[facebook.com/profile.php?id=100063491599265]
+  id=562   platform=Facebook   handle='นอนอ ชอบรีวิว'                gen_name='NonoChobReview'               followers=18000
+  id=563   platform=Facebook   handle='นอนอชอบรีวิว'                 gen_name='nonochobreview'               followers=18000
+
+[facebook.com/jamyamsom]
+  id=573   platform=Facebook   handle='น้องแจมแยมส้ม รีวิว'          gen_name='NongJamYamsomReview'          followers=6900
+  id=574   platform=Facebook   handle='น้องแจมแยมส้ม รีวิว-VDO'      gen_name='NongJamYemSomReviewVDO'       followers=8900
+
+[facebook.com/amtichahome]
+  id=583   platform=Facebook   handle='บ้านของแอมธิชา'               gen_name='BaanKhongAmthicha'            followers=34000
+  id=584   platform=Facebook   handle='บ้านของแอมธิชา VDO'           gen_name='BanKhongAmThichaVDO'          followers=33000
+  id=585   platform=Facebook   handle='บ้านของแอมธิชา-VDO'           gen_name='BanKhongAmthichaVDO'          followers=33000
+
+[facebook.com/profile.php?id=100086089886647]
+  id=589   platform=Facebook   handle='บ้านหลังน้อยหลังคาสีเขียว'    gen_name='baanlangnoilangkhasi khiao'   followers=89000
+  id=590   platform=Facebook   handle='บ้านหลังน้อยหลังคาสีเขียว VDO' gen_name='BaanLangNoiLangKhaSeeKhiaoVDO' followers=81000
+
+[facebook.com/baanraoyakreview]
+  id=592   platform=Facebook   handle='บ้านเราอยากรีวิว'             gen_name='BaanRaoYakReview'             followers=42000
+  id=593   platform=Facebook   handle='บ้านเราอยากรีวิว VDO'         gen_name=None                           followers=41000
+
+[facebook.com/PlookBaanDiary]
+  id=598   platform=Facebook   handle='ปลูกบ้าน ไดอารี่'             gen_name='PlukBanDiary'                 followers=62000
+  id=599   platform=Facebook   handle='ปลูกบ้าน ไดอารี่-VDO'         gen_name='PlukBanDiaryVDO'              followers=65000
+
+[facebook.com/profile.php?id=100095597430195]
+  id=602   platform=Facebook   handle='ป้าไจ๋กับน้องไข่ตุ๋น'         gen_name='pajaikapnongkhaitun'          followers=None
+  id=603   platform=Facebook   handle='ป้าไจ๋กับน้องไข่ตุ๋น-VDO'     gen_name='PaJaiKubNongKhaiToonVDO'      followers=94000
+
+[facebook.com/phomchobtaengban]
+  id=612   platform=Facebook   handle='ผมชอบแต่งบ้าน'                gen_name='pomchobtangbaan'              followers=29000
+  id=613   platform=Facebook   handle='ผมชอบแต่งบ้าน-Photo'          gen_name='PhomChobTaengBaanPhoto'       followers=29000
+  id=615   platform=Facebook   handle='ผมชอบแต่งบ้าน-VDO'            gen_name='PomChobTangBanVDO'            followers=29000
+  id=616   platform=Facebook   handle='ผมชอบแต่งบ้าน-VDO-Kit'        gen_name='PhomChobTangBanVDOKit'        followers=29000
+
+[facebook.com/Pharacoolboy]
+  id=634   platform=Facebook   handle='ภาระเด็กดี'                   gen_name=None                           followers=32000
+  id=635   platform=Facebook   handle='ภาระเด็กดี VDO'               gen_name=None                           followers=32000
+
+[facebook.com/profile.php?id=61583968899732]
+  id=641   platform=Facebook   handle='มันม่วงแมวหางกุด VDO'         gen_name='MunmuangMaewHangkutVDO'       followers=37000
+  id=642   platform=Facebook   handle='มันม่วงแมวหางกุด-VDO'         gen_name='MunmuangmaohangkudVDO'        followers=32000
+
+[facebook.com/sananthecat]
+  id=677   platform=Facebook   handle='สนั่น the cat'                gen_name='SananTheCat'                  followers=10000
+  id=678   platform=Facebook   handle='สนั่น the cat-VDO'            gen_name='SananTheCatVDO'               followers=10000
+
+[facebook.com/InsideSmartHome]
+  id=728   platform=Facebook   handle='เบื้องหลังสมาร์ทโฮม'          gen_name='Beuanglangsmarthome'          followers=226000
+  id=729   platform=Facebook   handle='เบื้องหลังสมาร์ทโฮม-Kit'      gen_name='BeuanglangSmartHomeKit'       followers=210000
+
+[facebook.com/un.finished.house0]
+  id=731   platform=Facebook   handle='เมื่อไหร่บ้านจะเสร็จ'         gen_name='muenrai-ban-cha-set'          followers=44000
+  id=732   platform=Facebook   handle='เมื่อไหร่บ้านจะเสร็จ?'        gen_name='Muearaibanchaset'             followers=42000
+  id=733   platform=Facebook   handle='เมื่อไหร่บ้านจะเสร็จ? VDO'    gen_name='MuearaiBanChaSetVDO'          followers=40000
+
+[facebook.com/thelazymaid]
+  id=771   platform=Facebook   handle='แม่บ้านขี้เกียจ'              gen_name=None                           followers=2000
+  id=772   platform=Facebook   handle='แม่บ้านขี้เกียจ VDO'          gen_name='MaebanKhikiatVDO'             followers=2100
+
+[facebook.com/profile.php?id=61570094805204]
+  id=775   platform=Facebook   handle='แม่ปอยชอบทำงานบ้าน'           gen_name='MaePoyChobThamNganBan'        followers=64000
+  id=776   platform=Facebook   handle='แม่ปอยชอบทำงานบ้าน VDO'       gen_name='MaePoyChobThamNganBanVDO'     followers=66000
+
+[facebook.com/meamareview]
+  id=779   platform=Facebook   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  followers=49000
+  id=780   platform=Facebook   handle='แม่มารีวิว VDO'               gen_name='MaeMaReviewVDO'               followers=49000
+
+[facebook.com/heykidstm]
+  id=785   platform=Facebook   handle='แม่แต้วเล่าเรื่อง'            gen_name='MaeTaewLaoRueng'              followers=121000
+  id=786   platform=Facebook   handle='แม่แต้วเล่าเรื่อง VDO'        gen_name='MaeTaewLaoRueangVDO'          followers=121000
+
+=== A2) Same profile_url, NO simple format-suffix explanation — 34 groups — NEEDS HUMAN REVIEW ===
+
+[facebook.com/MissMuayAof]
+  id=13    platform=Facebook   handle='@MissMuayAof'                 gen_name='MissMuayAof'                  followers=10000
+  id=663   platform=Facebook   handle='รีวิวสาวหมวย'                 gen_name=None                           followers=8900
+
+[tiktok.com/@pairpairphan]
+  id=17    platform=TikTok     handle='@pairpairphan'                gen_name='pairpairphan'                 followers=None
+  id=341   platform=TikTok     handle='pairpairphan'                 gen_name='pairpairphan'                 followers=29500
+  id=761   platform=TikTok     handle='แพพัน 🏡 (IG.pairpairphan)'    gen_name='pairpairphan'                 followers=26000
+
+[facebook.com/reviewfeelchan]
+  id=20    platform=Facebook   handle='@reviewfeelchan'              gen_name='reviewfeelchan'               followers=15000
+  id=659   platform=Facebook   handle='รีวิวฟิลฉัน'                  gen_name='ReviewFeelChan'               followers=15000
+  id=660   platform=Facebook   handle='รีวิวฟีลฉัน'                  gen_name=None                           followers=13000
+
+[tiktok.com/@delight_athome]
+  id=108   platform=TikTok     handle='delight_athome'               gen_name='delightathome'                followers=83500
+  id=685   platform=TikTok     handle='สุขใจที่บ้านเรา'              gen_name=None                           followers=77100
+
+[tiktok.com/@iammind_t]
+  id=159   platform=TikTok     handle='iammind_t'                    gen_name='iammindt'                     followers=23900
+  id=702   platform=TikTok     handle='อยู่บ้านกับมาร์ติน 🏡✨'        gen_name='U Baan Gub Martin'            followers=19000
+
+[tiktok.com/@jam28185]
+  id=173   platform=TikTok     handle='jam28185'                     gen_name='jam28185'                     followers=2500
+  id=575   platform=TikTok     handle='น้องแจมแยมส้ม เที่ยวเหนือ'    gen_name='NongJamYamSomThiaoNuea'       followers=25200
+
+[tiktok.com/@jikthawineek]
+  id=181   platform=TikTok     handle='jikthawineek'                 gen_name='jikthawineek'                 followers=109800
+  id=765   platform=TikTok     handle='แม่จิ๊ก Story'                gen_name='MaeJigStory'                  followers=110000
+  id=782   platform=Facebook   handle='แม่ว่าดี'                     gen_name='MaeWaDee'                     followers=150000
+
+[tiktok.com/@jsee236]
+  id=193   platform=TikTok     handle='jsee236'                      gen_name='jsee236'                      followers=418000
+  id=720   platform=TikTok     handle='เจ้ศรีปากอ้า'                 gen_name='JaeSriPakA'                   followers=417900
+
+[facebook.com/katevariety.silentvlog]
+  id=201   platform=Facebook   handle='Kate Variety แม่บ้านมินิมอล VDO' gen_name='KateVarietyMaebanMinimalVDO'  followers=32000
+  id=202   platform=Facebook   handle='Kate Variety_VDO'             gen_name='KateVarietyVDO'               followers=31000
+
+[tiktok.com/@lata_arss]
+  id=224   platform=TikTok     handle='lata_arss'                    gen_name=None                           followers=6000
+  id=451   platform=TikTok     handle='Ta Diary'                     gen_name='TaDiary'                      followers=7347
+
+[facebook.com/manimatravel]
+  id=246   platform=Facebook   handle='manimatravel'                 gen_name='manimatravel'                 followers=83000
+  id=643   platform=Facebook   handle='มานี่มา : manima travel'      gen_name='ManimaManimatravel'           followers=75000
+  id=644   platform=Facebook   handle='มานี่มา : manima travel VDO'  gen_name='ManimaManimaTravelVDO'        followers=83000
+
+[tiktok.com/@mommyjaahome]
+  id=282   platform=TikTok     handle='mommyjaahome'                 gen_name='mommyjaahome'                 followers=6943
+  id=586   platform=TikTok     handle='บ้านจ๋า'                      gen_name=None                           followers=6700
+
+[facebook.com/mookdachaaa]
+  id=285   platform=Facebook   handle='mookdachaaa'                  gen_name='mookdachaaa'                  followers=260000
+  id=661   platform=Facebook   handle='รีวิวระดับชาติ'               gen_name=None                           followers=265000
+
+[tiktok.com/@niiineeew]
+  id=314   platform=TikTok     handle='niiineeew'                    gen_name='niiineeew'                    followers=31400
+  id=770   platform=TikTok     handle='แม่บ้านกิ๊งก่องแก้ว'          gen_name='MaebaanGingGongKaew'          followers=31100
+
+[tiktok.com/@nongjinj]
+  id=320   platform=TikTok     handle='nongjinj'                     gen_name='nongjinj'                     followers=154200
+  id=784   platform=TikTok     handle='แม่เรียกเจ๋งเจ๋ง'             gen_name=None                           followers=151000
+
+[tiktok.com/@omployy]
+  id=333   platform=TikTok     handle='omploy'                       gen_name=None                           followers=30900
+  id=334   platform=TikTok     handle='omployy'                      gen_name=None                           followers=31000
+
+[tiktok.com/@ployvatin]
+  id=368   platform=TikTok     handle='ployvatin'                    gen_name=None                           followers=1300000
+  id=778   platform=TikTok     handle='แม่พลอยวาทิน'                 gen_name='MaePloyWatin'                 followers=1700000
+
+[tiktok.com/@porbaanreview]
+  id=378   platform=TikTok     handle='porbaanreview'                gen_name='porbaanreview'                followers=11600
+  id=629   platform=TikTok     handle='พ่อบ้านรีวิว'                 gen_name=None                           followers=11400
+
+[facebook.com/retouchhome]
+  id=397   platform=Facebook   handle='Retouch Home'                 gen_name='RetouchHome'                  followers=53000
+  id=398   platform=Facebook   handle='Retouch Home_VDO'             gen_name='RetouchHomeVDO'               followers=11000
+  id=399   platform=TikTok     handle='retouchhome'                  gen_name='retouchhome'                  followers=52800
+
+[facebook.com/rewiewww]
+  id=400   platform=Facebook   handle='Review รีวิ้ว'                gen_name='Reviewreview'                 followers=58000
+  id=403   platform=Facebook   handle='Rewiew รีวิ้วว VDO'           gen_name='RewiewReviewVDO'              followers=58000
+
+[facebook.com/salinstory]
+  id=412   platform=Facebook   handle='Salin Stoy'                   gen_name='SalinStoy'                    followers=117000
+  id=823   platform=Facebook   handle='𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮'                  gen_name='𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮'                  followers=174000
+  id=824   platform=Facebook   handle='𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮 VDO'              gen_name=None                           followers=158000
+  id=825   platform=Facebook   handle='𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮_VDO'              gen_name='SalinStoryVDO'                followers=160000
+
+[tiktok.com/@spoonandfork.kitchen]
+  id=437   platform=TikTok     handle='spoonandfork'                 gen_name='spoonandfork'                 followers=114000
+  id=438   platform=TikTok     handle='spoonandfork.kitchen'         gen_name=None                           followers=114300
+
+[tiktok.com/@tidyytales]
+  id=472   platform=TikTok     handle='tidyytales'                   gen_name='tidyytales'                   followers=11000
+  id=596   platform=TikTok     handle='ปปไม่ชอบล้างจาน🫧🧽'            gen_name='Popmaichoblangjan'            followers=11000
+
+[tiktok.com/@tis.tid.baan]
+  id=474   platform=TikTok     handle='tis.tid.baan'                 gen_name='tistidbaan'                   followers=9233
+  id=551   platform=TikTok     handle='ติสติดบ้าน🏡'                  gen_name='tistidbaan'                   followers=9130
+
+[facebook.com/jampongandbros]
+  id=527   platform=Facebook   handle='จัมปงแอนด์โบรว์'              gen_name='jampongandbros'               followers=None
+  id=528   platform=Facebook   handle='จัมปงแอนด์โบรว์_VDO'          gen_name='JampongAndBrowVDO'            followers=13000
+
+[facebook.com/CHARMMYKEKIEZ]
+  id=537   platform=Facebook   handle='ชาร์มกีกี้'                   gen_name='Chramkiki'                    followers=43000
+  id=538   platform=Facebook   handle='ชาร์มมี่ กีกี้'               gen_name=None                           followers=45000
+
+[facebook.com/profile.php?id=100078269920436]
+  id=580   platform=Facebook   handle='บ้านของกาญจน์'                gen_name='bankhongkarn'                 followers=None
+  id=581   platform=Facebook   handle='บ้านของกาญจน์_VDO'            gen_name='BaankhongkanVDO'              followers=None
+  id=818   platform=Facebook   handle='𝙆𝙖𝙧𝙣 𝙎𝙩𝙤𝙧𝙮 ; บ้านของกาญจน์'   gen_name='KarnStoryBaankhongKarn'       followers=48000
+
+[facebook.com/ourhouse.th]
+  id=588   platform=Facebook   handle='บ้านนี้มีเรา'                 gen_name='Ourhouse'                     followers=120000
+  id=821   platform=Facebook   handle='𝙊𝙪𝙧 𝙝𝙤𝙪𝙨𝙚 : บ้านนี้มีเรา'     gen_name='OurhouseBaanNeeMeeRao'        followers=122000
+  id=822   platform=Facebook   handle='𝙊𝙪𝙧 𝙝𝙤𝙪𝙨𝙚 : บ้านนี้มีเรา-VDO' gen_name='OurhouseBannuemeeraoVDO'      followers=120000
+
+[facebook.com/mamalikescafes]
+  id=605   platform=Facebook   handle='ป๊าม๊าชอบอยู่บ้าน'            gen_name='mamalikescafes'               followers=74000
+  id=606   platform=Facebook   handle='ป๊าม๊าอยู่บ้าน'               gen_name=None                           followers=24000
+  id=607   platform=Facebook   handle='ป๊าม๊าอยู่บ้าน VDO'           gen_name='PaMaYuBanVDO'                 followers=72000
+
+[facebook.com/porbaanreview]
+  id=630   platform=Facebook   handle='พ่อบ้านรีวิว Lazada & Shopee' gen_name=None                           followers=92000
+  id=631   platform=Facebook   handle='พ่อบ้านรีวิว Lazada & Shopee_VDO' gen_name='PhobanReviewLazadaShopeeVDO'  followers=91000
+
+[facebook.com/profile.php?id=100083420763172]
+  id=647   platform=Facebook   handle='มีตังค์ไหมครับพ่อ VDO'        gen_name='MeetangmaikrubporVDO'         followers=11000
+  id=648   platform=Facebook   handle='มีตังค์ไหมครับพ่อ_VDO'        gen_name='MeatangmaikhrapporVDO'        followers=11000
+
+[facebook.com/bonamydaughter]
+  id=652   platform=Facebook   handle='ยัยหมวยโบน่า'                 gen_name=None                           followers=13000
+  id=653   platform=Facebook   handle='ยัยหมวยโบรา'                  gen_name='bonamydaughter'               followers=None
+
+[facebook.com/fun.bygreen]
+  id=742   platform=Facebook   handle='เลี้ยงลูกสนุกดี By เเม่กรีน VDO' gen_name='LiangluksanukdibymaegreenVDO' followers=372000
+  id=743   platform=Facebook   handle='เลี้ยงลูกสนุกดีVDO'           gen_name='LiangluksanookdeeVDO'         followers=370000
+
+[facebook.com/lokbaiyai.th]
+  id=801   platform=Facebook   handle='โลกใบใหญ่ของอองรี'            gen_name=None                           followers=206000
+  id=802   platform=Facebook   handle='โลกใบใหญ่ของอองรี_Photo'      gen_name='LokBaiYaiKhongHenriPhoto'     followers=210000
+
+Excel exported: kol_duplicates_needs_review.xlsx (34 groups, 78 rows)
+
+=== B) Same platform, similar name but DIFFERENT profile_url — needs human judgement ===
+
+similarity=0.74  platform=TikTok
+  id=290   handle='mungkuddd'                    gen_name='mungkuddd'                    profile_url='https://www.tiktok.com/@mungkuddd'                          url_kind=profile followers=940200
+  id=640   handle='มังคุดมนุษย์แมว(มังจู๊ด)'     gen_name='mungkuuuud'                   profile_url='https://www.tiktok.com/@mungkuuuud?_r=1&_t=ZS-95PwtajBnN6'  url_kind=profile followers=None
+
+similarity=1.00  platform=TikTok
+  id=296   handle='My Catstory'                  gen_name=None                           profile_url='https://www.facebook.com/profile.php?id=100075482367732'    url_kind=profile followers=63500
+  id=298   handle='my_catstory'                  gen_name='mycatstory'                   profile_url='https://www.tiktok.com/@my_catstory'                        url_kind=profile followers=66600
+
+similarity=0.74  platform=TikTok
+  id=312   handle='nicediary'                    gen_name='nicediary'                    profile_url='https://www.tiktok.com/@nicediary.me'                       url_kind=profile followers=19900
+  id=318   handle='nonewdiary'                   gen_name='nonewdiary'                   profile_url='https://www.tiktok.com/@nonewdiary'                         url_kind=profile followers=65800
+
+similarity=0.76  platform=TikTok
+  id=329   handle='ohm_review'                   gen_name=None                           profile_url='https://www.tiktok.com/@ohm_review'                         url_kind=profile followers=17000
+  id=477   handle='toey_review'                  gen_name='toeyreview'                   profile_url='https://www.tiktok.com/@toey_review'                        url_kind=profile followers=39700
+
+similarity=0.95  platform=TikTok
+  id=354   handle='peeakewit'                    gen_name='peeakewit'                    profile_url='https://www.tiktok.com/@peeakewit'                          url_kind=profile followers=924000
+  id=355   handle='peeakewit2'                   gen_name=None                           profile_url='https://www.tiktok.com/@peeakewit2'                         url_kind=profile followers=107000
+
+similarity=0.72  platform=TikTok
+  id=413   handle='salin_story'                  gen_name='salinstory'                   profile_url='https://www.tiktok.com/@salin_story'                        url_kind=profile followers=23100
+  id=415   handle='sangsung_story'               gen_name='sangsungstory'                profile_url='https://www.tiktok.com/@sangsung_story'                     url_kind=profile followers=93200
+
+similarity=0.74  platform=TikTok
+  id=444   handle='style.maew'                   gen_name='stylemaew'                    profile_url='https://www.tiktok.com/@style.maew'                         url_kind=profile followers=55000
+  id=446   handle='styloesave'                   gen_name=None                           profile_url='https://www.tiktok.com/@styloesave'                         url_kind=profile followers=52000
+
+similarity=0.73  platform=YouTube
+  id=310   handle='NEXT TECH'                    gen_name='NEXTTECH'                     profile_url='https://www.facebook.com/NextTechStudio'                    url_kind=profile followers=18600
+  id=311   handle='NextTechStudio'               gen_name=None                           profile_url='https://www.youtube.com/@NextTechStudio'                    url_kind=profile followers=18400
+
+similarity=0.72  platform=Facebook
+  id=21    handle='@reviewno1.th'                gen_name='reviewno1th'                  profile_url='https://www.facebook.com/reviewno1.th?comment_id=Y29tbWVudDoxNTM5MDk4OTAxNTQ4NjM2Xzg0MTg1NDExNTYwNzU1Ng%3D%3D' url_kind=profile followers=20000
+  id=22    handle='@reviewnonstopp'              gen_name='reviewnonstopp'               profile_url='https://www.facebook.com/reviewnonstopp?comment_id=Y29tbWVudDoxNDcyODkyMDM0ODUwMjY4XzI1NTE4Mzc0MjExMTcxMDIy' url_kind=profile followers=24000
+
+similarity=0.76  platform=Facebook
+  id=50    handle='Ava & Eve รีวิว'              gen_name='AvaEveReview'                 profile_url='https://www.facebook.com/avaandevereview?__cft__%5B0%5D=AZZ7A15Hca4mF8jg0c3jVvnvXvmF7qQ4Pg6KIjEY7LEOGWCPhbrV0YJD8Ac4eyyiGGJqdHvP4VU4DXrphfhkD_9i9wDgnk0cWKHMxRk64IAG5DzVsbuiMtcuXwps2J1khTsqnniyOvRImBaJ8ej5_Ip4AK6bP-s4n4-9gsHkFv8vCvDgak5lMs4MdrJqmAwkP_Y&__tn__=-UC%2CP-R' url_kind=profile followers=74000
+  id=649   handle='มี่มารีวิว'                   gen_name='MeeReview'                    profile_url='https://www.facebook.com/profile.php?id=61579671808781'     url_kind=profile followers=9100
+
+similarity=0.74  platform=Facebook
+  id=50    handle='Ava & Eve รีวิว'              gen_name='AvaEveReview'                 profile_url='https://www.facebook.com/avaandevereview?__cft__%5B0%5D=AZZ7A15Hca4mF8jg0c3jVvnvXvmF7qQ4Pg6KIjEY7LEOGWCPhbrV0YJD8Ac4eyyiGGJqdHvP4VU4DXrphfhkD_9i9wDgnk0cWKHMxRk64IAG5DzVsbuiMtcuXwps2J1khTsqnniyOvRImBaJ8ej5_Ip4AK6bP-s4n4-9gsHkFv8vCvDgak5lMs4MdrJqmAwkP_Y&__tn__=-UC%2CP-R' url_kind=profile followers=74000
+  id=709   handle='อะไรดีก็รีวิว'                gen_name='Araideekoreview'              profile_url='https://www.facebook.com/reviewEveryTimes'                  url_kind=profile followers=1000000
+
+similarity=0.75  platform=Facebook
+  id=50    handle='Ava & Eve รีวิว'              gen_name='AvaEveReview'                 profile_url='https://www.facebook.com/avaandevereview?__cft__%5B0%5D=AZZ7A15Hca4mF8jg0c3jVvnvXvmF7qQ4Pg6KIjEY7LEOGWCPhbrV0YJD8Ac4eyyiGGJqdHvP4VU4DXrphfhkD_9i9wDgnk0cWKHMxRk64IAG5DzVsbuiMtcuXwps2J1khTsqnniyOvRImBaJ8ej5_Ip4AK6bP-s4n4-9gsHkFv8vCvDgak5lMs4MdrJqmAwkP_Y&__tn__=-UC%2CP-R' url_kind=profile followers=74000
+  id=789   handle='แอ่วดี-Review'                gen_name='AewdeeReview'                 profile_url='https://www.facebook.com/aewdeereview'                      url_kind=profile followers=125000
+
+similarity=0.73  platform=Facebook
+  id=54    handle='BaansuanPimsook'              gen_name='BaansuanPimsook'              profile_url='https://www.facebook.com/p/BaansuanPimsook-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99%E0%B8%AA%E0%B8%A7%E0%B8%99%E0%B8%9E%E0%B8%B4%E0%B8%A1%E0%B8%9E%E0%B9%8C%E0%B8%AA%E0%B8%B8%E0%B8%82-100095227421134/' url_kind=profile followers=147000
+  id=55    handle='BaansuanPimsook - บ้านสวนพิมพ์สุข' gen_name=None                           profile_url='https://www.facebook.com/profile.php?id=100095227421134'    url_kind=profile followers=135000
+
+similarity=0.92  platform=Facebook
+  id=254   handle='Milin little wonders'         gen_name=None                           profile_url='https://www.tiktok.com/@milinlittlewonders'                 url_kind=profile followers=53000
+  id=255   handle='Milin little wonders VDO'     gen_name=None                           profile_url='https://www.facebook.com/Milindee'                          url_kind=profile followers=53000
+
+similarity=0.72  platform=Facebook
+  id=293   handle='My cat story VDO'             gen_name='MycatstoryVDO'                profile_url='https://www.facebook.com/profile.php?id=100075482367732'    url_kind=profile followers=51000
+  id=476   handle='Toey Story VDO'               gen_name='ToeyStoryVDO'                 profile_url='https://www.facebook.com/ToeyStoryChannel'                  url_kind=profile followers=129000
+
+similarity=0.72  platform=Facebook
+  id=295   handle='My cat story-VDO'             gen_name='MycatstoryVDO'                profile_url='https://www.facebook.com/profile.php?id=100075482367732'    url_kind=profile followers=53000
+  id=476   handle='Toey Story VDO'               gen_name='ToeyStoryVDO'                 profile_url='https://www.facebook.com/ToeyStoryChannel'                  url_kind=profile followers=129000
+
+similarity=0.80  platform=Facebook
+  id=400   handle='Review รีวิ้ว'                gen_name='Reviewreview'                 profile_url='https://www.facebook.com/rewiewww?mibextid=wwXIfr&rdid=8JFtM3BVvMHDZBwA&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1JXWzQ4bxF%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=58000
+  id=402   handle='ReviewHub - รีวิวฮับ'         gen_name='ReviewHubReviewHub'           profile_url='https://www.facebook.com/Reviewhubco'                       url_kind=profile followers=63000
+
+similarity=0.75  platform=Facebook
+  id=400   handle='Review รีวิ้ว'                gen_name='Reviewreview'                 profile_url='https://www.facebook.com/rewiewww?mibextid=wwXIfr&rdid=8JFtM3BVvMHDZBwA&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1JXWzQ4bxF%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=58000
+  id=700   handle='อยากรีวิว Yarkreview'         gen_name='YarkreviewYarkreview'         profile_url='https://www.facebook.com/yarkreview9'                       url_kind=profile followers=52000
+
+similarity=0.75  platform=Facebook
+  id=403   handle='Rewiew รีวิ้วว VDO'           gen_name='RewiewReviewVDO'              profile_url='https://www.facebook.com/rewiewww?__cft__%5B0%5D=AZavIJ5295Ir5w2VmT3q2dLW4g1orEB-1yPz7jaxpxh5r9YBTrZ54CTqhyE6PiHQs8nFNtbCYrEK0LVhsg5xiBwV_JSfpPoBOVWUrVRbidvO_pSKGooWDKDynM6yr5YDdeM2F8b3YDZhTrKoHwtJH79WzanIIFu9YVyMN7oovXTKQiWhJ2gORaKUypj_KIu-bs9uK3FucilW29ZePx9Exuzf&__tn__=-UC%2CP-R' url_kind=profile followers=58000
+  id=716   handle='เกร๋ๆ รีวิว_VDO'              gen_name='KraeKraeReviewVDO'            profile_url='https://www.facebook.com/Online789356'                      url_kind=profile followers=None
+
+similarity=0.72  platform=Facebook
+  id=462   handle='The Daily Review'             gen_name='TheDailyReview'               profile_url='https://www.facebook.com/thedaily.review/'                  url_kind=profile followers=16000
+  id=752   handle='แด๊ดดี้รีวิว'                 gen_name='DaddyReview'                  profile_url='https://www.facebook.com/daddy.daddyreview'                 url_kind=profile followers=19000
+
+similarity=0.72  platform=Facebook
+  id=476   handle='Toey Story VDO'               gen_name='ToeyStoryVDO'                 profile_url='https://www.facebook.com/ToeyStoryChannel'                  url_kind=profile followers=129000
+  id=486   handle='Uncle Story VDO'              gen_name='UncleStoryVDO'                profile_url='https://www.facebook.com/unclestory23'                      url_kind=profile followers=15000
+
+similarity=0.72  platform=Facebook
+  id=493   handle='Watsamon VDO'                 gen_name='WatsamonVDO'                  profile_url='https://www.facebook.com/watsamonchannel/'                  url_kind=profile followers=59000
+  id=497   handle='Wipatsaya Ho VDO'             gen_name='WipatsayaHoVDO'               profile_url='https://www.facebook.com/the.rakkaew'                       url_kind=profile followers=5900
+
+similarity=0.73  platform=Facebook
+  id=495   handle='We Share รีวิว'               gen_name='WeShareReview'                profile_url='https://www.facebook.com/wesharereview'                     url_kind=profile followers=19000
+  id=649   handle='มี่มารีวิว'                   gen_name='MeeReview'                    profile_url='https://www.facebook.com/profile.php?id=61579671808781'     url_kind=profile followers=9100
+
+similarity=0.75  platform=Facebook
+  id=495   handle='We Share รีวิว'               gen_name='WeShareReview'                profile_url='https://www.facebook.com/wesharereview'                     url_kind=profile followers=19000
+  id=680   handle='สรรหารีวิว'                   gen_name='sanhareview'                  profile_url='https://www.facebook.com/share/1Aqo74jXh9/?mibextid=wwXIfr' url_kind=profile followers=30000
+
+similarity=0.72  platform=Facebook
+  id=495   handle='We Share รีวิว'               gen_name='WeShareReview'                profile_url='https://www.facebook.com/wesharereview'                     url_kind=profile followers=19000
+  id=789   handle='แอ่วดี-Review'                gen_name='AewdeeReview'                 profile_url='https://www.facebook.com/aewdeereview'                      url_kind=profile followers=125000
+
+similarity=0.86  platform=Facebook
+  id=506   handle='yonghaii - VDO'               gen_name='yonghaiiVDO'                  profile_url='https://www.facebook.com/profile.php?id=61566756432694'     url_kind=profile followers=350000
+  id=667   handle='ลองให้_VDO'                   gen_name='LonghaiVDO'                   profile_url='https://www.facebook.com/longhai.ds'                        url_kind=profile followers=100000
+
+similarity=0.80  platform=Facebook
+  id=512   handle='กีกี้รีวิว'                   gen_name='KikeeReview'                  profile_url='https://www.facebook.com/profile.php?id=100076292255797'    url_kind=profile followers=11000
+  id=649   handle='มี่มารีวิว'                   gen_name='MeeReview'                    profile_url='https://www.facebook.com/profile.php?id=61579671808781'     url_kind=profile followers=9100
+
+similarity=0.77  platform=Facebook
+  id=532   handle='ฉันอยู่บ้านกับหมา'            gen_name='ChanYuBanKapMa'               profile_url='https://www.facebook.com/stayhomewithmydog'                 url_kind=profile followers=47000
+  id=703   handle='อยู่บ้านกับหมาผี VDO'         gen_name='YuBanKapMaPhiVDO'             profile_url='https://www.facebook.com/stayhomewithghostdog/'             url_kind=profile followers=6300
+
+similarity=0.88  platform=Facebook
+  id=534   handle='ชอบเที่ยว'                    gen_name='Choptravel'                   profile_url='https://www.facebook.com/chobtiew.mn?mibextid=wwXIfr&rdid=pawREoYq0LemQt3V&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1CUP77XkUv%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=120000
+  id=766   handle='แม่ชอบเที่ยว'                 gen_name='MaeChobThiao'                 profile_url='https://www.facebook.com/MomAtomBabyAlpha/?_rdr'            url_kind=profile followers=10000
+
+similarity=0.84  platform=Facebook
+  id=546   handle='ดีดีรีวิว'                    gen_name='DDReview'                     profile_url='https://www.facebook.com/ddreview686'                       url_kind=profile followers=26000
+  id=752   handle='แด๊ดดี้รีวิว'                 gen_name='DaddyReview'                  profile_url='https://www.facebook.com/daddy.daddyreview'                 url_kind=profile followers=19000
+
+similarity=0.74  platform=Facebook
+  id=546   handle='ดีดีรีวิว'                    gen_name='DDReview'                     profile_url='https://www.facebook.com/ddreview686'                       url_kind=profile followers=26000
+  id=760   handle='แพนด้ารีวิว'                  gen_name='PandaReview'                  profile_url='https://www.facebook.com/profile.php?id=100064331340849'    url_kind=profile followers=10000
+
+similarity=0.72  platform=Facebook
+  id=569   handle='นายอาร์ม รีวิว'               gen_name='NaiArmReview'                 profile_url='https://www.facebook.com/9ArmReview'                        url_kind=profile followers=18000
+  id=617   handle='ฝ้ายขอรีวิว'                  gen_name='FaiiKorReview'                profile_url='https://www.facebook.com/FaiiKorReview'                     url_kind=profile followers=73000
+
+similarity=0.73  platform=Facebook
+  id=569   handle='นายอาร์ม รีวิว'               gen_name='NaiArmReview'                 profile_url='https://www.facebook.com/9ArmReview'                        url_kind=profile followers=18000
+  id=707   handle='ออนนี่รีวิว'                  gen_name='onnireview'                   profile_url='https://www.facebook.com/unnireviewer?mibextid=wwXIfr&rdid=Ro5tpQDpJEKIXEvW&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BC59KWXqP%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=None
+
+similarity=0.75  platform=Facebook
+  id=569   handle='นายอาร์ม รีวิว'               gen_name='NaiArmReview'                 profile_url='https://www.facebook.com/9ArmReview'                        url_kind=profile followers=18000
+  id=711   handle='อาณาจักรรีวิว'                gen_name='AnajakReview'                 profile_url='https://www.facebook.com/Woobookrevieww?__cft__%5B0%5D=AZbbXbi3-jdFMMTQqcr1adFoiALJlM2ka0wgMVB-IUl_XbnnDP2SbANoAx_4Sz0yxhBLxn42nCnua93h26BetaPuHWpCLTYOAO2dAytvC7ZJaTjpgyz9oMFubzIeYnKfXoeGpGbDaEBTnRk_DqSKfWQkIVGW998k_wydVIkj95MOJRaFVLfNSA9HF18byTyqWpc&__tn__=-UC%2CP-R' url_kind=profile followers=19000
+
+similarity=0.75  platform=Facebook
+  id=569   handle='นายอาร์ม รีวิว'               gen_name='NaiArmReview'                 profile_url='https://www.facebook.com/9ArmReview'                        url_kind=profile followers=18000
+  id=756   handle='แนนนี่รีวิว'                  gen_name='NannieReview'                 profile_url='https://www.facebook.com/nannyrevieww?__cft__%5B0%5D=AZbAaUHWn5wLLyhKKoP_GSJzJDetwJjAsUhGsD8mrKa7UC_BSHHBbD_fKo5DGw6M674KoSogE-uxVmnRH1OTkSZki1I9h28oPQA5JggZtHL7ojmh2rqCHIZEeEDYE5Yx2mlSxqmvZA86jluOaovaai1gKLL-_XGqiOopROIMHFpTNtj9GIy-7eDTuKsr-Y6zylU&__tn__=-UC%2CP-R' url_kind=profile followers=50000
+
+similarity=0.73  platform=Facebook
+  id=570   handle='นาแนนป้ายยา'                  gen_name='nananpaiya'                   profile_url='https://www.facebook.com/Nananblogblog'                     url_kind=profile followers=111000
+  id=769   handle='แม่บ้าน ป้ายยา'               gen_name='MaebaanPaiya'                 profile_url='https://www.facebook.com/Maebanreviewer'                    url_kind=profile followers=6400000
+
+similarity=0.75  platform=Facebook
+  id=571   handle='นุ่นนุ่นขอรีวิว'              gen_name='NunNunKhorReview'             profile_url='https://www.facebook.com/nunnunklpan'                       url_kind=profile followers=31000
+  id=756   handle='แนนนี่รีวิว'                  gen_name='NannieReview'                 profile_url='https://www.facebook.com/nannyrevieww?__cft__%5B0%5D=AZbAaUHWn5wLLyhKKoP_GSJzJDetwJjAsUhGsD8mrKa7UC_BSHHBbD_fKo5DGw6M674KoSogE-uxVmnRH1OTkSZki1I9h28oPQA5JggZtHL7ojmh2rqCHIZEeEDYE5Yx2mlSxqmvZA86jluOaovaai1gKLL-_XGqiOopROIMHFpTNtj9GIy-7eDTuKsr-Y6zylU&__tn__=-UC%2CP-R' url_kind=profile followers=50000
+
+similarity=0.72  platform=Facebook
+  id=572   handle='น้องซิสรีวิว'                 gen_name='Nongsisreview'                profile_url='https://www.facebook.com/clubsister?comment_id=Y29tbWVudDo5NjYzMjI4ODI4MTc2NTJfMjA5MDkyNDkwMTQ5NDU1Nw%3D%3D' url_kind=profile followers=83000
+  id=691   handle='หนูเก่ง รีวิว'                gen_name='NukengReview'                 profile_url='https://www.facebook.com/Noogengreview'                     url_kind=profile followers=102000
+
+similarity=0.78  platform=Facebook
+  id=572   handle='น้องซิสรีวิว'                 gen_name='Nongsisreview'                profile_url='https://www.facebook.com/clubsister?comment_id=Y29tbWVudDo5NjYzMjI4ODI4MTc2NTJfMjA5MDkyNDkwMTQ5NDU1Nw%3D%3D' url_kind=profile followers=83000
+  id=707   handle='ออนนี่รีวิว'                  gen_name='onnireview'                   profile_url='https://www.facebook.com/unnireviewer?mibextid=wwXIfr&rdid=Ro5tpQDpJEKIXEvW&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BC59KWXqP%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=None
+
+similarity=0.72  platform=Facebook
+  id=572   handle='น้องซิสรีวิว'                 gen_name='Nongsisreview'                profile_url='https://www.facebook.com/clubsister?comment_id=Y29tbWVudDo5NjYzMjI4ODI4MTc2NTJfMjA5MDkyNDkwMTQ5NDU1Nw%3D%3D' url_kind=profile followers=83000
+  id=756   handle='แนนนี่รีวิว'                  gen_name='NannieReview'                 profile_url='https://www.facebook.com/nannyrevieww?__cft__%5B0%5D=AZbAaUHWn5wLLyhKKoP_GSJzJDetwJjAsUhGsD8mrKa7UC_BSHHBbD_fKo5DGw6M674KoSogE-uxVmnRH1OTkSZki1I9h28oPQA5JggZtHL7ojmh2rqCHIZEeEDYE5Yx2mlSxqmvZA86jluOaovaai1gKLL-_XGqiOopROIMHFpTNtj9GIy-7eDTuKsr-Y6zylU&__tn__=-UC%2CP-R' url_kind=profile followers=50000
+
+similarity=0.75  platform=Facebook
+  id=577   handle='บาร์กี้แมวจ้ม-VDO'            gen_name='BarkieMaewJomVDO'             profile_url='https://www.facebook.com/profile.php?id=100088148741577&__cft__%5B0%5D=AZZFY_Shfnj-5p6DK_dUrhx0mh0xU9Cqd0HH-oP1Ovgt5g1xmep1jA8kJ84GRQnJEuQOp5lK-N9A7nqDwwMn7OyASk7yyvqG1op0eoAEJ3nrkGWJ5qAwrxFvpdri6yGTJ-7JH4m9Q7SJrZfZ-pNN0-wZNNGTNUa4dwYu00axRIRDx9_YKybyiQy8xjnleF0D1JwEboiCvL8stHyrNJtgQwGx&__tn__=-UC%2CP-R' url_kind=profile followers=35000
+  id=578   handle='บูจาไม่รักแม่-VDO'            gen_name='BuchamairakmaeVDOfinal'       profile_url='https://www.facebook.com/profile.php?id=61575350037869'     url_kind=profile followers=30000
+
+similarity=0.75  platform=Facebook
+  id=582   handle='บ้านของธุธุ'                  gen_name='BaanKhongThuthu'              profile_url='https://www.facebook.com/BaankhongTuTu'                     url_kind=profile followers=22000
+  id=583   handle='บ้านของแอมธิชา'               gen_name='BaanKhongAmthicha'            profile_url='https://www.facebook.com/amtichahome?__cft__%5B0%5D=AZbCPpc1MLBiK0bY1OVUHvg49hIhkhqGpJnPgppNQ4EIq5hakhXXtXTdBeTIO3u8ivK4t19LVz1RQsnlNDu5VxEzgcGFak9OXH4UTcIsbBTRWru4BzpVlrpmMMLhAzkhdk4jLdaSIbP4BShPrsqxsuomb4KX6y_WQDzvY0eZ-JPUTsWUhOw2IdEsh4L7cNbTIgQ&__tn__=-UC%2CP-R' url_kind=profile followers=34000
+
+similarity=0.79  platform=Facebook
+  id=583   handle='บ้านของแอมธิชา'               gen_name='BaanKhongAmthicha'            profile_url='https://www.facebook.com/amtichahome?__cft__%5B0%5D=AZbCPpc1MLBiK0bY1OVUHvg49hIhkhqGpJnPgppNQ4EIq5hakhXXtXTdBeTIO3u8ivK4t19LVz1RQsnlNDu5VxEzgcGFak9OXH4UTcIsbBTRWru4BzpVlrpmMMLhAzkhdk4jLdaSIbP4BShPrsqxsuomb4KX6y_WQDzvY0eZ-JPUTsWUhOw2IdEsh4L7cNbTIgQ&__tn__=-UC%2CP-R' url_kind=profile followers=34000
+  id=594   handle='บ้านเล็กๆของธิชา'             gen_name='BaanLekLekKhongThicha'        profile_url='https://www.facebook.com/profile.php?id=61555703687756'     url_kind=profile followers=63000
+
+similarity=0.86  platform=Facebook
+  id=588   handle='บ้านนี้มีเรา'                 gen_name='Ourhouse'                     profile_url='https://www.facebook.com/ourhouse.th'                       url_kind=profile followers=120000
+  id=591   handle='บ้านเรา'                      gen_name=None                           profile_url='https://www.facebook.com/BaanRaoOurHome'                    url_kind=profile followers=390000
+
+similarity=0.79  platform=Facebook
+  id=592   handle='บ้านเราอยากรีวิว'             gen_name='BaanRaoYakReview'             profile_url='https://www.facebook.com/baanraoyakreview'                  url_kind=profile followers=42000
+  id=711   handle='อาณาจักรรีวิว'                gen_name='AnajakReview'                 profile_url='https://www.facebook.com/Woobookrevieww?__cft__%5B0%5D=AZbbXbi3-jdFMMTQqcr1adFoiALJlM2ka0wgMVB-IUl_XbnnDP2SbANoAx_4Sz0yxhBLxn42nCnua93h26BetaPuHWpCLTYOAO2dAytvC7ZJaTjpgyz9oMFubzIeYnKfXoeGpGbDaEBTnRk_DqSKfWQkIVGW998k_wydVIkj95MOJRaFVLfNSA9HF18byTyqWpc&__tn__=-UC%2CP-R' url_kind=profile followers=19000
+
+similarity=0.73  platform=Facebook
+  id=612   handle='ผมชอบแต่งบ้าน'                gen_name='pomchobtangbaan'              profile_url='https://www.facebook.com/phomchobtaengban/'                 url_kind=profile followers=29000
+  id=614   handle='ผมชอบแต่งบ้าน-Photo-Kit'      gen_name='PhomChopTaengBanPhotoKit'     profile_url=None                                                         url_kind=none followers=29000
+
+similarity=0.91  platform=Facebook
+  id=613   handle='ผมชอบแต่งบ้าน-Photo'          gen_name='PhomChobTaengBaanPhoto'       profile_url='https://www.facebook.com/phomchobtaengban'                  url_kind=profile followers=29000
+  id=614   handle='ผมชอบแต่งบ้าน-Photo-Kit'      gen_name='PhomChopTaengBanPhotoKit'     profile_url=None                                                         url_kind=none followers=29000
+
+similarity=0.73  platform=Facebook
+  id=614   handle='ผมชอบแต่งบ้าน-Photo-Kit'      gen_name='PhomChopTaengBanPhotoKit'     profile_url=None                                                         url_kind=none followers=29000
+  id=615   handle='ผมชอบแต่งบ้าน-VDO'            gen_name='PomChobTangBanVDO'            profile_url='https://www.facebook.com/phomchobtaengban'                  url_kind=profile followers=29000
+
+similarity=0.83  platform=Facebook
+  id=614   handle='ผมชอบแต่งบ้าน-Photo-Kit'      gen_name='PhomChopTaengBanPhotoKit'     profile_url=None                                                         url_kind=none followers=29000
+  id=616   handle='ผมชอบแต่งบ้าน-VDO-Kit'        gen_name='PhomChobTangBanVDOKit'        profile_url='https://www.facebook.com/phomchobtaengban'                  url_kind=profile followers=29000
+
+similarity=0.73  platform=Facebook
+  id=615   handle='ผมชอบแต่งบ้าน-VDO'            gen_name='PomChobTangBanVDO'            profile_url='https://www.facebook.com/phomchobtaengban'                  url_kind=profile followers=29000
+  id=776   handle='แม่ปอยชอบทำงานบ้าน VDO'       gen_name='MaePoyChobThamNganBanVDO'     profile_url='https://www.facebook.com/profile.php?id=61570094805204'     url_kind=profile followers=66000
+
+similarity=0.78  platform=Facebook
+  id=617   handle='ฝ้ายขอรีวิว'                  gen_name='FaiiKorReview'                profile_url='https://www.facebook.com/FaiiKorReview'                     url_kind=profile followers=73000
+  id=683   handle='สายฝอขอรีวิว'                 gen_name=None                           profile_url='https://www.facebook.com/toffyreview?__cft__%5B0%5D=AZbA0FFW47Y64WldHnUi3GE7j8t3CkLAlWAPybYZ8ddaB7WhR2OmsxrMYE6bcU1TGb_HGEExlo5EsQGGD_XMr8VrvO328Xnh_a3gs9jGrWVqNzg2zpsvdho82bP_utLpJS6wTl79EVODjYy4zhXk-9Y-IpekuXtduZ8KQzS5wVNPb8T1expxIPedFTDS6LTHYogzEk4hqVImDJUVxq4i9XKRize4kyaTFUC7HK9iliVvyA&__tn__=-UC%2CP-R' url_kind=profile followers=407000
+
+similarity=0.86  platform=Facebook
+  id=636   handle='มอดอ บอกต่อ'                  gen_name=None                           profile_url='https://www.facebook.com/profile.php?id=61572447335821'     url_kind=profile followers=21000
+  id=637   handle='มอดอรีวิวบอกต่อ'              gen_name='MordoReviewBokTor'            profile_url='https://www.facebook.com/profile.php?id=61584428680605&__cft__%5B0%5D=AZbamYjsjiND1Jy39yMCi8QPSVZzZ5Ct0g7IEs0jmn3j3qIlJ4dKCsC5xlcUbXreE3LAvM09tvAni15SpMGpjQySFhk73Tw0Rutu-P9oje8TD3Jhlux9qo6zu292Vj0fzqYCh0v9UCjltgrE05q4ElhoRXpMrogY61eCajLwwIEVEnehUmMAeCZ5zYRgL09pcB9QUHnexYpWxrAb_8X3WIt9&__tn__=-%5DC%2CP-R' url_kind=profile followers=25000
+
+similarity=0.73  platform=Facebook
+  id=636   handle='มอดอ บอกต่อ'                  gen_name=None                           profile_url='https://www.facebook.com/profile.php?id=61572447335821'     url_kind=profile followers=21000
+  id=638   handle='มอปอ อยากบอกต่อ'              gen_name='MoporYakBokTor'               profile_url='https://www.facebook.com/morporyakboktor'                   url_kind=profile followers=32000
+
+similarity=0.83  platform=Facebook
+  id=637   handle='มอดอรีวิวบอกต่อ'              gen_name='MordoReviewBokTor'            profile_url='https://www.facebook.com/profile.php?id=61584428680605&__cft__%5B0%5D=AZbamYjsjiND1Jy39yMCi8QPSVZzZ5Ct0g7IEs0jmn3j3qIlJ4dKCsC5xlcUbXreE3LAvM09tvAni15SpMGpjQySFhk73Tw0Rutu-P9oje8TD3Jhlux9qo6zu292Vj0fzqYCh0v9UCjltgrE05q4ElhoRXpMrogY61eCajLwwIEVEnehUmMAeCZ5zYRgL09pcB9QUHnexYpWxrAb_8X3WIt9&__tn__=-%5DC%2CP-R' url_kind=profile followers=25000
+  id=658   handle='รีวิวบอกต่อ'                  gen_name='ReviewBokTor'                 profile_url='https://www.facebook.com/reviewsBOHKTOH'                    url_kind=profile followers=5400000
+
+similarity=0.80  platform=Facebook
+  id=638   handle='มอปอ อยากบอกต่อ'              gen_name='MoporYakBokTor'               profile_url='https://www.facebook.com/morporyakboktor'                   url_kind=profile followers=32000
+  id=757   handle='แป้งอยากบอกต่อ'               gen_name='Pangyakboktor'                profile_url='https://www.facebook.com/pangyarkborktor'                   url_kind=profile followers=12000
+
+similarity=0.92  platform=Facebook
+  id=649   handle='มี่มารีวิว'                   gen_name='MeeReview'                    profile_url='https://www.facebook.com/profile.php?id=61579671808781'     url_kind=profile followers=9100
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.75  platform=Facebook
+  id=649   handle='มี่มารีวิว'                   gen_name='MeeReview'                    profile_url='https://www.facebook.com/profile.php?id=61579671808781'     url_kind=profile followers=9100
+  id=780   handle='แม่มารีวิว VDO'               gen_name='MaeMaReviewVDO'               profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.76  platform=Facebook
+  id=649   handle='มี่มารีวิว'                   gen_name='MeeReview'                    profile_url='https://www.facebook.com/profile.php?id=61579671808781'     url_kind=profile followers=9100
+  id=789   handle='แอ่วดี-Review'                gen_name='AewdeeReview'                 profile_url='https://www.facebook.com/aewdeereview'                      url_kind=profile followers=125000
+
+similarity=0.73  platform=Facebook
+  id=668   handle='ละมุนี รีวิว'                 gen_name='LamuniReview'                 profile_url='https://www.facebook.com/lamunee.review'                    url_kind=profile followers=150000
+  id=707   handle='ออนนี่รีวิว'                  gen_name='onnireview'                   profile_url='https://www.facebook.com/unnireviewer?mibextid=wwXIfr&rdid=Ro5tpQDpJEKIXEvW&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BC59KWXqP%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=None
+
+similarity=0.75  platform=Facebook
+  id=668   handle='ละมุนี รีวิว'                 gen_name='LamuniReview'                 profile_url='https://www.facebook.com/lamunee.review'                    url_kind=profile followers=150000
+  id=756   handle='แนนนี่รีวิว'                  gen_name='NannieReview'                 profile_url='https://www.facebook.com/nannyrevieww?__cft__%5B0%5D=AZbAaUHWn5wLLyhKKoP_GSJzJDetwJjAsUhGsD8mrKa7UC_BSHHBbD_fKo5DGw6M674KoSogE-uxVmnRH1OTkSZki1I9h28oPQA5JggZtHL7ojmh2rqCHIZEeEDYE5Yx2mlSxqmvZA86jluOaovaai1gKLL-_XGqiOopROIMHFpTNtj9GIy-7eDTuKsr-Y6zylU&__tn__=-UC%2CP-R' url_kind=profile followers=50000
+
+similarity=0.78  platform=Facebook
+  id=680   handle='สรรหารีวิว'                   gen_name='sanhareview'                  profile_url='https://www.facebook.com/share/1Aqo74jXh9/?mibextid=wwXIfr' url_kind=profile followers=30000
+  id=711   handle='อาณาจักรรีวิว'                gen_name='AnajakReview'                 profile_url='https://www.facebook.com/Woobookrevieww?__cft__%5B0%5D=AZbbXbi3-jdFMMTQqcr1adFoiALJlM2ka0wgMVB-IUl_XbnnDP2SbANoAx_4Sz0yxhBLxn42nCnua93h26BetaPuHWpCLTYOAO2dAytvC7ZJaTjpgyz9oMFubzIeYnKfXoeGpGbDaEBTnRk_DqSKfWQkIVGW998k_wydVIkj95MOJRaFVLfNSA9HF18byTyqWpc&__tn__=-UC%2CP-R' url_kind=profile followers=19000
+
+similarity=0.82  platform=Facebook
+  id=680   handle='สรรหารีวิว'                   gen_name='sanhareview'                  profile_url='https://www.facebook.com/share/1Aqo74jXh9/?mibextid=wwXIfr' url_kind=profile followers=30000
+  id=760   handle='แพนด้ารีวิว'                  gen_name='PandaReview'                  profile_url='https://www.facebook.com/profile.php?id=100064331340849'    url_kind=profile followers=10000
+
+similarity=0.73  platform=Facebook
+  id=680   handle='สรรหารีวิว'                   gen_name='sanhareview'                  profile_url='https://www.facebook.com/share/1Aqo74jXh9/?mibextid=wwXIfr' url_kind=profile followers=30000
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.74  platform=Facebook
+  id=684   handle='สำ นั ก ป้ า ย ย า'           gen_name='Samnakpaiya'                  profile_url='https://www.facebook.com/profile.php?id=100076191692759'    url_kind=profile followers=53000
+  id=769   handle='แม่บ้าน ป้ายยา'               gen_name='MaebaanPaiya'                 profile_url='https://www.facebook.com/Maebanreviewer'                    url_kind=profile followers=6400000
+
+similarity=0.72  platform=Facebook
+  id=687   handle='สไมล์อยากรีวิว'               gen_name='SmileYakReview'               profile_url='https://www.facebook.com/smileyarkreview'                   url_kind=profile followers=31000
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.73  platform=Facebook
+  id=690   handle='หนีแม่มารีวิว V.2_VDO'        gen_name='NeeMaeMaReviewV2VDO'          profile_url='https://www.facebook.com/pimpuntaree3?__cft__%5B0%5D=AZb79NDjybNXOYdQ_1pDCUWeEsaj6X9xgu2Lpg7PbY-dn3OjV7lAL9BmJr9-NxkGxzLXi--F-KVXlPHK-ea8Ofx8MLrD1D2znwGN3f0cbj-DF6cR2fRcYnG0m14e7dmZUKU2PPVtbA_EII_-h8Nox_ILHLLguWY9vdm1807Ni5pRNF6FlNhjasIynD04ZrZXOZY&__tn__=-UC%2CP-R' url_kind=profile followers=140000
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.85  platform=Facebook
+  id=690   handle='หนีแม่มารีวิว V.2_VDO'        gen_name='NeeMaeMaReviewV2VDO'          profile_url='https://www.facebook.com/pimpuntaree3?__cft__%5B0%5D=AZb79NDjybNXOYdQ_1pDCUWeEsaj6X9xgu2Lpg7PbY-dn3OjV7lAL9BmJr9-NxkGxzLXi--F-KVXlPHK-ea8Ofx8MLrD1D2znwGN3f0cbj-DF6cR2fRcYnG0m14e7dmZUKU2PPVtbA_EII_-h8Nox_ILHLLguWY9vdm1807Ni5pRNF6FlNhjasIynD04ZrZXOZY&__tn__=-UC%2CP-R' url_kind=profile followers=140000
+  id=780   handle='แม่มารีวิว VDO'               gen_name='MaeMaReviewVDO'               profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.76  platform=Facebook
+  id=691   handle='หนูเก่ง รีวิว'                gen_name='NukengReview'                 profile_url='https://www.facebook.com/Noogengreview'                     url_kind=profile followers=102000
+  id=692   handle='หนูเก่งทดลอง-รีวิว'           gen_name='NookengThodlongReview'        profile_url='https://www.facebook.com/noogengtodlong'                    url_kind=profile followers=31000
+
+similarity=0.73  platform=Facebook
+  id=691   handle='หนูเก่ง รีวิว'                gen_name='NukengReview'                 profile_url='https://www.facebook.com/Noogengreview'                     url_kind=profile followers=102000
+  id=707   handle='ออนนี่รีวิว'                  gen_name='onnireview'                   profile_url='https://www.facebook.com/unnireviewer?mibextid=wwXIfr&rdid=Ro5tpQDpJEKIXEvW&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BC59KWXqP%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=None
+
+similarity=0.82  platform=Facebook
+  id=707   handle='ออนนี่รีวิว'                  gen_name='onnireview'                   profile_url='https://www.facebook.com/unnireviewer?mibextid=wwXIfr&rdid=Ro5tpQDpJEKIXEvW&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1BC59KWXqP%2F%3Fmibextid%3DwwXIfr' url_kind=profile followers=None
+  id=756   handle='แนนนี่รีวิว'                  gen_name='NannieReview'                 profile_url='https://www.facebook.com/nannyrevieww?__cft__%5B0%5D=AZbAaUHWn5wLLyhKKoP_GSJzJDetwJjAsUhGsD8mrKa7UC_BSHHBbD_fKo5DGw6M674KoSogE-uxVmnRH1OTkSZki1I9h28oPQA5JggZtHL7ojmh2rqCHIZEeEDYE5Yx2mlSxqmvZA86jluOaovaai1gKLL-_XGqiOopROIMHFpTNtj9GIy-7eDTuKsr-Y6zylU&__tn__=-UC%2CP-R' url_kind=profile followers=50000
+
+similarity=0.74  platform=Facebook
+  id=709   handle='อะไรดีก็รีวิว'                gen_name='Araideekoreview'              profile_url='https://www.facebook.com/reviewEveryTimes'                  url_kind=profile followers=1000000
+  id=789   handle='แอ่วดี-Review'                gen_name='AewdeeReview'                 profile_url='https://www.facebook.com/aewdeereview'                      url_kind=profile followers=125000
+
+similarity=0.77  platform=Facebook
+  id=709   handle='อะไรดีก็รีวิว'                gen_name='Araideekoreview'              profile_url='https://www.facebook.com/reviewEveryTimes'                  url_kind=profile followers=1000000
+  id=805   handle='ใช้ดีก็รีวิว'                 gen_name='ChaiDeeGorReview'             profile_url='https://www.facebook.com/chaideekorreview'                  url_kind=profile followers=187000
+
+similarity=0.78  platform=Facebook
+  id=711   handle='อาณาจักรรีวิว'                gen_name='AnajakReview'                 profile_url='https://www.facebook.com/Woobookrevieww?__cft__%5B0%5D=AZbbXbi3-jdFMMTQqcr1adFoiALJlM2ka0wgMVB-IUl_XbnnDP2SbANoAx_4Sz0yxhBLxn42nCnua93h26BetaPuHWpCLTYOAO2dAytvC7ZJaTjpgyz9oMFubzIeYnKfXoeGpGbDaEBTnRk_DqSKfWQkIVGW998k_wydVIkj95MOJRaFVLfNSA9HF18byTyqWpc&__tn__=-UC%2CP-R' url_kind=profile followers=19000
+  id=760   handle='แพนด้ารีวิว'                  gen_name='PandaReview'                  profile_url='https://www.facebook.com/profile.php?id=100064331340849'    url_kind=profile followers=10000
+
+similarity=0.77  platform=Facebook
+  id=716   handle='เกร๋ๆ รีวิว_VDO'              gen_name='KraeKraeReviewVDO'            profile_url='https://www.facebook.com/Online789356'                      url_kind=profile followers=None
+  id=780   handle='แม่มารีวิว VDO'               gen_name='MaeMaReviewVDO'               profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.73  platform=Facebook
+  id=734   handle='เรื่องของ ตู'                 gen_name='RuangKhongTu'                 profile_url='https://www.facebook.com/storybykhaotoo'                    url_kind=profile followers=22000
+  id=735   handle='เรื่องของกรุบ VDO'            gen_name='RueangKhongKrupVDO'           profile_url='https://www.facebook.com/storyofgrub/'                      url_kind=profile followers=1100
+
+similarity=0.85  platform=Facebook
+  id=734   handle='เรื่องของ ตู'                 gen_name='RuangKhongTu'                 profile_url='https://www.facebook.com/storybykhaotoo'                    url_kind=profile followers=22000
+  id=736   handle='เรื่องของจั๋ง'                gen_name='RuangKhongJung'               profile_url='https://www.facebook.com/ZumChunk.PAWstar'                  url_kind=profile followers=66000
+
+similarity=0.73  platform=Facebook
+  id=752   handle='แด๊ดดี้รีวิว'                 gen_name='DaddyReview'                  profile_url='https://www.facebook.com/daddy.daddyreview'                 url_kind=profile followers=19000
+  id=760   handle='แพนด้ารีวิว'                  gen_name='PandaReview'                  profile_url='https://www.facebook.com/profile.php?id=100064331340849'    url_kind=profile followers=10000
+
+similarity=0.75  platform=Facebook
+  id=758   handle='แพตตี้มารีวิว'                gen_name='Pattymareview'                profile_url='https://www.facebook.com/reviewbypatty'                     url_kind=profile followers=67000
+  id=760   handle='แพนด้ารีวิว'                  gen_name='PandaReview'                  profile_url='https://www.facebook.com/profile.php?id=100064331340849'    url_kind=profile followers=10000
+
+similarity=0.75  platform=Facebook
+  id=758   handle='แพตตี้มารีวิว'                gen_name='Pattymareview'                profile_url='https://www.facebook.com/reviewbypatty'                     url_kind=profile followers=67000
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.73  platform=Facebook
+  id=760   handle='แพนด้ารีวิว'                  gen_name='PandaReview'                  profile_url='https://www.facebook.com/profile.php?id=100064331340849'    url_kind=profile followers=10000
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.75  platform=Facebook
+  id=768   handle='แม่บุ๋มขอรีวิว'               gen_name=None                           profile_url='https://www.facebook.com/profile.php?id=100072112921160'    url_kind=profile followers=110000
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+
+similarity=0.80  platform=Facebook
+  id=779   handle='แม่มารีวิว'                   gen_name='MaeMaReview'                  profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+  id=788   handle='แอบลูกมารีวิว'                gen_name='AebLukMaReview'               profile_url='https://www.facebook.com/profile.php?id=100082820830140'    url_kind=profile followers=15000
+
+similarity=0.72  platform=Facebook
+  id=780   handle='แม่มารีวิว VDO'               gen_name='MaeMaReviewVDO'               profile_url='https://www.facebook.com/meamareview'                       url_kind=profile followers=49000
+  id=783   handle='แม่ว่าดี VDO'                 gen_name='MaeWaDeeVDO'                  profile_url='https://www.facebook.com/Maewadee.cooking/'                 url_kind=profile followers=151000
+
+similarity=0.84  platform=Facebook
+  id=782   handle='แม่ว่าดี'                     gen_name='MaeWaDee'                     profile_url='https://www.tiktok.com/@jikthawineek?lang=en'               url_kind=profile followers=150000
+  id=783   handle='แม่ว่าดี VDO'                 gen_name='MaeWaDeeVDO'                  profile_url='https://www.facebook.com/Maewadee.cooking/'                 url_kind=profile followers=151000
+
+similarity=0.85  platform=Instagram
+  id=299   handle='my_catstoryVDO'               gen_name='MycatstoryVDOIG'              profile_url='https://www.instagram.com/reel/DWiRhAUEzyv/?igsh=ZHk2b3I0dW5qczMw' url_kind=post followers=34300
+  id=300   handle='my_catstoryy-PhotoIG'         gen_name='my_catstoryy'                 profile_url='https://www.instagram.com/p/DWi276Ok_rN/?igsh=MWJkZmU2cWc1YWsyZg%3D%3D&img_index=2' url_kind=post followers=34300
+
+=== C) profile_url looks like a POST link, not a profile link (by platform) ===
+Total: 8 / 825 KOL rows
+Counter({'Instagram': 5, 'TikTok': 2, 'YouTube': 1})
+
+Sample (up to 15):
+  id=73    platform=Instagram  handle='bombiescatIG'                 profile_url=http://instagram.com/reel/DXqtGIAPp4g/?igsh=MW1lcTQ1cjY0cTV0bg==
+  id=121   platform=YouTube    handle='Extreme IT'                   profile_url=https://www.youtube.com/watch?v=Fja_XrIVMUk
+  id=299   platform=Instagram  handle='my_catstoryVDO'               profile_url=https://www.instagram.com/reel/DWiRhAUEzyv/?igsh=ZHk2b3I0dW5qczMw
+  id=300   platform=Instagram  handle='my_catstoryy-PhotoIG'         profile_url=https://www.instagram.com/p/DWi276Ok_rN/?igsh=MWJkZmU2cWc1YWsyZg%3D%3D&img_index=2
+  id=373   platform=TikTok     handle='polyreviewver'                profile_url=https://www.tiktok.com/@polyreviewver/video/7634860271365786898?_r=1&_t=ZS-95zjvl8IVFQ
+  id=374   platform=Instagram  handle='polyreviewverig'              profile_url=https://www.instagram.com/reel/DXyt7DUjw-q/?fbclid=IwY2xjawRhXwpleHRuA2FlbQIxMABicmlkETFOZ1V0WlBObElOaUR5dnNhc3J0YwZhcHBfaWQPNTE0NzcxNTY5MjI4MDYxAAEeoOcuuZzjxR0NY8yxoG7ti6q_geRdv9FunEITmyxXEG7n8Qi4yhsL1XmCuLc_aem_qOf1ryZ8kpiXEUK4Oh_oOQ
+  id=440   platform=TikTok     handle='srymgif'                      profile_url=https://www.tiktok.com/@srymgif/video/7632656369824386324
+  id=604   platform=Instagram  handle='ป้าไจ๋น้องไข๋ตุ๋น'            profile_url=https://www.instagram.com/p/DXyHjhukTPZ/?igsh=MWZidmhtMmppbmpwOA%3D%3D
+
+=== D) platform field != domain of profile_url (data entry mismatch) ===
+  id=99    platform=YouTube    handle='Crepeyen is here'             profile_url=https://www.tiktok.com/@crepeyenishere
+  id=241   platform=YouTube    handle='MAKER FRIEND SHOP'            profile_url=https://www.tiktok.com/@maker_friend?_r=1&_t=ZS-95OHDbE4EKa
+  id=242   platform=TikTok     handle="Maker's_Friend"               profile_url=https://www.youtube.com/@makers_friend3920/shorts
+  id=254   platform=Facebook   handle='Milin little wonders'         profile_url=https://www.tiktok.com/@milinlittlewonders
+  id=296   platform=TikTok     handle='My Catstory'                  profile_url=https://www.facebook.com/profile.php?id=100075482367732
+  id=304   platform=TikTok     handle='mynster'                      profile_url=https://www.instagram.com/mynster/
+  id=310   platform=YouTube    handle='NEXT TECH'                    profile_url=https://www.facebook.com/NextTechStudio
+  id=399   platform=TikTok     handle='retouchhome'                  profile_url=https://www.facebook.com/retouchhome
+  id=559   platform=Facebook   handle='ธีอาแมวเอเลี่ยนบ๊วยเค็ม'      profile_url=https://www.instagram.com/theia.littlecat/
+  id=782   platform=Facebook   handle='แม่ว่าดี'                     profile_url=https://www.tiktok.com/@jikthawineek?lang=en

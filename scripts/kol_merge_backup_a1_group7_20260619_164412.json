@@ -1,0 +1,41 @@
+{
+  "note": "group 7 crepeyenishere - resolved as keep-separate, field fixes only, no merge",
+  "before": [
+    {
+      "id": 99,
+      "handle": "Crepeyen is here",
+      "handle_normalized": "crepeyen is here",
+      "gen_name": null,
+      "content_category_id": 4,
+      "kol_tier_id": 1,
+      "platform_id": 4,
+      "follower_count": 39,
+      "notes": null,
+      "created_at": "2026-06-10 08:41:52.718648+00:00",
+      "profile_url": "https://www.tiktok.com/@crepeyenishere",
+      "contact_info": null,
+      "audience_tags": null,
+      "custom_tags": null,
+      "main_selling_points": null,
+      "avatar_url": null
+    },
+    {
+      "id": 100,
+      "handle": "crepeyenishere",
+      "handle_normalized": "crepeyenishere",
+      "gen_name": "crepeyenishere",
+      "content_category_id": 4,
+      "kol_tier_id": 3,
+      "platform_id": 2,
+      "follower_count": 91900,
+      "notes": null,
+      "created_at": "2026-06-10 08:41:52.718648+00:00",
+      "profile_url": "https://www.tiktok.com/@crepeyenishere",
+      "contact_info": null,
+      "audience_tags": null,
+      "custom_tags": null,
+      "main_selling_points": null,
+      "avatar_url": null
+    }
+  ]
+}

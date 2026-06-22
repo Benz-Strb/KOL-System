@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model brands {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @unique
+  active               Boolean                @default(true)
+  kol_commercial_terms kol_commercial_terms[]
+  kol_samples          kol_samples[]
+  placements           placements[]
+  user_brands          user_brands[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model campaigns {
+  id         Int          @id @default(autoincrement())
+  code       String
+  label      String?
+  year       Int
+  start_date DateTime?    @db.Date
+  end_date   DateTime?    @db.Date
+  placements placements[]
+
+  @@unique([code, year])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model content_categories {
+  id     Int     @id @default(autoincrement())
+  name   String  @unique
+  active Boolean @default(true)
+  kols   kols[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model kol_tiers {
+  id           Int    @id @default(autoincrement())
+  name         String @unique
+  follower_min Int?
+  follower_max Int?
+  kols         kols[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model kols {
+  id                   Int                    @id @default(autoincrement())
+  handle               String
+  handle_normalized    String                 @unique
+  gen_name             String?
+  content_category_id  Int?
+  kol_tier_id          Int?
+  platform_id          Int?
+  follower_count       Int?
+  notes                String?
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  profile_url          String?
+  contact_info         Json?
+  audience_tags        String[]
+  custom_tags          String[]
+  main_selling_points  String?
+  avatar_url           String?
+  kol_commercial_terms kol_commercial_terms[]
+  kol_samples          kol_samples[]
+  content_categories   content_categories?    @relation(fields: [content_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kol_tiers            kol_tiers?             @relation(fields: [kol_tier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  platforms            platforms?             @relation(fields: [platform_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  placements           placements[]
+
+  @@index([content_category_id], map: "idx_kols_content_category")
+  @@index([platform_id], map: "idx_kols_platform")
+  @@index([kol_tier_id], map: "idx_kols_tier")
+  @@index([audience_tags], map: "idx_kols_audience_tags", type: Gin)
+  @@index([custom_tags], map: "idx_kols_custom_tags", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model placement_metrics {
+  id               Int        @id @default(autoincrement())
+  placement_id     Int
+  channel          String
+  period_days      Int        @default(30)
+  measured_at      DateTime?  @db.Date
+  visits           Int?
+  atc              Int?
+  atc_value        Decimal?   @db.Decimal(14, 2)
+  gmv              Decimal?   @db.Decimal(14, 2)
+  orders           Int?
+  vdo_view         Int?
+  clicks           Int?
+  ads_spend        Decimal?   @db.Decimal(14, 2)
+  is_automated     Boolean    @default(false)
+  created_at       DateTime   @default(now()) @db.Timestamptz(6)
+  likes            Int?
+  comments         Int?
+  saves            Int?
+  impressions      Int?
+  shares           Int?
+  engagement_rate  Decimal?   @db.Decimal(10, 6)
+  tracking_period  String?    @default("recent_30_days")
+  promotion_status String?
+  placements       placements @relation(fields: [placement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([placement_id, channel, period_days, measured_at])
+  @@index([channel], map: "idx_metrics_channel")
+  @@index([placement_id], map: "idx_metrics_placement")
+  @@index([promotion_status], map: "idx_metrics_promotion_status")
+  @@index([tracking_period], map: "idx_metrics_tracking_period")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model placements {
+  id                                          Int                 @id @default(autoincrement())
+  placement_type                              String              @default("online")
+  campaign_id                                 Int?
+  store_id                                    Int?
+  person_in_charge                            String?
+  kol_id                                      Int?
+  platform_id                                 Int?
+  product_id                                  Int?
+  payment_type                                String              @default("paid")
+  final_price                                 Decimal?            @db.Decimal(12, 2)
+  pay_amount                                  Decimal?            @db.Decimal(12, 2)
+  ads_cost                                    Decimal?            @db.Decimal(12, 2)
+  follower_at_time                            Int?
+  target_pub_date                             DateTime?           @db.Date
+  publication_date                            DateTime?           @db.Date
+  post_url                                    String?
+  shopee_utm                                  String?
+  lazada_utm                                  String?
+  website_utm                                 String?
+  utm_campaign_name                           String?
+  ad_content_name                             String?
+  status                                      String              @default("planned")
+  notes                                       String?
+  created_at                                  DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                                  DateTime            @default(now()) @db.Timestamptz(6)
+  brand_id                                    Int
+  person_in_charge_id                         Int?
+  created_by_id                               Int?
+  kol_samples                                 kol_samples[]
+  placement_metrics                           placement_metrics[]
+  brands                                      brands              @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  campaigns                                   campaigns?          @relation(fields: [campaign_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_placements_created_by_idTousers       users?              @relation("placements_created_by_idTousers", fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kols                                        kols?               @relation(fields: [kol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_placements_person_in_charge_idTousers users?              @relation("placements_person_in_charge_idTousers", fields: [person_in_charge_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  platforms                                   platforms?          @relation(fields: [platform_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products                                    products?           @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stores                                      stores?             @relation(fields: [store_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([brand_id], map: "idx_placements_brand")
+  @@index([campaign_id], map: "idx_placements_campaign")
+  @@index([created_by_id], map: "idx_placements_created_by")
+  @@index([kol_id], map: "idx_placements_kol")
+  @@index([person_in_charge_id], map: "idx_placements_pic")
+  @@index([platform_id], map: "idx_placements_platform")
+  @@index([product_id], map: "idx_placements_product")
+  @@index([publication_date], map: "idx_placements_pub_date")
+  @@index([store_id], map: "idx_placements_store")
+  @@index([placement_type], map: "idx_placements_type")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model platforms {
+  id         Int          @id @default(autoincrement())
+  name       String       @unique
+  active     Boolean      @default(true)
+  kols       kols[]
+  placements placements[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model product_categories {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique
+  active   Boolean    @default(true)
+  products products[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model products {
+  id                   Int                 @id @default(autoincrement())
+  product_category_id  Int?
+  model_code           String              @unique
+  active               Boolean             @default(true)
+  canonical_product_id Int?
+  is_canonical         Boolean             @default(true)
+  kol_samples          kol_samples[]
+  placements           placements[]
+  products             products?           @relation("productsToproducts", fields: [canonical_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_products       products[]          @relation("productsToproducts")
+  product_categories   product_categories? @relation(fields: [product_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([product_category_id], map: "idx_products_category")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model stores {
+  id         Int          @id @default(autoincrement())
+  name       String
+  branch     String?
+  active     Boolean      @default(true)
+  placements placements[]
+
+  @@unique([name, branch])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_brands {
+  user_id  Int
+  brand_id Int
+  brands   brands @relation(fields: [brand_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users    users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, brand_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id                                               Int           @id @default(autoincrement())
+  full_name                                        String        @unique
+  email                                            String?       @unique
+  role                                             String        @default("marketing")
+  is_active                                        Boolean       @default(true)
+  created_at                                       DateTime      @default(now()) @db.Timestamptz(6)
+  placements_placements_created_by_idTousers       placements[]  @relation("placements_created_by_idTousers")
+  placements_placements_person_in_charge_idTousers placements[]  @relation("placements_person_in_charge_idTousers")
+  user_brands                                      user_brands[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model kol_commercial_terms {
+  id                   Int      @id @default(autoincrement())
+  kol_id               Int
+  brand_id             Int?
+  pricing_type         String
+  single_post_price    Decimal? @db.Decimal(14, 2)
+  package_price        Decimal? @db.Decimal(14, 2)
+  multi_platform_price Decimal? @db.Decimal(14, 2)
+  is_barter            Boolean  @default(false)
+  notes                String?
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+  brands               brands?  @relation(fields: [brand_id], references: [id], onUpdate: NoAction)
+  kols                 kols     @relation(fields: [kol_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([brand_id], map: "idx_kol_commercial_terms_brand")
+  @@index([kol_id], map: "idx_kol_commercial_terms_kol")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model kol_samples {
+  id            Int         @id @default(autoincrement())
+  kol_id        Int
+  placement_id  Int?
+  brand_id      Int?
+  product_id    Int?
+  sample_status String      @default("to_be_shipped")
+  return_policy String      @default("no_return_required")
+  shipped_at    DateTime?   @db.Date
+  signed_at     DateTime?   @db.Date
+  notes         String?
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime    @default(now()) @db.Timestamptz(6)
+  brands        brands?     @relation(fields: [brand_id], references: [id], onUpdate: NoAction)
+  kols          kols        @relation(fields: [kol_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  placements    placements? @relation(fields: [placement_id], references: [id], onUpdate: NoAction)
+  products      products?   @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+
+  @@index([brand_id], map: "idx_kol_samples_brand")
+  @@index([kol_id], map: "idx_kol_samples_kol")
+  @@index([placement_id], map: "idx_kol_samples_placement")
+  @@index([product_id], map: "idx_kol_samples_product")
+  @@index([sample_status], map: "idx_kol_samples_status")
+}

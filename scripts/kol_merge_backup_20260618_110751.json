@@ -1,0 +1,1471 @@
+{
+ "merges": [
+  [
+   13,
+   [
+    663
+   ]
+  ],
+  [
+   761,
+   [
+    341,
+    17
+   ]
+  ],
+  [
+   659,
+   [
+    20,
+    660
+   ]
+  ],
+  [
+   108,
+   [
+    685
+   ]
+  ],
+  [
+   702,
+   [
+    159
+   ]
+  ],
+  [
+   575,
+   [
+    173
+   ]
+  ],
+  [
+   765,
+   [
+    181
+   ]
+  ],
+  [
+   720,
+   [
+    193
+   ]
+  ],
+  [
+   201,
+   [
+    202
+   ]
+  ],
+  [
+   451,
+   [
+    224
+   ]
+  ],
+  [
+   643,
+   [
+    246,
+    644
+   ]
+  ],
+  [
+   586,
+   [
+    282
+   ]
+  ],
+  [
+   661,
+   [
+    285
+   ]
+  ],
+  [
+   770,
+   [
+    314
+   ]
+  ],
+  [
+   784,
+   [
+    320
+   ]
+  ],
+  [
+   334,
+   [
+    333
+   ]
+  ],
+  [
+   778,
+   [
+    368
+   ]
+  ],
+  [
+   629,
+   [
+    378
+   ]
+  ],
+  [
+   397,
+   [
+    398
+   ]
+  ],
+  [
+   400,
+   [
+    403
+   ]
+  ],
+  [
+   412,
+   [
+    823,
+    824,
+    825
+   ]
+  ],
+  [
+   437,
+   [
+    438
+   ]
+  ],
+  [
+   596,
+   [
+    472
+   ]
+  ],
+  [
+   551,
+   [
+    474
+   ]
+  ],
+  [
+   528,
+   [
+    527
+   ]
+  ],
+  [
+   538,
+   [
+    537
+   ]
+  ],
+  [
+   818,
+   [
+    580,
+    581
+   ]
+  ],
+  [
+   821,
+   [
+    588,
+    822
+   ]
+  ],
+  [
+   630,
+   [
+    631
+   ]
+  ],
+  [
+   647,
+   [
+    648
+   ]
+  ],
+  [
+   652,
+   [
+    653
+   ]
+  ],
+  [
+   742,
+   [
+    743
+   ]
+  ],
+  [
+   802,
+   [
+    801
+   ]
+  ]
+ ],
+ "field_edits": [
+  [
+   782,
+   {
+    "profile_url": "https://www.facebook.com/Maewadee.cooking"
+   }
+  ],
+  [
+   399,
+   {
+    "profile_url": "https://www.tiktok.com/@retouchhome"
+   }
+  ],
+  [
+   201,
+   {
+    "handle": "Kate Variety แม่บ้านมินิมอล",
+    "gen_name": "KateVarietyMaebanMinimal"
+   }
+  ],
+  [
+   586,
+   {
+    "gen_name": "mommyjaahome"
+   }
+  ],
+  [
+   334,
+   {
+    "handle": "ออมพลอยไม่ใช่พลอย",
+    "gen_name": "omployy"
+   }
+  ],
+  [
+   629,
+   {
+    "gen_name": "porbaanreview"
+   }
+  ],
+  [
+   702,
+   {
+    "gen_name": "iammind_t"
+   }
+  ],
+  [
+   596,
+   {
+    "gen_name": "tidyytales"
+   }
+  ],
+  [
+   528,
+   {
+    "handle": "จัมปงแอนด์โบรว์",
+    "gen_name": "JampongAndBrow"
+   }
+  ],
+  [
+   538,
+   {
+    "gen_name": "charmmy kekie"
+   }
+  ],
+  [
+   647,
+   {
+    "handle": "มีตังค์ไหมครับพ่อ",
+    "gen_name": "Meetangmaikrubpor"
+   }
+  ],
+  [
+   742,
+   {
+    "handle": "เลี้ยงลูกสนุกดี By เเม่กรีน",
+    "gen_name": "Liangluksanukdibymaegreen"
+   }
+  ],
+  [
+   802,
+   {
+    "handle": "โลกใบใหญ่ของอองรี",
+    "gen_name": "LokBaiYaiKhongHenri"
+   }
+  ]
+ ],
+ "kols": [
+  {
+   "id": 13,
+   "handle": "@MissMuayAof",
+   "handle_normalized": "@missmuayaof",
+   "gen_name": "MissMuayAof",
+   "platform_id": 1,
+   "content_category_id": 6,
+   "kol_tier_id": 2,
+   "follower_count": 10000,
+   "profile_url": "https://www.facebook.com/MissMuayAof",
+   "avatar_url": "https://graph.facebook.com/MissMuayAof/picture?type=large"
+  },
+  {
+   "id": 17,
+   "handle": "@pairpairphan",
+   "handle_normalized": "@pairpairphan",
+   "gen_name": "pairpairphan",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": null,
+   "follower_count": null,
+   "profile_url": "https://www.tiktok.com/@pairpairphan?_r=1&_t=ZS-95OfNnKeuvv",
+   "avatar_url": null
+  },
+  {
+   "id": 20,
+   "handle": "@reviewfeelchan",
+   "handle_normalized": "@reviewfeelchan",
+   "gen_name": "reviewfeelchan",
+   "platform_id": 1,
+   "content_category_id": 6,
+   "kol_tier_id": 2,
+   "follower_count": 15000,
+   "profile_url": "https://www.facebook.com/reviewfeelchan",
+   "avatar_url": "https://graph.facebook.com/reviewfeelchan/picture?type=large"
+  },
+  {
+   "id": 108,
+   "handle": "delight_athome",
+   "handle_normalized": "delight_athome",
+   "gen_name": "delightathome",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 3,
+   "follower_count": 83500,
+   "profile_url": "https://www.tiktok.com/@delight_athome",
+   "avatar_url": null
+  },
+  {
+   "id": 159,
+   "handle": "iammind_t",
+   "handle_normalized": "iammind_t",
+   "gen_name": "iammindt",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 23900,
+   "profile_url": "https://www.tiktok.com/@iammind_t",
+   "avatar_url": null
+  },
+  {
+   "id": 173,
+   "handle": "jam28185",
+   "handle_normalized": "jam28185",
+   "gen_name": "jam28185",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 1,
+   "follower_count": 2500,
+   "profile_url": "https://www.tiktok.com/@jam28185?fbclid=IwY2xjawQeEgVleHRuA2FlbQIxMABicmlkETFRWUkxTzR5WUFkOE01MnBHc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHr_7uKS_r3BIuTr3i6s0ZBFtdyfCDwY6fqlULEEtoao3ApgDCkk4gsB1pcdg_aem_7nueMnh9-e1PDN2KFcoQdg",
+   "avatar_url": null
+  },
+  {
+   "id": 181,
+   "handle": "jikthawineek",
+   "handle_normalized": "jikthawineek",
+   "gen_name": "jikthawineek",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 109800,
+   "profile_url": "https://www.tiktok.com/@jikthawineek",
+   "avatar_url": null
+  },
+  {
+   "id": 193,
+   "handle": "jsee236",
+   "handle_normalized": "jsee236",
+   "gen_name": "jsee236",
+   "platform_id": 2,
+   "content_category_id": 4,
+   "kol_tier_id": 4,
+   "follower_count": 418000,
+   "profile_url": "https://www.tiktok.com/@jsee236",
+   "avatar_url": null
+  },
+  {
+   "id": 201,
+   "handle": "Kate Variety แม่บ้านมินิมอล VDO",
+   "handle_normalized": "kate variety แม่บ้านมินิมอล vdo",
+   "gen_name": "KateVarietyMaebanMinimalVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 32000,
+   "profile_url": "https://www.facebook.com/katevariety.silentvlog",
+   "avatar_url": "https://graph.facebook.com/katevariety.silentvlog/picture?type=large"
+  },
+  {
+   "id": 202,
+   "handle": "Kate Variety_VDO",
+   "handle_normalized": "kate variety_vdo",
+   "gen_name": "KateVarietyVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 31000,
+   "profile_url": "https://www.facebook.com/katevariety.silentvlog",
+   "avatar_url": "https://graph.facebook.com/katevariety.silentvlog/picture?type=large"
+  },
+  {
+   "id": 224,
+   "handle": "lata_arss",
+   "handle_normalized": "lata_arss",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 1,
+   "follower_count": 6000,
+   "profile_url": "https://www.tiktok.com/@lata_arss",
+   "avatar_url": null
+  },
+  {
+   "id": 246,
+   "handle": "manimatravel",
+   "handle_normalized": "manimatravel",
+   "gen_name": "manimatravel",
+   "platform_id": 1,
+   "content_category_id": 7,
+   "kol_tier_id": 3,
+   "follower_count": 83000,
+   "profile_url": "https://www.facebook.com/manimatravel",
+   "avatar_url": "https://graph.facebook.com/manimatravel/picture?type=large"
+  },
+  {
+   "id": 282,
+   "handle": "mommyjaahome",
+   "handle_normalized": "mommyjaahome",
+   "gen_name": "mommyjaahome",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 1,
+   "follower_count": 6943,
+   "profile_url": "https://www.tiktok.com/@mommyjaahome",
+   "avatar_url": null
+  },
+  {
+   "id": 285,
+   "handle": "mookdachaaa",
+   "handle_normalized": "mookdachaaa",
+   "gen_name": "mookdachaaa",
+   "platform_id": 1,
+   "content_category_id": 6,
+   "kol_tier_id": 4,
+   "follower_count": 260000,
+   "profile_url": "https://www.facebook.com/mookdachaaa",
+   "avatar_url": "https://graph.facebook.com/mookdachaaa/picture?type=large"
+  },
+  {
+   "id": 314,
+   "handle": "niiineeew",
+   "handle_normalized": "niiineeew",
+   "gen_name": "niiineeew",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 31400,
+   "profile_url": "https://www.tiktok.com/@niiineeew",
+   "avatar_url": null
+  },
+  {
+   "id": 320,
+   "handle": "nongjinj",
+   "handle_normalized": "nongjinj",
+   "gen_name": "nongjinj",
+   "platform_id": 2,
+   "content_category_id": 2,
+   "kol_tier_id": 4,
+   "follower_count": 154200,
+   "profile_url": "https://www.tiktok.com/@nongjinj",
+   "avatar_url": null
+  },
+  {
+   "id": 333,
+   "handle": "omploy",
+   "handle_normalized": "omploy",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 30900,
+   "profile_url": "https://www.tiktok.com/@omployy?is_from_webapp=1&sender_device=pc",
+   "avatar_url": null
+  },
+  {
+   "id": 334,
+   "handle": "omployy",
+   "handle_normalized": "omployy",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 31000,
+   "profile_url": "https://www.tiktok.com/@omployy",
+   "avatar_url": null
+  },
+  {
+   "id": 341,
+   "handle": "pairpairphan",
+   "handle_normalized": "pairpairphan",
+   "gen_name": "pairpairphan",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 29500,
+   "profile_url": "https://www.tiktok.com/@pairpairphan",
+   "avatar_url": null
+  },
+  {
+   "id": 368,
+   "handle": "ployvatin",
+   "handle_normalized": "ployvatin",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 5,
+   "follower_count": 1300000,
+   "profile_url": "https://www.tiktok.com/@ployvatin",
+   "avatar_url": null
+  },
+  {
+   "id": 378,
+   "handle": "porbaanreview",
+   "handle_normalized": "porbaanreview",
+   "gen_name": "porbaanreview",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 11600,
+   "profile_url": "https://www.tiktok.com/@porbaanreview",
+   "avatar_url": null
+  },
+  {
+   "id": 397,
+   "handle": "Retouch Home",
+   "handle_normalized": "retouch home",
+   "gen_name": "RetouchHome",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 3,
+   "follower_count": 53000,
+   "profile_url": "https://www.facebook.com/retouchhome",
+   "avatar_url": "https://graph.facebook.com/retouchhome/picture?type=large"
+  },
+  {
+   "id": 398,
+   "handle": "Retouch Home_VDO",
+   "handle_normalized": "retouch home_vdo",
+   "gen_name": "RetouchHomeVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 11000,
+   "profile_url": "https://www.facebook.com/retouchhome",
+   "avatar_url": "https://graph.facebook.com/retouchhome/picture?type=large"
+  },
+  {
+   "id": 400,
+   "handle": "Review รีวิ้ว",
+   "handle_normalized": "review รีวิ้ว",
+   "gen_name": "Reviewreview",
+   "platform_id": 1,
+   "content_category_id": 6,
+   "kol_tier_id": 3,
+   "follower_count": 58000,
+   "profile_url": "https://www.facebook.com/rewiewww?mibextid=wwXIfr&rdid=8JFtM3BVvMHDZBwA&share_url=https%3A%2F%2Fwww.facebook.com%2Fshare%2F1JXWzQ4bxF%2F%3Fmibextid%3DwwXIfr",
+   "avatar_url": "https://graph.facebook.com/rewiewww/picture?type=large"
+  },
+  {
+   "id": 403,
+   "handle": "Rewiew รีวิ้วว VDO",
+   "handle_normalized": "rewiew รีวิ้วว vdo",
+   "gen_name": "RewiewReviewVDO",
+   "platform_id": 1,
+   "content_category_id": 6,
+   "kol_tier_id": 3,
+   "follower_count": 58000,
+   "profile_url": "https://www.facebook.com/rewiewww?__cft__%5B0%5D=AZavIJ5295Ir5w2VmT3q2dLW4g1orEB-1yPz7jaxpxh5r9YBTrZ54CTqhyE6PiHQs8nFNtbCYrEK0LVhsg5xiBwV_JSfpPoBOVWUrVRbidvO_pSKGooWDKDynM6yr5YDdeM2F8b3YDZhTrKoHwtJH79WzanIIFu9YVyMN7oovXTKQiWhJ2gORaKUypj_KIu-bs9uK3FucilW29ZePx9Exuzf&__tn__=-UC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/rewiewww/picture?type=large"
+  },
+  {
+   "id": 412,
+   "handle": "Salin Stoy",
+   "handle_normalized": "salin stoy",
+   "gen_name": "SalinStoy",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 117000,
+   "profile_url": "https://www.facebook.com/salinstory",
+   "avatar_url": "https://graph.facebook.com/salinstory/picture?type=large"
+  },
+  {
+   "id": 437,
+   "handle": "spoonandfork",
+   "handle_normalized": "spoonandfork",
+   "gen_name": "spoonandfork",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 4,
+   "follower_count": 114000,
+   "profile_url": "https://www.tiktok.com/@spoonandfork.kitchen",
+   "avatar_url": null
+  },
+  {
+   "id": 438,
+   "handle": "spoonandfork.kitchen",
+   "handle_normalized": "spoonandfork.kitchen",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 114300,
+   "profile_url": "https://www.tiktok.com/@spoonandfork.kitchen",
+   "avatar_url": null
+  },
+  {
+   "id": 451,
+   "handle": "Ta Diary",
+   "handle_normalized": "ta diary",
+   "gen_name": "TaDiary",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 1,
+   "follower_count": 7347,
+   "profile_url": "https://www.tiktok.com/@lata_arss",
+   "avatar_url": null
+  },
+  {
+   "id": 472,
+   "handle": "tidyytales",
+   "handle_normalized": "tidyytales",
+   "gen_name": "tidyytales",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 11000,
+   "profile_url": "https://www.tiktok.com/@tidyytales",
+   "avatar_url": null
+  },
+  {
+   "id": 474,
+   "handle": "tis.tid.baan",
+   "handle_normalized": "tis.tid.baan",
+   "gen_name": "tistidbaan",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 1,
+   "follower_count": 9233,
+   "profile_url": "https://www.tiktok.com/@tis.tid.baan",
+   "avatar_url": null
+  },
+  {
+   "id": 527,
+   "handle": "จัมปงแอนด์โบรว์",
+   "handle_normalized": "จัมปงแอนด์โบรว์",
+   "gen_name": "jampongandbros",
+   "platform_id": 1,
+   "content_category_id": 2,
+   "kol_tier_id": null,
+   "follower_count": null,
+   "profile_url": "https://www.facebook.com/jampongandbros",
+   "avatar_url": "https://graph.facebook.com/jampongandbros/picture?type=large"
+  },
+  {
+   "id": 528,
+   "handle": "จัมปงแอนด์โบรว์_VDO",
+   "handle_normalized": "จัมปงแอนด์โบรว์_vdo",
+   "gen_name": "JampongAndBrowVDO",
+   "platform_id": 1,
+   "content_category_id": 2,
+   "kol_tier_id": 2,
+   "follower_count": 13000,
+   "profile_url": "https://www.facebook.com/jampongandbros",
+   "avatar_url": "https://graph.facebook.com/jampongandbros/picture?type=large"
+  },
+  {
+   "id": 537,
+   "handle": "ชาร์มกีกี้",
+   "handle_normalized": "ชาร์มกีกี้",
+   "gen_name": "Chramkiki",
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 43000,
+   "profile_url": "https://www.facebook.com/CHARMMYKEKIEZ",
+   "avatar_url": "https://graph.facebook.com/CHARMMYKEKIEZ/picture?type=large"
+  },
+  {
+   "id": 538,
+   "handle": "ชาร์มมี่ กีกี้",
+   "handle_normalized": "ชาร์มมี่ กีกี้",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 6,
+   "kol_tier_id": 2,
+   "follower_count": 45000,
+   "profile_url": "https://www.facebook.com/CHARMMYKEKIEZ?__cft__%5B0%5D=AZZDm2x4OjGnitde1qnCRm3jU6eblD3tqMvg_eILLrjBGFGLhav8bEfBsAcqxESCSitg6jWfZ8LXo0VSfeStKzYPoclKs2YEyAuB4mTwT8at09EN6Qq03kidUsJxW60nRlJJ72VQxUqqXzvbmV9PUTdmVBln5Coe3H2UMDCjYifHnjLdNnhiEWBcJaYFtAzso7mp1OyVqN24YFUIjHauK7jA&__tn__=-%5DC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/CHARMMYKEKIEZ/picture?type=large"
+  },
+  {
+   "id": 551,
+   "handle": "ติสติดบ้าน🏡",
+   "handle_normalized": "ติสติดบ้าน🏡",
+   "gen_name": "tistidbaan",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 1,
+   "follower_count": 9130,
+   "profile_url": "https://www.tiktok.com/@tis.tid.baan?lang=th-TH",
+   "avatar_url": null
+  },
+  {
+   "id": 575,
+   "handle": "น้องแจมแยมส้ม เที่ยวเหนือ",
+   "handle_normalized": "น้องแจมแยมส้ม เที่ยวเหนือ",
+   "gen_name": "NongJamYamSomThiaoNuea",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 25200,
+   "profile_url": "https://www.tiktok.com/@jam28185?fbclid=IwY2xjawQgeNNleHRuA2FlbQIxMABicmlkETE1aFZ5MnZ3Uk1sSjk2eGxYc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHlRSIs3O-QwhUv3q9cCSMbgisHeeUVeBWUFy4NW5_9tVQybliB6UcRlGrl-y_aem_5YO3xOlMYFkg29v41cMvAw",
+   "avatar_url": null
+  },
+  {
+   "id": 580,
+   "handle": "บ้านของกาญจน์",
+   "handle_normalized": "บ้านของกาญจน์",
+   "gen_name": "bankhongkarn",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": null,
+   "follower_count": null,
+   "profile_url": "https://www.facebook.com/profile.php?id=100078269920436",
+   "avatar_url": "https://graph.facebook.com/100078269920436/picture?type=large"
+  },
+  {
+   "id": 581,
+   "handle": "บ้านของกาญจน์_VDO",
+   "handle_normalized": "บ้านของกาญจน์_vdo",
+   "gen_name": "BaankhongkanVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": null,
+   "follower_count": null,
+   "profile_url": "https://www.facebook.com/profile.php?id=100078269920436",
+   "avatar_url": "https://graph.facebook.com/100078269920436/picture?type=large"
+  },
+  {
+   "id": 586,
+   "handle": "บ้านจ๋า",
+   "handle_normalized": "บ้านจ๋า",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 1,
+   "follower_count": 6700,
+   "profile_url": "https://www.tiktok.com/@mommyjaahome",
+   "avatar_url": null
+  },
+  {
+   "id": 588,
+   "handle": "บ้านนี้มีเรา",
+   "handle_normalized": "บ้านนี้มีเรา",
+   "gen_name": "Ourhouse",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 120000,
+   "profile_url": "https://www.facebook.com/ourhouse.th",
+   "avatar_url": "https://graph.facebook.com/ourhouse.th/picture?type=large"
+  },
+  {
+   "id": 596,
+   "handle": "ปปไม่ชอบล้างจาน🫧🧽",
+   "handle_normalized": "ปปไม่ชอบล้างจาน🫧🧽",
+   "gen_name": "Popmaichoblangjan",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 11000,
+   "profile_url": "https://www.tiktok.com/@tidyytales",
+   "avatar_url": null
+  },
+  {
+   "id": 629,
+   "handle": "พ่อบ้านรีวิว",
+   "handle_normalized": "พ่อบ้านรีวิว",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 11400,
+   "profile_url": "https://www.tiktok.com/@porbaanreview",
+   "avatar_url": null
+  },
+  {
+   "id": 630,
+   "handle": "พ่อบ้านรีวิว Lazada & Shopee",
+   "handle_normalized": "พ่อบ้านรีวิว lazada & shopee",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 3,
+   "follower_count": 92000,
+   "profile_url": "https://www.facebook.com/porbaanreview",
+   "avatar_url": "https://graph.facebook.com/porbaanreview/picture?type=large"
+  },
+  {
+   "id": 631,
+   "handle": "พ่อบ้านรีวิว Lazada & Shopee_VDO",
+   "handle_normalized": "พ่อบ้านรีวิว lazada & shopee_vdo",
+   "gen_name": "PhobanReviewLazadaShopeeVDO",
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 3,
+   "follower_count": 91000,
+   "profile_url": "https://www.facebook.com/porbaanreview",
+   "avatar_url": "https://graph.facebook.com/porbaanreview/picture?type=large"
+  },
+  {
+   "id": 643,
+   "handle": "มานี่มา : manima travel",
+   "handle_normalized": "มานี่มา : manima travel",
+   "gen_name": "ManimaManimatravel",
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 3,
+   "follower_count": 75000,
+   "profile_url": "https://www.facebook.com/manimatravel",
+   "avatar_url": "https://graph.facebook.com/manimatravel/picture?type=large"
+  },
+  {
+   "id": 644,
+   "handle": "มานี่มา : manima travel VDO",
+   "handle_normalized": "มานี่มา : manima travel vdo",
+   "gen_name": "ManimaManimaTravelVDO",
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 3,
+   "follower_count": 83000,
+   "profile_url": "https://www.facebook.com/manimatravel",
+   "avatar_url": "https://graph.facebook.com/manimatravel/picture?type=large"
+  },
+  {
+   "id": 647,
+   "handle": "มีตังค์ไหมครับพ่อ VDO",
+   "handle_normalized": "มีตังค์ไหมครับพ่อ vdo",
+   "gen_name": "MeetangmaikrubporVDO",
+   "platform_id": 1,
+   "content_category_id": 2,
+   "kol_tier_id": 2,
+   "follower_count": 11000,
+   "profile_url": "https://www.facebook.com/profile.php?id=100083420763172",
+   "avatar_url": "https://graph.facebook.com/100083420763172/picture?type=large"
+  },
+  {
+   "id": 648,
+   "handle": "มีตังค์ไหมครับพ่อ_VDO",
+   "handle_normalized": "มีตังค์ไหมครับพ่อ_vdo",
+   "gen_name": "MeatangmaikhrapporVDO",
+   "platform_id": 1,
+   "content_category_id": 2,
+   "kol_tier_id": 2,
+   "follower_count": 11000,
+   "profile_url": "https://www.facebook.com/profile.php?id=100083420763172",
+   "avatar_url": "https://graph.facebook.com/100083420763172/picture?type=large"
+  },
+  {
+   "id": 652,
+   "handle": "ยัยหมวยโบน่า",
+   "handle_normalized": "ยัยหมวยโบน่า",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 5,
+   "kol_tier_id": 2,
+   "follower_count": 13000,
+   "profile_url": "https://www.facebook.com/bonamydaughter?__cft__%5B0%5D=AZahLTM8fDZyMcBAe_uc7UgGq_V4uPCMX3ool0X6YnJVyK41KVZqu_BmfNFksP6t9xcVZkMn_Iu5SFF7ad2_3OlH4hgdTvuuFXN-fLmAK3RVn4n-QqlYX7p6VLYSHr1UZkX9-c_Bk7Sp1QANwD7K5vL8HIXRYOWS5Ecr6a-wM0Wo7TZjF-rr72KRlakBJ1Z0tAI&__tn__=-UC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/bonamydaughter/picture?type=large"
+  },
+  {
+   "id": 653,
+   "handle": "ยัยหมวยโบรา",
+   "handle_normalized": "ยัยหมวยโบรา",
+   "gen_name": "bonamydaughter",
+   "platform_id": 1,
+   "content_category_id": 5,
+   "kol_tier_id": null,
+   "follower_count": null,
+   "profile_url": "https://www.facebook.com/bonamydaughter",
+   "avatar_url": "https://graph.facebook.com/bonamydaughter/picture?type=large"
+  },
+  {
+   "id": 659,
+   "handle": "รีวิวฟิลฉัน",
+   "handle_normalized": "รีวิวฟิลฉัน",
+   "gen_name": "ReviewFeelChan",
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 15000,
+   "profile_url": "https://www.facebook.com/reviewfeelchan/",
+   "avatar_url": "https://graph.facebook.com/reviewfeelchan/picture?type=large"
+  },
+  {
+   "id": 660,
+   "handle": "รีวิวฟีลฉัน",
+   "handle_normalized": "รีวิวฟีลฉัน",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 13000,
+   "profile_url": "https://www.facebook.com/reviewfeelchan/",
+   "avatar_url": "https://graph.facebook.com/reviewfeelchan/picture?type=large"
+  },
+  {
+   "id": 661,
+   "handle": "รีวิวระดับชาติ",
+   "handle_normalized": "รีวิวระดับชาติ",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 4,
+   "follower_count": 265000,
+   "profile_url": "https://www.facebook.com/mookdachaaa?__cft__%5B0%5D=AZZQ_aTqUK17pf2mBErVhiv-gtlGygb6tT3r8h8SlJk9Idi6LflBctou57K8sSEQsN2zKtN5Zabbq6EiQ5OXpNovj23mt6RUeFK-IQLnRuu9oJ2_XnJVjUj1x1WYLzhO8Tkg7GxSam5FLHJgAnvHTuU5VkEMi2XgTyYpfAbf5d6WcEtktE5YyFyuJJRP6tdUp_I&__tn__=-UC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/mookdachaaa/picture?type=large"
+  },
+  {
+   "id": 663,
+   "handle": "รีวิวสาวหมวย",
+   "handle_normalized": "รีวิวสาวหมวย",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 1,
+   "follower_count": 8900,
+   "profile_url": "https://www.facebook.com/MissMuayAof?__cft__%5B0%5D=AZYAfPQgQ9Sap0YoWo6Y9qBKJq0YBIkQym4jEe4V_0JoFWyWtoe-KbXrCpGNUXah7Cx1tu9gEnb_n4JsZzunVSM5vL6QwBzEg3esUx1bMVg2jJw3bApUXkXLvT2PlQqYsL_0039UVe9LPjfQEbwxv5NXpdx1-Bw5dMbtJ8uqqEXJZP2AHP7EvM6kxqit9ELBOYY&__tn__=-UC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/MissMuayAof/picture?type=large"
+  },
+  {
+   "id": 685,
+   "handle": "สุขใจที่บ้านเรา",
+   "handle_normalized": "สุขใจที่บ้านเรา",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 3,
+   "follower_count": 77100,
+   "profile_url": "https://www.tiktok.com/@delight_athome?is_from_webapp=1&sender_device=pc",
+   "avatar_url": null
+  },
+  {
+   "id": 702,
+   "handle": "อยู่บ้านกับมาร์ติน 🏡✨",
+   "handle_normalized": "อยู่บ้านกับมาร์ติน 🏡✨",
+   "gen_name": "U Baan Gub Martin",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 19000,
+   "profile_url": "https://www.tiktok.com/@iammind_t",
+   "avatar_url": null
+  },
+  {
+   "id": 720,
+   "handle": "เจ้ศรีปากอ้า",
+   "handle_normalized": "เจ้ศรีปากอ้า",
+   "gen_name": "JaeSriPakA",
+   "platform_id": 2,
+   "content_category_id": 4,
+   "kol_tier_id": 4,
+   "follower_count": 417900,
+   "profile_url": "https://www.tiktok.com/@jsee236?lang=th-TH",
+   "avatar_url": null
+  },
+  {
+   "id": 742,
+   "handle": "เลี้ยงลูกสนุกดี By เเม่กรีน VDO",
+   "handle_normalized": "เลี้ยงลูกสนุกดี by เเม่กรีน vdo",
+   "gen_name": "LiangluksanukdibymaegreenVDO",
+   "platform_id": 1,
+   "content_category_id": 5,
+   "kol_tier_id": 4,
+   "follower_count": 372000,
+   "profile_url": "https://www.facebook.com/fun.bygreen",
+   "avatar_url": "https://graph.facebook.com/fun.bygreen/picture?type=large"
+  },
+  {
+   "id": 743,
+   "handle": "เลี้ยงลูกสนุกดีVDO",
+   "handle_normalized": "เลี้ยงลูกสนุกดีvdo",
+   "gen_name": "LiangluksanookdeeVDO",
+   "platform_id": 1,
+   "content_category_id": 5,
+   "kol_tier_id": 4,
+   "follower_count": 370000,
+   "profile_url": "https://www.facebook.com/fun.bygreen",
+   "avatar_url": "https://graph.facebook.com/fun.bygreen/picture?type=large"
+  },
+  {
+   "id": 761,
+   "handle": "แพพัน 🏡 (IG.pairpairphan)",
+   "handle_normalized": "แพพัน 🏡 (ig.pairpairphan)",
+   "gen_name": "pairpairphan",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 2,
+   "follower_count": 26000,
+   "profile_url": "https://www.tiktok.com/@pairpairphan",
+   "avatar_url": null
+  },
+  {
+   "id": 765,
+   "handle": "แม่จิ๊ก Story",
+   "handle_normalized": "แม่จิ๊ก story",
+   "gen_name": "MaeJigStory",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 110000,
+   "profile_url": "https://www.tiktok.com/@jikthawineek",
+   "avatar_url": null
+  },
+  {
+   "id": 770,
+   "handle": "แม่บ้านกิ๊งก่องแก้ว",
+   "handle_normalized": "แม่บ้านกิ๊งก่องแก้ว",
+   "gen_name": "MaebaanGingGongKaew",
+   "platform_id": 2,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 31100,
+   "profile_url": "https://www.tiktok.com/@niiineeew",
+   "avatar_url": null
+  },
+  {
+   "id": 778,
+   "handle": "แม่พลอยวาทิน",
+   "handle_normalized": "แม่พลอยวาทิน",
+   "gen_name": "MaePloyWatin",
+   "platform_id": 2,
+   "content_category_id": 3,
+   "kol_tier_id": 5,
+   "follower_count": 1700000,
+   "profile_url": "https://www.tiktok.com/@ployvatin",
+   "avatar_url": null
+  },
+  {
+   "id": 784,
+   "handle": "แม่เรียกเจ๋งเจ๋ง",
+   "handle_normalized": "แม่เรียกเจ๋งเจ๋ง",
+   "gen_name": null,
+   "platform_id": 2,
+   "content_category_id": 2,
+   "kol_tier_id": 4,
+   "follower_count": 151000,
+   "profile_url": "https://www.tiktok.com/@nongjinj",
+   "avatar_url": null
+  },
+  {
+   "id": 801,
+   "handle": "โลกใบใหญ่ของอองรี",
+   "handle_normalized": "โลกใบใหญ่ของอองรี",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 5,
+   "kol_tier_id": 4,
+   "follower_count": 206000,
+   "profile_url": "https://www.facebook.com/lokbaiyai.th",
+   "avatar_url": "https://graph.facebook.com/lokbaiyai.th/picture?type=large"
+  },
+  {
+   "id": 802,
+   "handle": "โลกใบใหญ่ของอองรี_Photo",
+   "handle_normalized": "โลกใบใหญ่ของอองรี_photo",
+   "gen_name": "LokBaiYaiKhongHenriPhoto",
+   "platform_id": 1,
+   "content_category_id": 5,
+   "kol_tier_id": 4,
+   "follower_count": 210000,
+   "profile_url": "https://www.facebook.com/lokbaiyai.th?__cft__%5B0%5D=AZZEiPLEdvr05PnXHIh5shFcIUn_bCUvXRw3XfZO5rKFKvCLHroLP-Abfln2FWiGvlzupEqJheDUzmIF2aanirOvXiseTYCJaPXvRDLUVblQgJMuJ6NJ_Y42Sq1iTnmAXOeshM9CSsasvGaHGCVfzOke359UsGpucH88l_tRvb-5lRAjcI_skRB0yretQMhQVLA&__tn__=-UC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/lokbaiyai.th/picture?type=large"
+  },
+  {
+   "id": 818,
+   "handle": "𝙆𝙖𝙧𝙣 𝙎𝙩𝙤𝙧𝙮 ; บ้านของกาญจน์",
+   "handle_normalized": "𝙆𝙖𝙧𝙣 𝙎𝙩𝙤𝙧𝙮 ; บ้านของกาญจน์",
+   "gen_name": "KarnStoryBaankhongKarn",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 48000,
+   "profile_url": "https://www.facebook.com/profile.php?id=100078269920436",
+   "avatar_url": "https://graph.facebook.com/100078269920436/picture?type=large"
+  },
+  {
+   "id": 821,
+   "handle": "𝙊𝙪𝙧 𝙝𝙤𝙪𝙨𝙚 : บ้านนี้มีเรา",
+   "handle_normalized": "𝙊𝙪𝙧 𝙝𝙤𝙪𝙨𝙚 : บ้านนี้มีเรา",
+   "gen_name": "OurhouseBaanNeeMeeRao",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 122000,
+   "profile_url": "https://www.facebook.com/ourhouse.th",
+   "avatar_url": "https://graph.facebook.com/ourhouse.th/picture?type=large"
+  },
+  {
+   "id": 822,
+   "handle": "𝙊𝙪𝙧 𝙝𝙤𝙪𝙨𝙚 : บ้านนี้มีเรา-VDO",
+   "handle_normalized": "𝙊𝙪𝙧 𝙝𝙤𝙪𝙨𝙚 : บ้านนี้มีเรา-vdo",
+   "gen_name": "OurhouseBannuemeeraoVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 120000,
+   "profile_url": "https://www.facebook.com/ourhouse.th",
+   "avatar_url": "https://graph.facebook.com/ourhouse.th/picture?type=large"
+  },
+  {
+   "id": 823,
+   "handle": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮",
+   "handle_normalized": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮",
+   "gen_name": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 174000,
+   "profile_url": "https://www.facebook.com/salinstory",
+   "avatar_url": "https://graph.facebook.com/salinstory/picture?type=large"
+  },
+  {
+   "id": 824,
+   "handle": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮 VDO",
+   "handle_normalized": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮 vdo",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 158000,
+   "profile_url": "https://www.facebook.com/salinstory",
+   "avatar_url": "https://graph.facebook.com/salinstory/picture?type=large"
+  },
+  {
+   "id": 825,
+   "handle": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮_VDO",
+   "handle_normalized": "𝙎𝙖𝙡𝙞𝙣 𝙎𝙩𝙤𝙧𝙮_vdo",
+   "gen_name": "SalinStoryVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 4,
+   "follower_count": 160000,
+   "profile_url": "https://www.facebook.com/salinstory?__cft__%5B0%5D=AZZYf-GgjDZYcJebkrb407R5EscVh37Du2-k9SxwGOxNnFCF9Il3mal33oIDNBq8BCXwDVnab-remrMij4nLXytUGRaMvQ02QYEDUXcbXIuh_pnn2gZS2EX1jLoQQ4K0ZlpWiROuSUkvtsHLJyHKfm_dox3vB4WDtpcEw6n-CMuBzOqcUinKaZVf6lERJ6SOiCT_Mj6IwfS7GeSrLx1dCYww&__tn__=-UC%2CP-R",
+   "avatar_url": "https://graph.facebook.com/salinstory/picture?type=large"
+  }
+ ],
+ "placements_affected": [
+  [
+   34,
+   685,
+   1,
+   "posted"
+  ],
+  [
+   42,
+   368,
+   1,
+   "posted"
+  ],
+  [
+   124,
+   660,
+   1,
+   "posted"
+  ],
+  [
+   148,
+   663,
+   1,
+   "posted"
+  ],
+  [
+   343,
+   341,
+   1,
+   "posted"
+  ],
+  [
+   7,
+   224,
+   1,
+   "posted"
+  ],
+  [
+   539,
+   173,
+   1,
+   "posted"
+  ],
+  [
+   189,
+   824,
+   1,
+   "posted"
+  ],
+  [
+   231,
+   438,
+   1,
+   "posted"
+  ],
+  [
+   255,
+   181,
+   1,
+   "posted"
+  ],
+  [
+   279,
+   320,
+   1,
+   "posted"
+  ],
+  [
+   312,
+   341,
+   1,
+   "posted"
+  ],
+  [
+   317,
+   403,
+   1,
+   "posted"
+  ],
+  [
+   342,
+   341,
+   1,
+   "posted"
+  ],
+  [
+   423,
+   474,
+   1,
+   "posted"
+  ],
+  [
+   559,
+   472,
+   1,
+   "posted"
+  ],
+  [
+   583,
+   822,
+   1,
+   "posted"
+  ],
+  [
+   641,
+   474,
+   1,
+   "posted"
+  ],
+  [
+   808,
+   314,
+   1,
+   "posted"
+  ],
+  [
+   827,
+   159,
+   1,
+   "posted"
+  ],
+  [
+   838,
+   202,
+   1,
+   "posted"
+  ],
+  [
+   849,
+   648,
+   1,
+   "posted"
+  ],
+  [
+   850,
+   282,
+   1,
+   "posted"
+  ],
+  [
+   862,
+   378,
+   1,
+   "posted"
+  ],
+  [
+   863,
+   631,
+   1,
+   "posted"
+  ],
+  [
+   875,
+   581,
+   1,
+   "posted"
+  ],
+  [
+   877,
+   743,
+   1,
+   "posted"
+  ],
+  [
+   886,
+   825,
+   1,
+   "posted"
+  ],
+  [
+   903,
+   653,
+   1,
+   "posted"
+  ],
+  [
+   939,
+   527,
+   1,
+   "posted"
+  ],
+  [
+   950,
+   17,
+   1,
+   "posted"
+  ],
+  [
+   959,
+   580,
+   1,
+   "posted"
+  ],
+  [
+   960,
+   823,
+   1,
+   "posted"
+  ],
+  [
+   981,
+   644,
+   1,
+   "posted"
+  ],
+  [
+   1003,
+   472,
+   1,
+   "posted"
+  ],
+  [
+   1006,
+   823,
+   1,
+   "planned"
+  ],
+  [
+   1024,
+   398,
+   1,
+   "posted"
+  ],
+  [
+   1095,
+   588,
+   1,
+   "planned"
+  ],
+  [
+   1111,
+   20,
+   1,
+   "posted"
+  ],
+  [
+   1135,
+   537,
+   1,
+   "planned"
+  ],
+  [
+   1137,
+   246,
+   1,
+   "posted"
+  ],
+  [
+   1155,
+   285,
+   1,
+   "planned"
+  ],
+  [
+   16,
+   801,
+   1,
+   "posted"
+  ],
+  [
+   525,
+   159,
+   1,
+   "posted"
+  ],
+  [
+   540,
+   173,
+   1,
+   "posted"
+  ],
+  [
+   577,
+   193,
+   1,
+   "posted"
+  ],
+  [
+   576,
+   193,
+   1,
+   "posted"
+  ],
+  [
+   1027,
+   341,
+   1,
+   "posted"
+  ],
+  [
+   244,
+   333,
+   1,
+   "posted"
+  ]
+ ],
+ "kol_commercial_terms_affected": [],
+ "kol_samples_affected": []
+}

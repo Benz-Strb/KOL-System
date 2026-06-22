@@ -1,0 +1,65 @@
+{
+ "keep_id": 605,
+ "merge_ids": [
+  606,
+  607
+ ],
+ "field_edits": {
+  "profile_url": "https://www.facebook.com/paamaayoobaan",
+  "gen_name": "paamaayoobaan"
+ },
+ "kols": [
+  {
+   "id": 605,
+   "handle": "ป๊าม๊าชอบอยู่บ้าน",
+   "handle_normalized": "ป๊าม๊าชอบอยู่บ้าน",
+   "gen_name": "mamalikescafes",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 3,
+   "follower_count": 74000,
+   "profile_url": "https://www.facebook.com/mamalikescafes/",
+   "avatar_url": null
+  },
+  {
+   "id": 606,
+   "handle": "ป๊าม๊าอยู่บ้าน",
+   "handle_normalized": "ป๊าม๊าอยู่บ้าน",
+   "gen_name": null,
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 2,
+   "follower_count": 24000,
+   "profile_url": "https://www.facebook.com/mamalikescafes/",
+   "avatar_url": null
+  },
+  {
+   "id": 607,
+   "handle": "ป๊าม๊าอยู่บ้าน VDO",
+   "handle_normalized": "ป๊าม๊าอยู่บ้าน vdo",
+   "gen_name": "PaMaYuBanVDO",
+   "platform_id": 1,
+   "content_category_id": 1,
+   "kol_tier_id": 3,
+   "follower_count": 72000,
+   "profile_url": "https://www.facebook.com/mamalikescafes",
+   "avatar_url": null
+  }
+ ],
+ "placements_affected": [
+  [
+   123,
+   606,
+   1,
+   "posted"
+  ],
+  [
+   257,
+   607,
+   1,
+   "posted"
+  ]
+ ],
+ "kol_commercial_terms_affected": [],
+ "kol_samples_affected": []
+}

@@ -1,0 +1,42 @@
+{
+ "keep": 782,
+ "merge": [
+  783
+ ],
+ "kols": [
+  {
+   "id": 782,
+   "handle": "แม่ว่าดี",
+   "handle_normalized": "แม่ว่าดี",
+   "gen_name": "MaeWaDee",
+   "platform_id": 1,
+   "content_category_id": 3,
+   "kol_tier_id": 4,
+   "follower_count": 150000,
+   "profile_url": "https://www.facebook.com/Maewadee.cooking",
+   "avatar_url": null
+  },
+  {
+   "id": 783,
+   "handle": "แม่ว่าดี VDO",
+   "handle_normalized": "แม่ว่าดี vdo",
+   "gen_name": "MaeWaDeeVDO",
+   "platform_id": 1,
+   "content_category_id": null,
+   "kol_tier_id": 4,
+   "follower_count": 151000,
+   "profile_url": "https://www.facebook.com/Maewadee.cooking/",
+   "avatar_url": "https://graph.facebook.com/Maewadee.cooking/picture?type=large"
+  }
+ ],
+ "placements_affected": [
+  [
+   256,
+   783,
+   1,
+   "posted"
+  ]
+ ],
+ "terms_affected": [],
+ "samples_affected": []
+}
