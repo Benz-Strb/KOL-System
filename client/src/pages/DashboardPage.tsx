@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ScatterChart, Scatter,
   type TooltipContentProps,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext.js';
@@ -68,6 +69,36 @@ function formatAxisMoney(n: number) {
 }
 
 const TOOLTIP_TOP_N = 5;
+
+type ScatterAxis = 'price' | 'follower';
+type ScatterPoint = { kol_id: number; handle: string; x: number; y: number; placement_count: number };
+
+function ScatterTooltip({ active, payload, axis }: TooltipContentProps & { axis: ScatterAxis }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0]?.payload as ScatterPoint | undefined;
+  if (!p) return null;
+  return (
+    <div className="bg-surface border border-hairline rounded-xl shadow-lg px-3.5 py-2.5 text-xs min-w-[170px]">
+      <div className="font-semibold text-ink text-sm mb-1.5 truncate max-w-[200px]">{p.handle}</div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-3 text-muted">
+          <span>{axis === 'price' ? 'ราคาเฉลี่ย/โพสต์' : 'Follower'}</span>
+          <span className="text-ink font-medium tabular-nums">
+            {axis === 'price' ? formatMoney(p.x) : p.x.toLocaleString('th-TH')}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-muted">
+          <span>GMV</span>
+          <span className="text-ink font-medium tabular-nums">{formatMoney(p.y)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-muted">
+          <span>Placement</span>
+          <span className="text-ink font-medium tabular-nums">{p.placement_count}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ChannelTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
@@ -316,6 +347,7 @@ export default function DashboardPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
+  const [scatterAxis, setScatterAxis] = useState<ScatterAxis>('price');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -347,6 +379,16 @@ export default function DashboardPage() {
   const rankedKols = data ? (rankMode === 'gmv' ? data.topKolsByGmv : data.topKolsByRoi) : [];
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? 'ไม่มีแคมเปญ' }))
+    : [];
+  const scatterData: ScatterPoint[] = data
+    ? data.kolValueScatter
+        .map(k => {
+          const x = scatterAxis === 'price'
+            ? (k.placement_count > 0 ? k.total_spend / k.placement_count : 0)
+            : k.follower_count;
+          return x == null ? null : { kol_id: k.kol_id, handle: k.handle, x, y: k.total_gmv, placement_count: k.placement_count };
+        })
+        .filter((p): p is ScatterPoint => p !== null)
     : [];
 
   return (
@@ -407,6 +449,8 @@ export default function DashboardPage() {
               {Array.from({ length: 10 }).map((_, i) => <SkeletonKolRow key={i} />)}
             </div>
           </div>
+
+          <SkeletonChart />
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -532,6 +576,47 @@ export default function DashboardPage() {
                   <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} onSelect={setTrendKolId} />
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Price/Follower vs GMV scatter */}
+          <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
+              <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
+                <Scale size={14} className="text-accent" /> ราคา / Follower เทียบกับ GMV ต่อ KOL
+              </h2>
+              <div className="flex items-center gap-1 bg-canvas rounded-lg p-1">
+                <button
+                  onClick={() => setScatterAxis('price')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${scatterAxis === 'price' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                >
+                  ราคาเฉลี่ย/โพสต์
+                </button>
+                <button
+                  onClick={() => setScatterAxis('follower')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${scatterAxis === 'follower' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                >
+                  Follower
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted mb-3">
+              {scatterAxis === 'price'
+                ? 'แต่ละจุด = 1 KOL — จ่ายแพงกว่าแล้วได้ GMV คุ้มจริงไหม จุดที่อยู่ซ้ายบน (ราคาต่ำ แต่ GMV สูง) คือ KOL ที่คุ้มค่าที่สุด'
+                : 'แต่ละจุด = 1 KOL — follower เยอะแล้วขายได้จริงไหม จุดที่อยู่ขวาล่าง (follower สูง แต่ GMV ต่ำ) คือ KOL ที่ reach ดีแต่ขายไม่ออก'}
+            </p>
+            {scatterData.length === 0 ? (
+              <p className="text-sm text-muted">ยังไม่มีข้อมูล</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <ScatterChart margin={{ left: -16, right: 16, top: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline, #e5e7eb)" />
+                  <XAxis type="number" dataKey="x" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                  <YAxis type="number" dataKey="y" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                  <Tooltip content={(props: TooltipContentProps) => <ScatterTooltip {...props} axis={scatterAxis} />} cursor={{ strokeDasharray: '3 3' }} />
+                  <Scatter data={scatterData} fill="#6366f1" fillOpacity={0.65} animationDuration={500} />
+                </ScatterChart>
+              </ResponsiveContainer>
             )}
           </div>
         </div>
