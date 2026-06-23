@@ -6,6 +6,7 @@ import PerformanceModal from '../components/PerformanceModal.js';
 import MetricsViewModal from '../components/MetricsViewModal.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
+import BrandLogo from '../components/BrandLogo.js';
 import { getPlatformColor } from '../lib/platformColors.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 
@@ -354,7 +355,7 @@ export default function PlacementsPage() {
             {showBrandFilter && (
               <Select
                 size="sm" className="min-w-[140px]"
-                options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name }))]}
+                options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
                 value={brandId}
                 onChange={v => { setBrandId(v); setPage(1); }}
               />
@@ -528,6 +529,7 @@ export default function PlacementsPage() {
                                 {formatFollower(r.kols.follower_count)}
                               </span>
                             )}
+                            {r.brands && <BrandLogo name={r.brands.name} logoUrl={r.brands.logo_url} size={16} />}
                           </div>
                           <div className="flex items-center gap-1 mt-0.5 text-xs text-muted truncate">
                             {r.platforms?.name && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getPlatformColor(r.platforms.name)}`} />}

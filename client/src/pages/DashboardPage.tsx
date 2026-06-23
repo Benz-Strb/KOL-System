@@ -374,7 +374,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Select
             size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name }))]}
+            options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
             value={brandId}
             onChange={setBrandId}
           />

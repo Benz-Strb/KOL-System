@@ -148,7 +148,7 @@ export default function ImportPlacementsPage() {
             <SectionHeader icon={<Tag size={15} />} title="เลือกแบรนด์" />
             <p className="text-sm text-muted mb-3">เลือกแบรนด์ก่อนดาวน์โหลด template — Model ในไฟล์จะมีให้เลือกเฉพาะของแบรนด์นี้เท่านั้น</p>
             <Select
-              options={brands.map(b => ({ id: b.id, label: b.name }))}
+              options={brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))}
               value={brandId}
               onChange={handleBrandChange}
               placeholder="เลือกแบรนด์..."

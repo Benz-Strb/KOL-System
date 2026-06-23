@@ -23,7 +23,7 @@ export type Dropdowns = {
   brands: Brand[];
 };
 
-export type Brand = { id: number; name: string; active?: boolean };
+export type Brand = { id: number; name: string; active?: boolean; logo_url: string | null };
 export type AppUser = { id: number; supabaseId: string; full_name: string; email: string; role: string; brandIds: number[] };
 export type AdminUser = { id: number; full_name: string; email: string | null; role: string; is_active: boolean; created_at: string; user_brands: { brands: { id: number; name: string } }[] };
 
@@ -113,6 +113,7 @@ export type PlacementRow = {
   products: { model_code: string } | null;
   stores: { name: string; branch: string | null } | null;
   campaigns: { code: string; label: string | null } | null;
+  brands: { id: number; name: string; logo_url: string | null };
   users_placements_person_in_charge_idTousers: { full_name: string } | null;
 };
 
@@ -236,6 +237,14 @@ export const updatePerformance = (id: number, body: {
 
 export type ContactInfo = { email?: string; whatsapp?: string; line?: string; other?: string };
 
+export type KolBrandRow = {
+  brand_id: number;
+  brand_name: string;
+  logo_url: string | null;
+  products: string[];
+  campaigns: { code: string; label: string | null }[];
+};
+
 export type KolDirectoryRow = {
   id: number;
   handle: string;
@@ -251,6 +260,7 @@ export type KolDirectoryRow = {
   category: string | null;
   campaigns: { code: string; label: string | null }[];
   products: string[];
+  brands: KolBrandRow[];
 };
 
 export type CommercialTerm = {
@@ -534,9 +544,9 @@ export const getMe = () => api<AppUser>('/api/auth/me');
 // Admin
 export const getAdminUsers = () => api<AdminUser[]>('/api/admin/users');
 export const getAdminBrands = () => api<Brand[]>('/api/admin/brands');
-export const createAdminBrand = (name: string) =>
-  api<Brand>('/api/admin/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
-export const updateAdminBrand = (id: number, body: { name?: string; active?: boolean }) =>
+export const createAdminBrand = (name: string, logo_url?: string) =>
+  api<Brand>('/api/admin/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, logo_url }) });
+export const updateAdminBrand = (id: number, body: { name?: string; active?: boolean; logo_url?: string | null }) =>
   api<Brand>(`/api/admin/brands/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 export const createAdminUser = (body: { email: string; full_name: string; role: string; password: string; brand_ids?: number[] }) =>
   api<AdminUser>('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

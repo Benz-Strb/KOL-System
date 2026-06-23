@@ -195,7 +195,7 @@ export default function NewPlacementPage() {
           <div className="bg-surface border border-hairline rounded-2xl p-5">
             <SectionHeader icon={<Tag size={15} />} title="แบรนด์" />
             <Select
-              options={dropdowns.brands.map(b => ({ id: b.id, label: b.name }))}
+              options={dropdowns.brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))}
               value={form.brand_id}
               onChange={v => { set('brand_id', v); set('product_id', ''); }}
               placeholder="เลือกแบรนด์"

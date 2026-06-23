@@ -6,6 +6,7 @@ import KolDetailModal from '../components/KolDetailModal.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
+import BrandLogo from '../components/BrandLogo.js';
 import { getPlatformColor } from '../lib/platformColors.js';
 
 const LIMIT = 25;
@@ -190,8 +191,25 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
         {/* Divider */}
         <div className="h-px bg-hairline" />
 
-        {/* Row 3: campaigns + products */}
+        {/* Row 3: brands reviewed + campaigns + products */}
         <div className="flex flex-col gap-2 flex-1">
+          {r.brands.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">แบรนด์ที่เคยรีวิว</div>
+              <div className="flex flex-wrap gap-1.5">
+                {r.brands.map(b => (
+                  <span
+                    key={b.brand_id}
+                    className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 bg-canvas border border-hairline rounded-full"
+                    title={`${b.brand_name} — ${b.products.length} สินค้า, ${b.campaigns.length} แคมเปญ`}
+                  >
+                    <BrandLogo name={b.brand_name} logoUrl={b.logo_url} size={14} />
+                    <span className="text-[11px] font-medium text-ink">{b.brand_name}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">แคมเปญ</div>
             <CampaignPills campaigns={r.campaigns} />

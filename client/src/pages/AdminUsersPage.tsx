@@ -9,6 +9,7 @@ import Modal from '../components/Modal.js';
 import Toast from '../components/Toast.js';
 import Select from '../components/Select.js';
 import UserAvatar from '../components/UserAvatar.js';
+import BrandLogo from '../components/BrandLogo.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import { ROLE_LABELS } from '../lib/roleLabels.js';
 
@@ -64,10 +65,12 @@ export default function AdminUsersPage() {
   // Brand panel state
   const [showBrandsPanel, setShowBrandsPanel] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
+  const [newBrandLogoUrl, setNewBrandLogoUrl] = useState('');
   const [newBrandLoading, setNewBrandLoading] = useState(false);
   const [newBrandError, setNewBrandError] = useState('');
   const [editingBrandId, setEditingBrandId] = useState<number | null>(null);
   const [editBrandName, setEditBrandName] = useState('');
+  const [editBrandLogoUrl, setEditBrandLogoUrl] = useState('');
   const [editBrandLoading, setEditBrandLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -211,10 +214,11 @@ export default function AdminUsersPage() {
     setNewBrandError('');
     setNewBrandLoading(true);
     try {
-      const brand = await createAdminBrand(newBrandName.trim());
+      const brand = await createAdminBrand(newBrandName.trim(), newBrandLogoUrl.trim() || undefined);
       setBrands(prev => [...prev, brand].sort((a, b) => a.name.localeCompare(b.name)));
       setSelectedBrandIds([]);
       setNewBrandName('');
+      setNewBrandLogoUrl('');
       setToast(`เพิ่มแบรนด์ "${brand.name}" สำเร็จแล้ว`);
     } catch (err: unknown) {
       setNewBrandError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
@@ -224,15 +228,22 @@ export default function AdminUsersPage() {
   }
 
   async function handleSaveEditBrand(brand: Brand) {
-    if (!editBrandName.trim() || editBrandName.trim() === brand.name) {
+    const trimmedName = editBrandName.trim();
+    const trimmedLogo = editBrandLogoUrl.trim();
+    const nameChanged = !!trimmedName && trimmedName !== brand.name;
+    const logoChanged = trimmedLogo !== (brand.logo_url ?? '');
+    if (!nameChanged && !logoChanged) {
       setEditingBrandId(null);
       return;
     }
     setEditBrandLoading(true);
     try {
-      const updated = await updateAdminBrand(brand.id, { name: editBrandName.trim() });
+      const updated = await updateAdminBrand(brand.id, {
+        ...(nameChanged ? { name: trimmedName } : {}),
+        ...(logoChanged ? { logo_url: trimmedLogo || null } : {}),
+      });
       setBrands(prev => prev.map(b => b.id === updated.id ? updated : b).sort((a, b) => a.name.localeCompare(b.name)));
-      setToast(`เปลี่ยนชื่อแบรนด์เป็น "${updated.name}" แล้ว`);
+      setToast(`บันทึกแบรนด์ "${updated.name}" แล้ว`);
       setEditingBrandId(null);
     } catch (err: unknown) {
       setToast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
@@ -401,26 +412,40 @@ export default function AdminUsersPage() {
                   <div key={brand.id} className="flex items-center gap-2 px-4 py-2.5 border-b border-hairline last:border-0 hover:bg-canvas transition-colors">
                     {editingBrandId === brand.id ? (
                       <>
-                        <input
-                          autoFocus
-                          value={editBrandName}
-                          onChange={e => setEditBrandName(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
-                            if (e.key === 'Escape') setEditingBrandId(null);
-                          }}
-                          className="flex-1 px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink focus:outline-none focus:ring-2 focus:ring-accent"
-                        />
+                        <div className="flex-1 flex flex-col gap-1.5">
+                          <input
+                            autoFocus
+                            value={editBrandName}
+                            onChange={e => setEditBrandName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
+                              if (e.key === 'Escape') setEditingBrandId(null);
+                            }}
+                            placeholder="ชื่อแบรนด์"
+                            className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+                          />
+                          <input
+                            value={editBrandLogoUrl}
+                            onChange={e => setEditBrandLogoUrl(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
+                              if (e.key === 'Escape') setEditingBrandId(null);
+                            }}
+                            placeholder="URL โลโก้ (ไม่บังคับ)"
+                            className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                          />
+                        </div>
                         <button onClick={() => handleSaveEditBrand(brand)} disabled={editBrandLoading}
-                          className="text-accent hover:text-accent-hover disabled:opacity-50 transition-colors">
+                          className="text-accent hover:text-accent-hover disabled:opacity-50 transition-colors shrink-0">
                           <CheckIcon size={13} />
                         </button>
-                        <button onClick={() => setEditingBrandId(null)} className="text-muted hover:text-ink transition-colors">
+                        <button onClick={() => setEditingBrandId(null)} className="text-muted hover:text-ink transition-colors shrink-0">
                           <X size={13} />
                         </button>
                       </>
                     ) : (
                       <>
+                        <BrandLogo name={brand.name} logoUrl={brand.logo_url} size={20} />
                         <span className={`flex-1 text-sm ${brand.active ? 'text-ink' : 'text-muted line-through'}`}>
                           {brand.name}
                         </span>
@@ -434,7 +459,7 @@ export default function AdminUsersPage() {
                           {brand.active ? 'เปิด' : 'ปิด'}
                         </button>
                         <button
-                          onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name); }}
+                          onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name); setEditBrandLogoUrl(brand.logo_url ?? ''); }}
                           className="text-muted hover:text-accent transition-colors flex-shrink-0">
                           <Pencil size={12} />
                         </button>
@@ -447,19 +472,28 @@ export default function AdminUsersPage() {
 
             {/* Add brand form */}
             <div className="px-4 py-3 border-t border-hairline">
-              <form onSubmit={handleCreateBrand} className="flex gap-2">
+              <form onSubmit={handleCreateBrand} className="flex flex-col gap-1.5">
                 <input
                   type="text"
                   value={newBrandName}
                   onChange={e => { setNewBrandName(e.target.value); setNewBrandError(''); }}
                   placeholder="ชื่อแบรนด์ใหม่"
-                  className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
+                  className="px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
                 />
-                <button type="submit" disabled={!newBrandName.trim() || newBrandLoading}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all">
-                  <Plus size={11} />
-                  เพิ่ม
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newBrandLogoUrl}
+                    onChange={e => setNewBrandLogoUrl(e.target.value)}
+                    placeholder="URL โลโก้ (ไม่บังคับ)"
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
+                  />
+                  <button type="submit" disabled={!newBrandName.trim() || newBrandLoading}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all shrink-0">
+                    <Plus size={11} />
+                    เพิ่ม
+                  </button>
+                </div>
               </form>
               {newBrandError && <p className="text-xs text-red-500 mt-1">{newBrandError}</p>}
             </div>

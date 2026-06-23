@@ -13,6 +13,7 @@ model brands {
   id                   Int                    @id @default(autoincrement())
   name                 String                 @unique
   active               Boolean                @default(true)
+  logo_url             String?
   kol_commercial_terms kol_commercial_terms[]
   kol_samples          kol_samples[]
   placements           placements[]

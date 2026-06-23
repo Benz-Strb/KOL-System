@@ -1,7 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 
-interface Option { id: string | number; label: string; }
+interface Option { id: string | number; label: string; iconUrl?: string | null; }
+
+// small inline icon for options that opt in via `iconUrl` (e.g. brand logos) —
+// falls back to an initial when there's no URL or it fails to load. Kept
+// local instead of reusing BrandLogo so this generic dropdown stays
+// domain-agnostic (any Select usage can pass iconUrl, not just brands).
+function OptionIcon({ url, label }: { url: string | null | undefined; label: string }) {
+  const [errored, setErrored] = useState(false);
+  if (url && !errored) {
+    return <img src={url} alt="" onError={() => setErrored(true)} className="w-4 h-4 rounded object-contain bg-white border border-hairline shrink-0" />;
+  }
+  return (
+    <span className="w-4 h-4 rounded bg-canvas border border-hairline shrink-0 flex items-center justify-center text-[8px] font-bold text-muted">
+      {label.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
 
 interface Props {
   options: Option[];
@@ -67,8 +83,9 @@ export default function Select({
           open ? 'ring-2 ring-accent border-accent/30 shadow-sm' : '',
         ].join(' ')}
       >
-        <span className={`truncate ${selected ? 'text-ink' : 'text-muted'}`}>
-          {selected ? selected.label : placeholder}
+        <span className={`flex items-center gap-1.5 min-w-0 ${selected ? 'text-ink' : 'text-muted'}`}>
+          {selected && selected.iconUrl !== undefined && <OptionIcon url={selected.iconUrl} label={selected.label} />}
+          <span className="truncate">{selected ? selected.label : placeholder}</span>
         </span>
         <ChevronDown size={14} className={`text-muted transition-transform duration-200 flex-shrink-0 ml-1.5 ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -89,7 +106,10 @@ export default function Select({
                 ].join(' ')}
                 onClick={() => { onChange(String(o.id)); setOpen(false); }}
               >
-                {o.label}
+                <span className="flex items-center gap-2">
+                  {o.iconUrl !== undefined && <OptionIcon url={o.iconUrl} label={o.label} />}
+                  {o.label}
+                </span>
               </button>
             ))}
           </div>

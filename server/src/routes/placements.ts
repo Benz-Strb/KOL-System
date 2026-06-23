@@ -148,6 +148,7 @@ app.get('/', async c => {
           products: { select: { model_code: true } },
           stores: { select: { name: true, branch: true } },
           campaigns: { select: { code: true, label: true } },
+          brands: { select: { id: true, name: true, logo_url: true } },
           users_placements_person_in_charge_idTousers: { select: { full_name: true } },
         },
         orderBy: { created_at: 'desc' },

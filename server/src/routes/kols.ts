@@ -49,6 +49,7 @@ app.get('/', async c => {
             select: {
               campaigns: { select: { code: true, label: true } },
               products: { select: { model_code: true } },
+              brands: { select: { id: true, name: true, logo_url: true } },
             },
           },
         },
@@ -62,31 +63,62 @@ app.get('/', async c => {
     ]);
 
     const parseCode = (code: string) => { const [m, d] = code.split('.').map(Number); return [m || 0, d || 0]; };
-
-    const rows = kols.map(k => ({
-      id: k.id,
-      handle: k.handle,
-      gen_name: k.gen_name,
-      follower_count: k.follower_count,
-      profile_url: k.profile_url,
-      avatar_url: k.avatar_url,
-      contact_info: k.contact_info as Record<string, string> | null,
-      custom_tags: k.custom_tags,
-      audience_tags: k.audience_tags,
-      main_selling_points: k.main_selling_points,
-      platform: k.platforms,
-      category: k.content_categories?.name ?? null,
-      campaigns: [...new Map(
-        k.placements.filter(p => p.campaigns).map(p => [p.campaigns!.code, p.campaigns!])
-      ).values()].sort((a, b) => {
+    const sortCampaigns = (campaigns: { code: string; label: string | null }[]) =>
+      [...campaigns].sort((a, b) => {
         const [am, ad] = parseCode(a.code);
         const [bm, bd] = parseCode(b.code);
         return am !== bm ? am - bm : ad - bd;
-      }),
-      products: [...new Set(
-        k.placements.filter(p => p.products).map(p => p.products!.model_code)
-      )].sort(),
-    }));
+      });
+
+    const rows = kols.map(k => {
+      // group placements by brand so the card can show which brands this KOL
+      // has reviewed for, each with its own products/campaigns (used for a
+      // future hover-detail — see what's already reviewed per brand)
+      const brandMap = new Map<number, {
+        brand_id: number; brand_name: string; logo_url: string | null;
+        products: Set<string>; campaigns: Map<string, { code: string; label: string | null }>;
+      }>();
+      for (const p of k.placements) {
+        if (!p.brands) continue;
+        const entry = brandMap.get(p.brands.id) ?? {
+          brand_id: p.brands.id, brand_name: p.brands.name, logo_url: p.brands.logo_url,
+          products: new Set<string>(), campaigns: new Map(),
+        };
+        if (p.products) entry.products.add(p.products.model_code);
+        if (p.campaigns) entry.campaigns.set(p.campaigns.code, p.campaigns);
+        brandMap.set(p.brands.id, entry);
+      }
+
+      return {
+        id: k.id,
+        handle: k.handle,
+        gen_name: k.gen_name,
+        follower_count: k.follower_count,
+        profile_url: k.profile_url,
+        avatar_url: k.avatar_url,
+        contact_info: k.contact_info as Record<string, string> | null,
+        custom_tags: k.custom_tags,
+        audience_tags: k.audience_tags,
+        main_selling_points: k.main_selling_points,
+        platform: k.platforms,
+        category: k.content_categories?.name ?? null,
+        campaigns: sortCampaigns([...new Map(
+          k.placements.filter(p => p.campaigns).map(p => [p.campaigns!.code, p.campaigns!])
+        ).values()]),
+        products: [...new Set(
+          k.placements.filter(p => p.products).map(p => p.products!.model_code)
+        )].sort(),
+        brands: [...brandMap.values()]
+          .map(b => ({
+            brand_id: b.brand_id,
+            brand_name: b.brand_name,
+            logo_url: b.logo_url,
+            products: [...b.products].sort(),
+            campaigns: sortCampaigns([...b.campaigns.values()]),
+          }))
+          .sort((a, b) => a.brand_name.localeCompare(b.brand_name)),
+      };
+    });
 
     return c.json({ total, page: Number(page), limit: TAKE, rows });
   } catch (err) {

@@ -11,7 +11,7 @@ app.get('/brands', async c => {
     const prisma = c.get('prisma');
     const brands = await prisma.brands.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, active: true },
+      select: { id: true, name: true, active: true, logo_url: true },
     });
     return c.json(brands);
   } catch (err) {
@@ -22,12 +22,12 @@ app.get('/brands', async c => {
 
 app.post('/brands', async c => {
   const prisma = c.get('prisma');
-  const { name } = await c.req.json() as { name: string };
+  const { name, logo_url } = await c.req.json() as { name: string; logo_url?: string | null };
   if (!name?.trim()) return c.json({ error: 'name จำเป็น' }, 400);
   try {
     const brand = await prisma.brands.create({
-      data: { name: name.trim() },
-      select: { id: true, name: true, active: true },
+      data: { name: name.trim(), logo_url: logo_url?.trim() || null },
+      select: { id: true, name: true, active: true, logo_url: true },
     });
     return c.json(brand, 201);
   } catch (err: unknown) {
@@ -41,15 +41,16 @@ app.post('/brands', async c => {
 app.patch('/brands/:id', async c => {
   const prisma = c.get('prisma');
   const id = Number(c.req.param('id'));
-  const { name, active } = await c.req.json() as { name?: string; active?: boolean };
+  const { name, active, logo_url } = await c.req.json() as { name?: string; active?: boolean; logo_url?: string | null };
   try {
     const brand = await prisma.brands.update({
       where: { id },
       data: {
         ...(name !== undefined ? { name: name.trim() } : {}),
         ...(active !== undefined ? { active } : {}),
+        ...(logo_url !== undefined ? { logo_url: logo_url?.trim() || null } : {}),
       },
-      select: { id: true, name: true, active: true },
+      select: { id: true, name: true, active: true, logo_url: true },
     });
     return c.json(brand);
   } catch (err: unknown) {

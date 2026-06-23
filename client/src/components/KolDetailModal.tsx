@@ -194,7 +194,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
 function TermsTab({ kol }: { kol: KolDirectoryRow }) {
   const [terms, setTerms] = useState<CommercialTerm[]>([]);
   const [loading, setLoading] = useState(true);
-  const [brands, setBrands] = useState<{ id: number; name: string }[]>([]);
+  const [brands, setBrands] = useState<{ id: number; name: string; logo_url: string | null }[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     pricing_type: 'single_cooperation',
@@ -303,7 +303,7 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
             <div>
               <label className={labelCls}>Brand</label>
               <Select
-                options={[{ id: '', label: 'ทุก Brand' }, ...brands.map(b => ({ id: b.id, label: b.name }))]}
+                options={[{ id: '', label: 'ทุก Brand' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
                 value={form.brand_id}
                 onChange={v => setForm(f => ({ ...f, brand_id: v }))}
               />

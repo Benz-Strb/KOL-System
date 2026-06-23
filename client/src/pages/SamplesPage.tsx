@@ -334,7 +334,7 @@ export default function SamplesPage() {
           {brands.length > 1 && (
             <Select
               size="sm" className="min-w-[140px]"
-              options={[{ id: '', label: 'ทุก Brand' }, ...brands.map(b => ({ id: b.id, label: b.name }))]}
+              options={[{ id: '', label: 'ทุก Brand' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
               value={brandFilter}
               onChange={v => { setBrandFilter(v); setPage(1); }}
             />

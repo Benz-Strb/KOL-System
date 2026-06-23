@@ -35,7 +35,7 @@ app.get('/', async c => {
           ...(seesAllBrands ? {} : { id: { in: userBrandIds } }),
         },
         orderBy: { name: 'asc' },
-        select: { id: true, name: true },
+        select: { id: true, name: true, logo_url: true },
       }),
     ]);
 
