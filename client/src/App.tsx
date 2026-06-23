@@ -1,6 +1,6 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, LogOut } from 'lucide-react';
+import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
@@ -90,6 +90,13 @@ function Layout({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.contains('dark')
   );
 
+  const dashboardSectionActive = location.pathname.startsWith('/dashboard');
+  const [dashboardOpen, setDashboardOpen] = useState(dashboardSectionActive);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (dashboardSectionActive) setDashboardOpen(true);
+  }, [dashboardSectionActive]);
+
   function toggleDark() {
     const next = !dark;
     setDark(next);
@@ -151,16 +158,31 @@ function Layout({ children }: { children: React.ReactNode }) {
               Sample
             </NavLink>
             {(appUser?.role === 'admin' || appUser?.role === 'manager') && (
-              <NavLink to="/dashboard" className={navLinkCls}>
-                <LayoutDashboard size={15} />
-                Dashboard
-              </NavLink>
-            )}
-            {(appUser?.role === 'admin' || appUser?.role === 'manager') && (
-              <NavLink to="/dashboard/products" className={navLinkCls}>
-                <Boxes size={15} />
-                Dashboard สินค้า
-              </NavLink>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setDashboardOpen(o => !o)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    dashboardSectionActive ? 'text-white font-medium' : 'text-white/60 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <LayoutDashboard size={15} />
+                  <span className="flex-1 text-left">Dashboard</span>
+                  <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${dashboardOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {dashboardOpen && (
+                  <div className="flex flex-col gap-0.5 mt-0.5 ml-[13px] pl-3 border-l border-white/10">
+                    <NavLink to="/dashboard" end className={navLinkCls}>
+                      <LayoutDashboard size={14} />
+                      KOL
+                    </NavLink>
+                    <NavLink to="/dashboard/products" className={navLinkCls}>
+                      <Boxes size={14} />
+                      สินค้า
+                    </NavLink>
+                  </div>
+                )}
+              </div>
             )}
             {appUser?.role === 'admin' && (
               <NavLink to="/admin/users" className={navLinkCls}>
