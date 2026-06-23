@@ -13,7 +13,6 @@ import {
 import KolTrendModal from '../components/KolTrendModal.js';
 import Select from '../components/Select.js';
 import { getCached, setCached } from '../lib/swrCache.js';
-import { getPlatformColor } from '../lib/platformColors.js';
 
 const HOVER_EXPAND_DELAY = 400;
 
@@ -162,12 +161,12 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
           </a>
         )}
       </div>
-      {expanded && k.byPlatform.length > 0 && (
+      {expanded && k.byChannel.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-2 pb-2 -mt-0.5 pl-[44px]">
-          {k.byPlatform.map(p => (
-            <span key={`${p.platform_id ?? 'none'}`} className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-canvas text-muted">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getPlatformColor(p.name)}`} />
-              {p.name ?? 'ไม่ระบุ platform'} · {formatMoney(p.gmv)}
+          {k.byChannel.map(c => (
+            <span key={c.channel} className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-canvas text-muted">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? '#94a3b8' }} />
+              {CHANNEL_LABEL[c.channel] ?? c.channel} · {formatMoney(c.gmv)}
             </span>
           ))}
         </div>

@@ -374,7 +374,7 @@ export type DashboardSummary = {
 };
 export type DashboardChannelCampaignRow = { campaign_id: number | null; code: string | null; label: string | null; gmv: number };
 export type DashboardChannelRow = { channel: string; gmv: number; orders: number; visits: number; byCampaign: DashboardChannelCampaignRow[] };
-export type DashboardKolPlatformRow = { platform_id: number | null; name: string | null; gmv: number };
+export type DashboardKolChannelRow = { channel: string; gmv: number };
 export type DashboardKolRow = {
   kol_id: number;
   handle: string;
@@ -386,7 +386,7 @@ export type DashboardKolRow = {
   total_spend: number;
   total_orders: number;
   roi: number | null;
-  byPlatform: DashboardKolPlatformRow[];
+  byChannel: DashboardKolChannelRow[];
 };
 export type DashboardCampaignTrendRow = {
   campaign_id: number | null;
