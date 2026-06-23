@@ -71,22 +71,24 @@ app.get('/', async c => {
       });
 
     const rows = kols.map(k => {
-      // group placements by brand so the card can show which brands this KOL
-      // has reviewed for, each with its own products/campaigns (used for a
-      // future hover-detail — see what's already reviewed per brand)
+      // group placements by brand, then by product within each brand, so the
+      // card's brand hover-detail can show "this product, reviewed in these
+      // campaigns" — placements without a product (e.g. some offline ones)
+      // are skipped since there's nothing to list them under
       const brandMap = new Map<number, {
         brand_id: number; brand_name: string; logo_url: string | null;
-        products: Set<string>; campaigns: Map<string, { code: string; label: string | null }>;
+        products: Map<string, Map<string, { code: string; label: string | null }>>;
       }>();
       for (const p of k.placements) {
-        if (!p.brands) continue;
-        const entry = brandMap.get(p.brands.id) ?? {
+        if (!p.brands || !p.products) continue;
+        const brandEntry = brandMap.get(p.brands.id) ?? {
           brand_id: p.brands.id, brand_name: p.brands.name, logo_url: p.brands.logo_url,
-          products: new Set<string>(), campaigns: new Map(),
+          products: new Map<string, Map<string, { code: string; label: string | null }>>(),
         };
-        if (p.products) entry.products.add(p.products.model_code);
-        if (p.campaigns) entry.campaigns.set(p.campaigns.code, p.campaigns);
-        brandMap.set(p.brands.id, entry);
+        const productEntry = brandEntry.products.get(p.products.model_code) ?? new Map();
+        if (p.campaigns) productEntry.set(p.campaigns.code, p.campaigns);
+        brandEntry.products.set(p.products.model_code, productEntry);
+        brandMap.set(p.brands.id, brandEntry);
       }
 
       return {
@@ -102,19 +104,14 @@ app.get('/', async c => {
         main_selling_points: k.main_selling_points,
         platform: k.platforms,
         category: k.content_categories?.name ?? null,
-        campaigns: sortCampaigns([...new Map(
-          k.placements.filter(p => p.campaigns).map(p => [p.campaigns!.code, p.campaigns!])
-        ).values()]),
-        products: [...new Set(
-          k.placements.filter(p => p.products).map(p => p.products!.model_code)
-        )].sort(),
         brands: [...brandMap.values()]
           .map(b => ({
             brand_id: b.brand_id,
             brand_name: b.brand_name,
             logo_url: b.logo_url,
-            products: [...b.products].sort(),
-            campaigns: sortCampaigns([...b.campaigns.values()]),
+            products: [...b.products.entries()]
+              .map(([model_code, campaigns]) => ({ model_code, campaigns: sortCampaigns([...campaigns.values()]) }))
+              .sort((a, b2) => a.model_code.localeCompare(b2.model_code)),
           }))
           .sort((a, b) => a.brand_name.localeCompare(b.brand_name)),
       };

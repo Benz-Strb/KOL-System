@@ -237,12 +237,12 @@ export const updatePerformance = (id: number, body: {
 
 export type ContactInfo = { email?: string; whatsapp?: string; line?: string; other?: string };
 
+export type KolBrandProductRow = { model_code: string; campaigns: { code: string; label: string | null }[] };
 export type KolBrandRow = {
   brand_id: number;
   brand_name: string;
   logo_url: string | null;
-  products: string[];
-  campaigns: { code: string; label: string | null }[];
+  products: KolBrandProductRow[];
 };
 
 export type KolDirectoryRow = {
@@ -258,8 +258,6 @@ export type KolDirectoryRow = {
   main_selling_points: string | null;
   platform: { id: number; name: string } | null;
   category: string | null;
-  campaigns: { code: string; label: string | null }[];
-  products: string[];
   brands: KolBrandRow[];
 };
 

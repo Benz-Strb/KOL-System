@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ChevronLeft, ChevronRight, X, ExternalLink, Users } from 'lucide-react';
-import { getKolDirectory, getDropdowns, type KolDirectoryRow, type Platform, type ContentCategory } from '../api/index.js';
+import { getKolDirectory, getDropdowns, type KolDirectoryRow, type KolBrandRow, type Platform, type ContentCategory } from '../api/index.js';
 import KolDetailModal from '../components/KolDetailModal.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
@@ -18,8 +18,10 @@ function formatFollower(n: number | null) {
   return n.toLocaleString();
 }
 
-// ─── Overflow tooltip (portal) ────────────────────────────────
-function OverflowTooltip({ label, items }: { label: string; items: string[] }) {
+// ─── Brand chip with hover detail (portal) ─────────────────────
+// hover a brand → shows every product reviewed for that brand, each
+// annotated with which campaign(s) it was reviewed in
+function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLSpanElement>(null);
@@ -29,8 +31,8 @@ function OverflowTooltip({ label, items }: { label: string; items: string[] }) {
     clearTimeout(timer.current);
     if (ref.current) {
       const r = ref.current.getBoundingClientRect();
-      const above = r.top > 232;
-      const left = Math.min(r.left, window.innerWidth - 216);
+      const above = r.top > 280;
+      const left = Math.min(r.left, window.innerWidth - 260);
       setStyle(above
         ? { position: 'fixed', bottom: window.innerHeight - r.top + 8, left, zIndex: 9999 }
         : { position: 'fixed', top: r.bottom + 8, left, zIndex: 9999 });
@@ -42,18 +44,33 @@ function OverflowTooltip({ label, items }: { label: string; items: string[] }) {
   return (
     <>
       <span ref={ref}
-        className="inline-flex items-center px-1.5 py-px bg-canvas border border-hairline text-muted text-[11px] rounded-md cursor-default select-none"
+        className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 bg-canvas border border-hairline rounded-full cursor-default select-none"
         onMouseEnter={show} onMouseLeave={hide}>
-        {label}
+        <BrandLogo name={brand.brand_name} logoUrl={brand.logo_url} size={14} />
+        <span className="text-[11px] font-medium text-ink">{brand.brand_name}</span>
       </span>
       {open && createPortal(
         <div style={style} onMouseEnter={show} onMouseLeave={hide}>
-          <div className="bg-ink rounded-lg shadow-xl w-52">
-            <div className="max-h-52 overflow-y-auto px-2.5 py-2 flex flex-col gap-1 select-text">
-              {items.map(item => (
-                <span key={item} className="block text-white text-[11px] bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md leading-snug cursor-text">
-                  {item}
-                </span>
+          <div className="bg-ink rounded-lg shadow-xl w-60">
+            <div className="px-2.5 py-2 border-b border-white/10">
+              <span className="text-white text-[11px] font-semibold">{brand.brand_name} · สินค้าที่เคยรีวิว</span>
+            </div>
+            <div className="max-h-56 overflow-y-auto px-2.5 py-2 flex flex-col gap-2 select-text">
+              {brand.products.length === 0 ? (
+                <span className="text-white/50 text-[11px]">ไม่มีข้อมูล</span>
+              ) : brand.products.map(p => (
+                <div key={p.model_code}>
+                  <div className="text-white text-[11px] font-medium leading-snug">{p.model_code}</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {p.campaigns.length === 0 ? (
+                      <span className="text-white/40 text-[10px]">ไม่มีแคมเปญ</span>
+                    ) : p.campaigns.map(c => (
+                      <span key={c.code} className="text-white/70 text-[10px] bg-white/10 px-1.5 py-px rounded-md" title={c.label ?? c.code}>
+                        {c.code}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -61,52 +78,6 @@ function OverflowTooltip({ label, items }: { label: string; items: string[] }) {
         document.body,
       )}
     </>
-  );
-}
-
-// ─── Pills ────────────────────────────────────────────────────
-function CampaignPills({ campaigns }: { campaigns: KolDirectoryRow['campaigns'] }) {
-  const MAX = 6;
-  const visible = campaigns.slice(0, MAX);
-  const hidden = campaigns.slice(MAX);
-  if (campaigns.length === 0) return <span className="text-muted text-xs">—</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {visible.map(c => (
-        <span key={c.code}
-          className="inline-flex items-center px-1.5 py-px bg-accent/10 text-accent text-[11px] font-semibold rounded-md"
-          title={c.label ?? c.code}>
-          {c.code}
-        </span>
-      ))}
-      {hidden.length > 0 && (
-        <OverflowTooltip
-          label={`+${hidden.length}`}
-          items={hidden.map(c => c.label ? `${c.code} ${c.label}` : c.code)}
-        />
-      )}
-    </div>
-  );
-}
-
-function ProductPills({ products }: { products: string[] }) {
-  const MAX = 2;
-  const visible = products.slice(0, MAX);
-  const hidden = products.slice(MAX);
-  if (products.length === 0) return <span className="text-muted text-xs">—</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {visible.map(p => (
-        <span key={p}
-          className="inline-flex items-center px-1.5 py-px bg-surface border border-hairline text-ink text-[11px] rounded-md"
-          title={p}>
-          {p.length > 20 ? p.slice(0, 19) + '…' : p}
-        </span>
-      ))}
-      {hidden.length > 0 && (
-        <OverflowTooltip label={`+${hidden.length}`} items={hidden} />
-      )}
-    </div>
   );
 }
 
@@ -172,52 +143,16 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
           </div>
         </div>
 
-        {/* Row 2: category badge */}
-        {(r.platform || r.category) && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {r.platform && (
-              <span className="text-[11px] font-medium text-ink bg-canvas border border-hairline px-2 py-0.5 rounded-full">
-                {r.platform.name}
-              </span>
-            )}
-            {r.category && (
-              <span className="text-[11px] text-muted bg-canvas border border-hairline px-2 py-0.5 rounded-full">
-                {r.category}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Divider */}
-        <div className="h-px bg-hairline" />
-
-        {/* Row 3: brands reviewed + campaigns + products */}
-        <div className="flex flex-col gap-2 flex-1">
-          {r.brands.length > 0 && (
-            <div>
-              <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">แบรนด์ที่เคยรีวิว</div>
-              <div className="flex flex-wrap gap-1.5">
-                {r.brands.map(b => (
-                  <span
-                    key={b.brand_id}
-                    className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 bg-canvas border border-hairline rounded-full"
-                    title={`${b.brand_name} — ${b.products.length} สินค้า, ${b.campaigns.length} แคมเปญ`}
-                  >
-                    <BrandLogo name={b.brand_name} logoUrl={b.logo_url} size={14} />
-                    <span className="text-[11px] font-medium text-ink">{b.brand_name}</span>
-                  </span>
-                ))}
-              </div>
+        {/* Brands reviewed — hover a brand to see products + which campaign */}
+        <div className="flex-1">
+          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">แบรนด์ที่เคยรีวิว</div>
+          {r.brands.length === 0 ? (
+            <span className="text-muted text-xs">—</span>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {r.brands.map(b => <BrandHoverChip key={b.brand_id} brand={b} />)}
             </div>
           )}
-          <div>
-            <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">แคมเปญ</div>
-            <CampaignPills campaigns={r.campaigns} />
-          </div>
-          <div>
-            <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">สินค้า</div>
-            <ProductPills products={r.products} />
-          </div>
         </div>
       </div>
     </div>
@@ -240,18 +175,6 @@ function SkeletonCard() {
         <div className="flex gap-1.5">
           <div className="h-5 bg-canvas rounded-full w-20" />
           <div className="h-5 bg-canvas rounded-full w-16" />
-        </div>
-        <div className="h-px bg-hairline" />
-        <div className="space-y-2">
-          <div className="flex gap-1">
-            <div className="h-4 bg-canvas rounded-md w-10" />
-            <div className="h-4 bg-canvas rounded-md w-10" />
-            <div className="h-4 bg-canvas rounded-md w-10" />
-          </div>
-          <div className="flex gap-1">
-            <div className="h-4 bg-canvas rounded-md w-20" />
-            <div className="h-4 bg-canvas rounded-md w-16" />
-          </div>
         </div>
       </div>
     </div>
