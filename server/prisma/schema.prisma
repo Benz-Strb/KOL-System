@@ -43,41 +43,31 @@ model content_categories {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model kol_tiers {
-  id           Int    @id @default(autoincrement())
-  name         String @unique
-  follower_min Int?
-  follower_max Int?
-  kols         kols[]
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  follower_min  Int?
+  follower_max  Int?
+  kol_platforms kol_platforms[]
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model kols {
   id                   Int                    @id @default(autoincrement())
-  handle               String
-  handle_normalized    String                 @unique
   gen_name             String?
   content_category_id  Int?
-  kol_tier_id          Int?
-  platform_id          Int?
-  follower_count       Int?
   notes                String?
   created_at           DateTime               @default(now()) @db.Timestamptz(6)
-  profile_url          String?
   contact_info         Json?
   audience_tags        String[]
   custom_tags          String[]
   main_selling_points  String?
-  avatar_url           String?
   kol_commercial_terms kol_commercial_terms[]
+  kol_platforms        kol_platforms[]
   kol_samples          kol_samples[]
   content_categories   content_categories?    @relation(fields: [content_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  kol_tiers            kol_tiers?             @relation(fields: [kol_tier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  platforms            platforms?             @relation(fields: [platform_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   placements           placements[]
 
   @@index([content_category_id], map: "idx_kols_content_category")
-  @@index([platform_id], map: "idx_kols_platform")
-  @@index([kol_tier_id], map: "idx_kols_tier")
   @@index([audience_tags], map: "idx_kols_audience_tags", type: Gin)
   @@index([custom_tags], map: "idx_kols_custom_tags", type: Gin)
 }
@@ -173,11 +163,11 @@ model placements {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model platforms {
-  id         Int          @id @default(autoincrement())
-  name       String       @unique
-  active     Boolean      @default(true)
-  kols       kols[]
-  placements placements[]
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  active        Boolean         @default(true)
+  kol_platforms kol_platforms[]
+  placements    placements[]
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -287,4 +277,25 @@ model kol_samples {
   @@index([placement_id], map: "idx_kol_samples_placement")
   @@index([product_id], map: "idx_kol_samples_product")
   @@index([sample_status], map: "idx_kol_samples_status")
+}
+
+model kol_platforms {
+  id                Int        @id @default(autoincrement())
+  kol_id            Int
+  platform_id       Int?
+  handle            String
+  handle_normalized String     @unique
+  follower_count    Int?
+  avatar_url        String?
+  profile_url       String?
+  kol_tier_id       Int?
+  is_primary        Boolean    @default(false)
+  created_at        DateTime   @default(now()) @db.Timestamptz(6)
+  kols              kols       @relation(fields: [kol_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  kol_tiers         kol_tiers? @relation(fields: [kol_tier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  platforms         platforms? @relation(fields: [platform_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([kol_id], map: "idx_kol_platforms_kol_id")
+  @@index([platform_id], map: "idx_kol_platforms_platform_id")
+  @@index([kol_tier_id], map: "idx_kol_platforms_tier")
 }

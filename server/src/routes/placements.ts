@@ -27,7 +27,7 @@ app.get('/kol-gmv', async c => {
       ...(status && status !== 'all' ? { status } : {}),
       ...(placement_type && placement_type !== 'all' ? { placement_type } : {}),
       ...(payment_type && payment_type !== 'all' ? { payment_type } : {}),
-      ...(search ? { kols: { handle: { contains: search, mode: 'insensitive' as const } } } : {}),
+      ...(search ? { kols: { kol_platforms: { some: { handle: { contains: search, mode: 'insensitive' as const } } } } } : {}),
       ...(product_id ? { product_id: Number(product_id) } : {}),
       ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
       ...(price_min || price_max ? {
@@ -59,9 +59,9 @@ app.get('/kol-gmv', async c => {
     }[]>`
       SELECT
         k.id::int                 AS kol_id,
-        k.handle,
+        kp.handle,
         k.gen_name,
-        k.profile_url,
+        kp.profile_url,
         COUNT(DISTINCT p.id)::float                                                                  AS placement_count,
         COALESCE(SUM(pm.gmv::numeric), 0)::float                                                    AS total_gmv,
         COALESCE(SUM(CASE WHEN pm.channel = 'shopee'  THEN pm.gmv::numeric ELSE 0 END), 0)::float  AS shopee_gmv,
@@ -71,9 +71,10 @@ app.get('/kol-gmv', async c => {
         COALESCE(SUM(pm.orders), 0)::float                                                          AS total_orders
       FROM placements p
       JOIN kols k ON p.kol_id = k.id
+      JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
       LEFT JOIN placement_metrics pm ON pm.placement_id = p.id AND pm.gmv IS NOT NULL
       WHERE p.id IN (${Prisma.join(ids)})
-      GROUP BY k.id, k.handle, k.gen_name, k.profile_url
+      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url
       HAVING COALESCE(SUM(pm.gmv::numeric), 0) > 0
       ORDER BY total_gmv DESC
     `;
@@ -123,7 +124,7 @@ app.get('/', async c => {
       ...(status && status !== 'all' ? { status } : {}),
       ...(placement_type && placement_type !== 'all' ? { placement_type } : {}),
       ...(payment_type && payment_type !== 'all' ? { payment_type } : {}),
-      ...(search ? { kols: { handle: { contains: search, mode: 'insensitive' as const } } } : {}),
+      ...(search ? { kols: { kol_platforms: { some: { handle: { contains: search, mode: 'insensitive' as const } } } } } : {}),
       ...(product_id ? { product_id: Number(product_id) } : {}),
       ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
       ...(price_min || price_max ? {
@@ -138,12 +139,17 @@ app.get('/', async c => {
     const take = Number(limit);
     const skip = (Number(page) - 1) * take;
 
-    const [total, rows] = await Promise.all([
+    const [total, rawRows] = await Promise.all([
       prisma.placements.count({ where }),
       prisma.placements.findMany({
         where,
         include: {
-          kols: { select: { id: true, handle: true, gen_name: true, profile_url: true, follower_count: true, avatar_url: true, content_categories: { select: { name: true } } } },
+          kols: {
+            select: {
+              id: true, gen_name: true, content_categories: { select: { name: true } },
+              kol_platforms: { where: { is_primary: true }, select: { handle: true, profile_url: true, follower_count: true, avatar_url: true } },
+            },
+          },
           platforms: { select: { name: true } },
           products: { select: { model_code: true } },
           stores: { select: { name: true, branch: true } },
@@ -156,6 +162,25 @@ app.get('/', async c => {
         skip,
       }),
     ]);
+
+    // kols.handle/profile_url/follower_count/avatar_url moved to kol_platforms —
+    // flatten the primary platform row back into `kols` so the response shape
+    // (and the frontend reading it) stays unchanged.
+    const rows = rawRows.map(r => {
+      const primary = r.kols?.kol_platforms[0];
+      return {
+        ...r,
+        kols: r.kols ? {
+          id: r.kols.id,
+          handle: primary?.handle ?? '',
+          gen_name: r.kols.gen_name,
+          profile_url: primary?.profile_url ?? null,
+          follower_count: primary?.follower_count ?? null,
+          avatar_url: primary?.avatar_url ?? null,
+          content_categories: r.kols.content_categories,
+        } : null,
+      };
+    });
 
     return c.json({ total, page: Number(page), limit: take, rows });
   } catch (err) {

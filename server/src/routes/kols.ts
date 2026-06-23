@@ -7,60 +7,82 @@ const app = new Hono<AppEnv>();
 app.use('*', requireAuth);
 
 // ─── GET / — KOL Directory ────────────────────────────────
+// handle/follower_count/platform_id now live on kol_platforms (a kol/person
+// can have several). Listing + filtering + sorting still behaves like "1 row
+// per kol" by always reading through the primary (is_primary=true) platform —
+// resolve the page of ids with raw SQL first (Prisma can't ORDER BY a scalar
+// field on a specific row of a to-many relation), then fetch full nested data
+// via Prisma and re-apply that order. Same id-then-hydrate pattern already
+// used for kol-gmv/dashboard ranking queries elsewhere in this codebase.
 app.get('/', async c => {
   try {
     const prisma = c.get('prisma');
-    const q = c.req.query('q');
+    const q = c.req.query('q')?.trim();
     const platform_id = c.req.query('platform_id');
     const category_id = c.req.query('category_id');
     const page = c.req.query('page') ?? '1';
-    const TAKE = 25;
+    const TAKE = 20;
     const skip = (Number(page) - 1) * TAKE;
 
-    const where: Prisma.kolsWhereInput = {};
-    if (q?.trim()) {
-      where.OR = [
-        { handle: { contains: q.trim(), mode: 'insensitive' } },
-        { gen_name: { contains: q.trim(), mode: 'insensitive' } },
-      ];
-    }
-    if (platform_id) where.platform_id = Number(platform_id);
-    if (category_id) where.content_category_id = Number(category_id);
+    const whereSql = Prisma.sql`
+      WHERE 1=1
+      ${q ? Prisma.sql`AND (kp.handle ILIKE ${'%' + q + '%'} OR k.gen_name ILIKE ${'%' + q + '%'})` : Prisma.empty}
+      ${platform_id ? Prisma.sql`AND kp.platform_id = ${Number(platform_id)}` : Prisma.empty}
+      ${category_id ? Prisma.sql`AND k.content_category_id = ${Number(category_id)}` : Prisma.empty}
+    `;
 
-    const [total, kols] = await Promise.all([
-      prisma.kols.count({ where }),
-      prisma.kols.findMany({
-        where,
-        select: {
-          id: true,
-          handle: true,
-          gen_name: true,
-          follower_count: true,
-          profile_url: true,
-          avatar_url: true,
-          contact_info: true,
-          custom_tags: true,
-          audience_tags: true,
-          main_selling_points: true,
-          platforms: { select: { id: true, name: true } },
-          content_categories: { select: { name: true } },
-          placements: {
-            where: { status: { not: 'cancelled' } },
-            select: {
-              campaigns: { select: { code: true, label: true } },
-              products: { select: { model_code: true } },
-              brands: { select: { id: true, name: true, logo_url: true } },
-            },
+    const [countRows, idRows] = await Promise.all([
+      prisma.$queryRaw<{ total: bigint }[]>`
+        SELECT COUNT(*) AS total
+        FROM kols k
+        JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
+        ${whereSql}
+      `,
+      prisma.$queryRaw<{ id: number }[]>`
+        SELECT k.id
+        FROM kols k
+        JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
+        ${whereSql}
+        ORDER BY kp.follower_count DESC NULLS LAST, kp.handle ASC
+        LIMIT ${TAKE} OFFSET ${skip}
+      `,
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
+    const orderedIds = idRows.map(r => r.id);
+
+    const kolsUnordered = orderedIds.length === 0 ? [] : await prisma.kols.findMany({
+      where: { id: { in: orderedIds } },
+      select: {
+        id: true,
+        gen_name: true,
+        contact_info: true,
+        custom_tags: true,
+        audience_tags: true,
+        main_selling_points: true,
+        content_categories: { select: { name: true } },
+        kol_platforms: {
+          select: {
+            handle: true,
+            follower_count: true,
+            profile_url: true,
+            avatar_url: true,
+            is_primary: true,
+            platforms: { select: { id: true, name: true } },
+          },
+          orderBy: { is_primary: 'desc' },
+        },
+        placements: {
+          where: { status: { not: 'cancelled' } },
+          select: {
+            campaigns: { select: { code: true, label: true } },
+            products: { select: { model_code: true } },
+            brands: { select: { id: true, name: true, logo_url: true } },
           },
         },
-        orderBy: [
-          { follower_count: { sort: 'desc', nulls: 'last' } },
-          { handle: 'asc' },
-        ],
-        take: TAKE,
-        skip,
-      }),
-    ]);
+      },
+    });
+    const byId = new Map(kolsUnordered.map(k => [k.id, k]));
+    const kols = orderedIds.map(id => byId.get(id)).filter((k): k is NonNullable<typeof k> => k != null);
 
     const parseCode = (code: string) => { const [m, d] = code.split('.').map(Number); return [m || 0, d || 0]; };
     const sortCampaigns = (campaigns: { code: string; label: string | null }[]) =>
@@ -91,18 +113,32 @@ app.get('/', async c => {
         brandMap.set(p.brands.id, brandEntry);
       }
 
+      const primary = k.kol_platforms.find(p => p.is_primary) ?? k.kol_platforms[0];
       return {
         id: k.id,
-        handle: k.handle,
+        handle: primary?.handle ?? '',
         gen_name: k.gen_name,
-        follower_count: k.follower_count,
-        profile_url: k.profile_url,
-        avatar_url: k.avatar_url,
+        follower_count: primary?.follower_count ?? null,
+        profile_url: primary?.profile_url ?? null,
+        avatar_url: primary?.avatar_url ?? null,
         contact_info: k.contact_info as Record<string, string> | null,
         custom_tags: k.custom_tags,
         audience_tags: k.audience_tags,
         main_selling_points: k.main_selling_points,
-        platform: k.platforms,
+        platform: primary?.platforms ?? null,
+        // every platform account this kol has — lets the UI show/link to all
+        // of them, not just the primary one (kept above for backward compat)
+        platforms: k.kol_platforms
+          .filter(p => p.platforms)
+          .map(p => ({
+            platform_id: p.platforms!.id,
+            platform_name: p.platforms!.name,
+            handle: p.handle,
+            follower_count: p.follower_count,
+            profile_url: p.profile_url,
+            avatar_url: p.avatar_url,
+            is_primary: p.is_primary,
+          })),
         category: k.content_categories?.name ?? null,
         brands: [...brandMap.values()]
           .map(b => ({
@@ -129,24 +165,25 @@ app.get('/search', async c => {
   try {
     const prisma = c.get('prisma');
     const query = c.req.query('q')?.trim() ?? '';
-    const rows = await prisma.kols.findMany({
-      where: query ? {
-        OR: [
-          { handle: { contains: query, mode: 'insensitive' } },
-          { gen_name: { contains: query, mode: 'insensitive' } },
-        ],
-      } : undefined,
-      select: {
-        id: true,
-        handle: true,
-        gen_name: true,
-        follower_count: true,
-        platforms: { select: { id: true, name: true } },
-      },
-      orderBy: { handle: 'asc' },
-      take: 10,
-    });
-    return c.json(rows);
+    const rows = await prisma.$queryRaw<{
+      id: number; handle: string; gen_name: string | null; follower_count: number | null;
+      platform_id: number | null; platform_name: string | null;
+    }[]>`
+      SELECT k.id, kp.handle, k.gen_name, kp.follower_count, kp.platform_id, p.name AS platform_name
+      FROM kols k
+      JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
+      LEFT JOIN platforms p ON p.id = kp.platform_id
+      ${query ? Prisma.sql`WHERE kp.handle ILIKE ${'%' + query + '%'} OR k.gen_name ILIKE ${'%' + query + '%'}` : Prisma.empty}
+      ORDER BY kp.handle ASC
+      LIMIT 10
+    `;
+    return c.json(rows.map(r => ({
+      id: r.id,
+      handle: r.handle,
+      gen_name: r.gen_name,
+      follower_count: r.follower_count,
+      platforms: r.platform_id != null ? { id: r.platform_id, name: r.platform_name } : null,
+    })));
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to search kols' }, 500);
@@ -273,31 +310,34 @@ app.post('/:id/terms', async c => {
 });
 
 // ─── PATCH /:id — update KOL profile fields ───────────────
+// follower_count now lives on kol_platforms — redirect that one field to the
+// primary platform row (updateMany, not update: (kol_id, is_primary) isn't a
+// modeled unique key, just a partial unique index Prisma doesn't expose).
 app.patch('/:id', async c => {
   try {
     const prisma = c.get('prisma');
+    const kolId = Number(c.req.param('id'));
     const { custom_tags, main_selling_points, contact_info, follower_count } = await c.req.json();
+
     const kol = await prisma.kols.update({
-      where: { id: Number(c.req.param('id')) },
+      where: { id: kolId },
       data: {
         ...(custom_tags !== undefined && { custom_tags }),
         ...(main_selling_points !== undefined && { main_selling_points: main_selling_points?.trim() || null }),
         ...(contact_info !== undefined && { contact_info: contact_info ?? null }),
-        ...(follower_count !== undefined && {
-          follower_count: follower_count === '' || follower_count == null ? null : Number(follower_count),
-        }),
       },
-      select: {
-        id: true,
-        handle: true,
-        custom_tags: true,
-        audience_tags: true,
-        main_selling_points: true,
-        contact_info: true,
-        follower_count: true,
-      },
+      select: { id: true, custom_tags: true, audience_tags: true, main_selling_points: true, contact_info: true },
     });
-    return c.json(kol);
+
+    if (follower_count !== undefined) {
+      await prisma.kol_platforms.updateMany({
+        where: { kol_id: kolId, is_primary: true },
+        data: { follower_count: follower_count === '' || follower_count == null ? null : Number(follower_count) },
+      });
+    }
+    const primary = await prisma.kol_platforms.findFirst({ where: { kol_id: kolId, is_primary: true }, select: { handle: true, follower_count: true } });
+
+    return c.json({ ...kol, handle: primary?.handle ?? '', follower_count: primary?.follower_count ?? null });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to update kol' }, 500);
@@ -305,6 +345,9 @@ app.patch('/:id', async c => {
 });
 
 // ─── POST / — create KOL ──────────────────────────────────
+// Creates the person (kols) + their first platform account (kol_platforms,
+// is_primary=true) together. handle_normalized uniqueness now lives on
+// kol_platforms, so this is a fresh kol_platforms row, not a fresh kols row.
 app.post('/', async c => {
   try {
     const prisma = c.get('prisma');
@@ -313,27 +356,37 @@ app.post('/', async c => {
 
     const normalized = handle.trim().toLowerCase().replace(/\s+/g, '');
 
-    const existing = await prisma.kols.findUnique({ where: { handle_normalized: normalized } });
-    if (existing) return c.json({ error: 'KOL นี้มีอยู่แล้ว', kol: existing }, 409);
+    const existing = await prisma.kol_platforms.findUnique({ where: { handle_normalized: normalized }, select: { kol_id: true, handle: true, follower_count: true } });
+    if (existing) return c.json({ error: 'KOL นี้มีอยู่แล้ว', kol: { id: existing.kol_id, handle: existing.handle, follower_count: existing.follower_count } }, 409);
 
-    const kol = await prisma.kols.create({
-      data: {
-        handle: handle.trim(),
-        handle_normalized: normalized,
-        gen_name: gen_name?.trim() || null,
-        platform_id: platform_id ? Number(platform_id) : null,
-        content_category_id: content_category_id ? Number(content_category_id) : null,
-        follower_count: follower_count ? Number(follower_count) : null,
-      },
-      select: {
-        id: true,
-        handle: true,
-        gen_name: true,
-        follower_count: true,
-        platforms: { select: { id: true, name: true } },
-      },
+    const { kol, platform } = await prisma.$transaction(async tx => {
+      const kol = await tx.kols.create({
+        data: {
+          gen_name: gen_name?.trim() || null,
+          content_category_id: content_category_id ? Number(content_category_id) : null,
+        },
+      });
+      const platform = await tx.kol_platforms.create({
+        data: {
+          kol_id: kol.id,
+          handle: handle.trim(),
+          handle_normalized: normalized,
+          platform_id: platform_id ? Number(platform_id) : null,
+          follower_count: follower_count ? Number(follower_count) : null,
+          is_primary: true,
+        },
+        select: { handle: true, follower_count: true, platforms: { select: { id: true, name: true } } },
+      });
+      return { kol, platform };
     });
-    return c.json(kol, 201);
+
+    return c.json({
+      id: kol.id,
+      handle: platform.handle,
+      gen_name: kol.gen_name,
+      follower_count: platform.follower_count,
+      platforms: platform.platforms,
+    }, 201);
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to create kol' }, 500);

@@ -194,18 +194,19 @@ app.get('/', async c => {
       )
       SELECT
         k.id::int                                AS kol_id,
-        k.handle,
+        kp.handle,
         k.gen_name,
-        k.profile_url,
-        k.avatar_url,
+        kp.profile_url,
+        kp.avatar_url,
         COUNT(DISTINCT ps.id)::int                AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float           AS total_gmv,
         COALESCE(SUM(ps.spend), 0)::float         AS total_spend,
         COALESCE(SUM(ma.orders), 0)::int          AS total_orders
       FROM placement_spend ps
       JOIN kols k ON ps.kol_id = k.id
+      JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
       LEFT JOIN metric_agg ma ON ma.placement_id = ps.id
-      GROUP BY k.id, k.handle, k.gen_name, k.profile_url, k.avatar_url
+      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url, kp.avatar_url
     `;
 
     // per-KOL GMV split by sales channel (shopee/lazada/website/tiktok/youtube/lamon8)
@@ -312,13 +313,17 @@ app.get('/kol/:id', async c => {
     const kol = await prisma.kols.findUnique({
       where: { id: kolId },
       select: {
-        id: true, handle: true, gen_name: true, profile_url: true, avatar_url: true, follower_count: true,
-        platforms: { select: { id: true, name: true } },
+        id: true, gen_name: true,
+        kol_platforms: {
+          where: { is_primary: true },
+          select: { handle: true, profile_url: true, avatar_url: true, follower_count: true, platforms: { select: { id: true, name: true } } },
+        },
       },
     });
     if (!kol) {
       return c.json({ error: 'KOL not found' }, 404);
     }
+    const kolPrimary = kol.kol_platforms[0];
 
     const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
     const placements = await prisma.placements.findMany({
@@ -383,8 +388,8 @@ app.get('/kol/:id', async c => {
 
     return c.json({
       kol: {
-        id: kol.id, handle: kol.handle, gen_name: kol.gen_name, profile_url: kol.profile_url,
-        avatar_url: kol.avatar_url, follower_count: kol.follower_count, platform: kol.platforms,
+        id: kol.id, handle: kolPrimary?.handle ?? '', gen_name: kol.gen_name, profile_url: kolPrimary?.profile_url ?? null,
+        avatar_url: kolPrimary?.avatar_url ?? null, follower_count: kolPrimary?.follower_count ?? null, platform: kolPrimary?.platforms ?? null,
       },
       reliability: {
         total_placements: placements.length,

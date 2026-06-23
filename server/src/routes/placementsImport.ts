@@ -72,6 +72,8 @@ function parseKindParam(v: string): PlacementKind | null {
 }
 
 // ─── Shared lookup context (loaded fresh for both validate + commit) ──
+// `id` here is the kol (person) id — i.e. kol_platforms.kol_id, not
+// kol_platforms.id — since that's what placements.kol_id must be set to.
 interface KolLookup { id: number; handle: string; handle_normalized: string; follower_count: number | null; platform_id: number | null }
 interface StoreLookup { id: number; name: string; branch: string | null }
 
@@ -107,11 +109,15 @@ async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookup
     prisma.$queryRaw<{ product_id: number; brand_id: number }[]>`
       SELECT DISTINCT product_id, brand_id FROM placements WHERE product_id IS NOT NULL`,
     prisma.stores.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { branch: 'asc' }], select: { id: true, name: true, branch: true } }),
-    prisma.kols.findMany({
-      select: { id: true, handle: true, handle_normalized: true, follower_count: true, platform_id: true },
+    // not filtered to is_primary: an Excel row's handle should resolve to
+    // whichever specific platform account it actually matches, since a kol
+    // can have more than one (each with its own handle/follower_count).
+    prisma.kol_platforms.findMany({
+      select: { kol_id: true, handle: true, handle_normalized: true, follower_count: true, platform_id: true },
       orderBy: { handle: 'asc' },
     }),
   ]);
+  const kolsLookup: KolLookup[] = kols.map(k => ({ id: k.kol_id, handle: k.handle, handle_normalized: k.handle_normalized, follower_count: k.follower_count, platform_id: k.platform_id }));
 
   const productBrandIds = new Map<number, Set<number>>();
   for (const row of productBrandRows) {
@@ -123,8 +129,8 @@ async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookup
     isAdmin,
     userBrandIds: user.brandIds,
     brands, platforms, campaigns, products, productBrandIds, stores,
-    kolsList: kols,
-    kolByNormalized: new Map(kols.map(k => [k.handle_normalized, k])),
+    kolsList: kolsLookup,
+    kolByNormalized: new Map(kolsLookup.map(k => [k.handle_normalized, k])),
   };
 }
 

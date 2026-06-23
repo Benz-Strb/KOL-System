@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, ChevronLeft, ChevronRight, X, ExternalLink, Users } from 'lucide-react';
-import { getKolDirectory, getDropdowns, type KolDirectoryRow, type KolBrandRow, type Platform, type ContentCategory } from '../api/index.js';
+import { Search, ChevronLeft, ChevronRight, X, Users } from 'lucide-react';
+import { getKolDirectory, getDropdowns, type KolDirectoryRow, type KolBrandRow, type KolPlatformAccount, type Platform, type ContentCategory } from '../api/index.js';
 import KolDetailModal from '../components/KolDetailModal.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
@@ -9,7 +9,7 @@ import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
 import { getPlatformColor } from '../lib/platformColors.js';
 
-const LIMIT = 25;
+const LIMIT = 20;
 
 function formatFollower(n: number | null) {
   if (!n) return null;
@@ -83,9 +83,33 @@ function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
 
 const HOVER_EXPAND_DELAY = 400;
 
+// ─── Platform badge — click opens that platform's profile in a new tab ────
+// No real brand-logo assets for platforms (unlike brands, which have a
+// self-service logo_url) — colored initial badge instead, same fallback
+// spirit as BrandLogo/KolAvatar elsewhere in this file.
+function PlatformBadge({ p }: { p: KolPlatformAccount }) {
+  const initial = p.platform_name.slice(0, 1).toUpperCase();
+  const tooltip = [p.platform_name, p.handle, p.follower_count ? `${p.follower_count.toLocaleString('th-TH')} followers` : null]
+    .filter(Boolean).join(' · ');
+
+  const badge = (
+    <span
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full border border-hairline text-[10px] font-bold text-white shrink-0 transition-transform ${getPlatformColor(p.platform_name)} ${p.profile_url ? 'hover:scale-110' : 'opacity-50'}`}
+    >
+      {initial}
+    </span>
+  );
+
+  if (!p.profile_url) return <span title={tooltip}>{badge}</span>;
+  return (
+    <a href={p.profile_url} target="_blank" rel="noopener noreferrer" title={tooltip} onClick={e => e.stopPropagation()}>
+      {badge}
+    </a>
+  );
+}
+
 // ─── KOL Card ─────────────────────────────────────────────────
 function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
-  const bar = getPlatformColor(r.platform?.name);
   const [expanded, setExpanded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -108,9 +132,6 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
           : 'border-hairline hover:shadow-md hover:border-accent/30 hover:-translate-y-0.5'
       }`}
     >
-      {/* Top accent bar */}
-      <div className={`h-1 w-full shrink-0 ${bar}`} />
-
       <div className="p-4 flex flex-col gap-3 flex-1">
         {/* Row 1: avatar + handle + follower + link */}
         <div className="flex items-start justify-between gap-2">
@@ -133,15 +154,15 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
                 {formatFollower(r.follower_count)}
               </span>
             )}
-            {r.profile_url && (
-              <a href={r.profile_url} target="_blank" rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-accent hover:bg-canvas transition-colors">
-                <ExternalLink size={11} />
-              </a>
-            )}
           </div>
         </div>
+
+        {/* Platform accounts — one badge per platform this kol has, click opens that platform's profile */}
+        {r.platforms.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {r.platforms.map(p => <PlatformBadge key={p.platform_id} p={p} />)}
+          </div>
+        )}
 
         {/* Brands reviewed — hover a brand to see products + which campaign */}
         <div className="flex-1">
@@ -163,7 +184,6 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
 function SkeletonCard() {
   return (
     <div className="bg-surface border border-hairline rounded-2xl overflow-hidden animate-pulse">
-      <div className="h-1 bg-hairline" />
       <div className="p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-xl bg-canvas shrink-0" />

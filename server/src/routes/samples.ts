@@ -6,6 +6,22 @@ import type { AppEnv } from '../types.js';
 const app = new Hono<AppEnv>();
 app.use('*', requireAuth);
 
+// handle/avatar_url/platform moved to kol_platforms — flatten the primary
+// platform row back into `kols` so the response shape stays unchanged.
+const KOLS_PRIMARY_INCLUDE = {
+  select: {
+    id: true, gen_name: true,
+    kol_platforms: { where: { is_primary: true as const }, select: { handle: true, avatar_url: true, platforms: { select: { name: true } } } },
+  },
+};
+function flattenKolPrimary<T extends { id: number; gen_name: string | null; kol_platforms: { handle: string; avatar_url: string | null; platforms: { name: string } | null }[] } | null>(
+  kol: T,
+) {
+  if (!kol) return null;
+  const primary = kol.kol_platforms[0];
+  return { id: kol.id, handle: primary?.handle ?? '', gen_name: kol.gen_name, avatar_url: primary?.avatar_url ?? null, platforms: primary?.platforms ?? null };
+}
+
 app.get('/', async c => {
   try {
     const prisma = c.get('prisma');
@@ -37,7 +53,7 @@ app.get('/', async c => {
       prisma.kol_samples.findMany({
         where,
         include: {
-          kols: { select: { id: true, handle: true, gen_name: true, avatar_url: true, platforms: { select: { name: true } } } },
+          kols: KOLS_PRIMARY_INCLUDE,
           brands: { select: { id: true, name: true } },
           products: { select: { id: true, model_code: true } },
         },
@@ -47,7 +63,7 @@ app.get('/', async c => {
       }),
     ]);
 
-    return c.json({ total, page: Number(page), limit: TAKE, rows });
+    return c.json({ total, page: Number(page), limit: TAKE, rows: rows.map(r => ({ ...r, kols: flattenKolPrimary(r.kols) })) });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load samples' }, 500);
@@ -79,12 +95,12 @@ app.post('/', async c => {
         notes: notes?.trim() || null,
       },
       include: {
-        kols: { select: { id: true, handle: true, gen_name: true, avatar_url: true, platforms: { select: { name: true } } } },
+        kols: KOLS_PRIMARY_INCLUDE,
         brands: { select: { id: true, name: true } },
         products: { select: { id: true, model_code: true } },
       },
     });
-    return c.json(sample, 201);
+    return c.json({ ...sample, kols: flattenKolPrimary(sample.kols) }, 201);
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to create sample' }, 500);
@@ -117,12 +133,12 @@ app.patch('/:id', async c => {
         ...(notes !== undefined && { notes: notes?.trim() || null }),
       },
       include: {
-        kols: { select: { id: true, handle: true, gen_name: true, avatar_url: true, platforms: { select: { name: true } } } },
+        kols: KOLS_PRIMARY_INCLUDE,
         brands: { select: { id: true, name: true } },
         products: { select: { id: true, model_code: true } },
       },
     });
-    return c.json(sample);
+    return c.json({ ...sample, kols: flattenKolPrimary(sample.kols) });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to update sample' }, 500);

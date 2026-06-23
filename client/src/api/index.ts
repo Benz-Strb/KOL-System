@@ -245,6 +245,16 @@ export type KolBrandRow = {
   products: KolBrandProductRow[];
 };
 
+export type KolPlatformAccount = {
+  platform_id: number;
+  platform_name: string;
+  handle: string;
+  follower_count: number | null;
+  profile_url: string | null;
+  avatar_url: string | null;
+  is_primary: boolean;
+};
+
 export type KolDirectoryRow = {
   id: number;
   handle: string;
@@ -257,6 +267,7 @@ export type KolDirectoryRow = {
   audience_tags: string[];
   main_selling_points: string | null;
   platform: { id: number; name: string } | null;
+  platforms: KolPlatformAccount[];
   category: string | null;
   brands: KolBrandRow[];
 };
