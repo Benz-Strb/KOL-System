@@ -38,7 +38,7 @@ function StatChip({ icon, label, value, tone = 'neutral' }: { icon: ReactNode; l
         <span className="shrink-0">{icon}</span>
         <span className="text-[10px] font-semibold uppercase tracking-wide">{label}</span>
       </div>
-      <span className={`text-base font-bold tabular-nums ${toneCls}`}>{value}</span>
+      <span className={`text-base font-bold tabular-nums font-mono ${toneCls}`}>{value}</span>
     </div>
   );
 }
@@ -66,7 +66,7 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
       className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 transition-opacity duration-200 ${closed ? 'opacity-0' : 'opacity-100'}`}
       onClick={requestClose}
     >
-      <div className={`bg-surface border border-hairline rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col transition-all duration-200 ${closed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+      <div className={`bg-surface border border-hairline rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col transition-all duration-200 ${closed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -123,7 +123,7 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
               <p className="text-[11px] text-muted">ค่าใช้จ่ายรวม/ROI ที่นี่นับเฉพาะค่าจ้าง KOL (ไม่รวม Ads Cost) — ดูความคุ้มค่าตัว KOL เอง</p>
               {data.reliability.delivery_rate != null && (
                 <p className="text-xs text-muted">
-                  อัตราทำตามนัด (โพสต์ ÷ โพสต์+ยกเลิก): <span className="font-semibold text-ink">{(data.reliability.delivery_rate * 100).toFixed(0)}%</span>
+                  อัตราทำตามนัด (โพสต์ ÷ โพสต์+ยกเลิก): <span className="font-semibold text-ink font-mono">{(data.reliability.delivery_rate * 100).toFixed(0)}%</span>
                 </p>
               )}
 

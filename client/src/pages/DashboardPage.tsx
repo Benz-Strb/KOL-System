@@ -148,13 +148,13 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
           <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
           {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
         </div>
-        <span className="text-xs text-muted tabular-nums shrink-0">{k.placement_count} placement</span>
+        <span className="text-xs text-muted tabular-nums font-mono shrink-0">{k.placement_count} placement</span>
         {mode === 'roi' && (
-          <span className="text-xs font-semibold text-emerald-600 tabular-nums w-16 text-right shrink-0">
+          <span className="text-xs font-semibold text-emerald-600 tabular-nums font-mono w-16 text-right shrink-0">
             {k.roi != null ? `x${k.roi.toFixed(2)}` : '—'}
           </span>
         )}
-        <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
+        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
         {k.profile_url && (
           <a href={k.profile_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
             className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-accent hover:bg-canvas transition-colors shrink-0">
@@ -218,10 +218,10 @@ function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
         value={query}
         onChange={e => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        className="w-60 pl-7 pr-3 py-1.5 rounded-full text-xs bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
+        className="w-60 pl-7 pr-3 py-1.5 rounded-lg text-xs bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
       />
       {open && query && (
-        <div className="absolute z-30 right-0 w-72 mt-1.5 bg-surface border border-hairline rounded-2xl shadow-xl max-h-64 overflow-y-auto">
+        <div className="absolute z-30 right-0 w-72 mt-1.5 bg-surface border border-hairline rounded-xl shadow-xl max-h-64 overflow-y-auto">
           {loading && <div className="px-3 py-3 text-sm text-muted">กำลังค้นหา...</div>}
           {!loading && results.length === 0 && <div className="px-3 py-3 text-sm text-muted">ไม่พบ KOL</div>}
           {!loading && results.map(kol => (
@@ -256,14 +256,14 @@ const selectCls = [
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-surface border border-hairline rounded-2xl p-4 flex flex-col gap-2 shadow-sm hover:shadow-lg hover:border-accent/30 hover:-translate-y-0.5 transition-all duration-200">
+    <div className="bg-surface border border-hairline rounded-xl p-4 flex flex-col gap-2 hover:border-accent/30 transition-colors duration-200">
       <div className="flex items-center gap-1.5">
         <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-accent/10 text-accent shrink-0">
           {icon}
         </span>
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</span>
       </div>
-      <div className="text-xl font-bold text-ink tabular-nums leading-tight">{value}</div>
+      <div className="text-xl font-bold text-ink tabular-nums font-mono leading-tight">{value}</div>
       {sub && <div className="text-[11px] text-muted">{sub}</div>}
     </div>
   );
@@ -271,7 +271,7 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
 
 function SkeletonKpiCard() {
   return (
-    <div className="bg-surface border border-hairline rounded-2xl p-4 flex flex-col gap-2 animate-pulse">
+    <div className="bg-surface border border-hairline rounded-xl p-4 flex flex-col gap-2 animate-pulse">
       <div className="h-2.5 bg-canvas rounded-md w-2/3" />
       <div className="h-5 bg-canvas rounded-md w-1/2" />
       <div className="h-2 bg-canvas rounded-md w-3/4" />
@@ -281,7 +281,7 @@ function SkeletonKpiCard() {
 
 function SkeletonChart() {
   return (
-    <div className="bg-surface border border-hairline rounded-2xl p-5">
+    <div className="bg-surface border border-hairline rounded-xl p-5">
       <div className="h-3.5 bg-canvas rounded-md w-40 mb-4 animate-pulse" />
       <div className="h-56 bg-canvas rounded-xl animate-pulse" />
     </div>
@@ -415,7 +415,7 @@ export default function DashboardPage() {
             <SkeletonChart />
           </div>
 
-          <div className="bg-surface border border-hairline rounded-2xl p-5">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
             <div className="h-3.5 bg-canvas rounded-md w-52 mb-4 animate-pulse" />
             <div className="flex flex-col gap-1">
               {Array.from({ length: 10 }).map((_, i) => <SkeletonKolRow key={i} />)}
@@ -447,7 +447,7 @@ export default function DashboardPage() {
 
           {/* Channel breakdown + campaign trend */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
+            <div className="bg-surface border border-hairline rounded-xl p-5">
               <h2 className="text-sm font-semibold text-ink mb-4">GMV แยกตามช่องทาง</h2>
               {data.channelBreakdown.length === 0 ? (
                 <p className="text-sm text-muted">ยังไม่มีข้อมูล GMV</p>
@@ -479,8 +479,8 @@ export default function DashboardPage() {
                       <div key={c.channel} className="flex items-center gap-2 text-xs">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
                         <span className="font-medium text-ink shrink-0 w-16 truncate">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
-                        <span className="flex-1 text-right text-ink tabular-nums">{formatMoney(c.gmv)}</span>
-                        <span className="w-20 text-right text-muted tabular-nums shrink-0">{c.orders.toLocaleString('th-TH')} orders</span>
+                        <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(c.gmv)}</span>
+                        <span className="w-20 text-right text-muted tabular-nums font-mono shrink-0">{c.orders.toLocaleString('th-TH')} orders</span>
                       </div>
                     ))}
                   </div>
@@ -488,7 +488,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
+            <div className="bg-surface border border-hairline rounded-xl p-5">
               <h2 className="text-sm font-semibold text-ink mb-4">GMV vs ค่าใช้จ่าย ต่อแคมเปญ</h2>
               {campaignTrendData.length === 0 ? (
                 <p className="text-sm text-muted">ยังไม่มีข้อมูล</p>
@@ -513,7 +513,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Top KOL ranking */}
-          <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
                 <Trophy size={14} className="text-accent" /> Ranking KOL (Top 10)
@@ -556,7 +556,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Price benchmark — compare a hypothetical rate against KOLs who actually got paid near it */}
-          <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
             <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5 mb-1">
               <Scale size={14} className="text-accent" /> เทียบเรทราคากับ GMV ที่เคยทำได้
             </h2>
@@ -587,7 +587,7 @@ export default function DashboardPage() {
                   <span className="text-xs text-muted">
                     พบ {priceBandKols.length} คน ในช่วงราคา ฿{Math.round(priceValue * (1 - PRICE_BAND_TOLERANCE)).toLocaleString('th-TH')}–฿{Math.round(priceValue * (1 + PRICE_BAND_TOLERANCE)).toLocaleString('th-TH')}
                   </span>
-                  <span className="text-xs text-ink font-semibold shrink-0">เฉลี่ย GMV ช่วงนี้: {formatMoney(priceBandAvgGmv ?? 0)}</span>
+                  <span className="text-xs text-ink font-semibold shrink-0">เฉลี่ย GMV ช่วงนี้: <span className="font-mono">{formatMoney(priceBandAvgGmv ?? 0)}</span></span>
                 </div>
                 <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
                   {priceBandKols.map((k, i) => (
@@ -602,8 +602,8 @@ export default function DashboardPage() {
                         <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
                         {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
                       </div>
-                      <span className="text-xs text-muted tabular-nums shrink-0">ราคาเฉลี่ย {formatMoney(k.avgPrice)}</span>
-                      <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
+                      <span className="text-xs text-muted tabular-nums shrink-0">ราคาเฉลี่ย <span className="font-mono">{formatMoney(k.avgPrice)}</span></span>
+                      <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
                     </div>
                   ))}
                 </div>
