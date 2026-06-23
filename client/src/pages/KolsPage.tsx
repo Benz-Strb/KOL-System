@@ -44,10 +44,10 @@ function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
   return (
     <>
       <span ref={ref}
-        className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 bg-canvas border border-hairline rounded-full cursor-default select-none"
-        onMouseEnter={show} onMouseLeave={hide}>
-        <BrandLogo name={brand.brand_name} logoUrl={brand.logo_url} size={14} />
-        <span className="text-[11px] font-medium text-ink">{brand.brand_name}</span>
+        className="inline-flex cursor-default select-none transition-transform hover:scale-110"
+        onMouseEnter={show} onMouseLeave={hide}
+        title={brand.brand_name}>
+        <BrandLogo name={brand.brand_name} logoUrl={brand.logo_url} size={32} />
       </span>
       {open && createPortal(
         <div style={style} onMouseEnter={show} onMouseLeave={hide}>
@@ -149,7 +149,7 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
           {r.brands.length === 0 ? (
             <span className="text-muted text-xs">—</span>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {r.brands.map(b => <BrandHoverChip key={b.brand_id} brand={b} />)}
             </div>
           )}

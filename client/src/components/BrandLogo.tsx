@@ -9,14 +9,14 @@ export default function BrandLogo({ name, logoUrl, size = 18 }: { name: string; 
         alt={name}
         onError={() => setErrored(true)}
         style={{ width: size, height: size }}
-        className="rounded-md object-contain bg-white border border-hairline shrink-0"
+        className="rounded-lg object-contain bg-white border border-hairline shrink-0"
       />
     );
   }
   return (
     <span
       style={{ width: size, height: size }}
-      className="rounded-md bg-canvas border border-hairline shrink-0 flex items-center justify-center font-bold text-muted"
+      className="rounded-lg bg-canvas border border-hairline shrink-0 flex items-center justify-center font-bold text-muted"
       title={name}
     >
       <span style={{ fontSize: Math.max(8, size * 0.45) }}>{name.slice(0, 1).toUpperCase()}</span>
