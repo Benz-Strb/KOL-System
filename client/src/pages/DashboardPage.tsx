@@ -498,7 +498,11 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
-                    <Tooltip formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย']} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                      labelStyle={{ color: 'var(--ink)' }}
+                      formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย']}
+                    />
                     <Legend formatter={(v: string) => (v === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย')} wrapperStyle={{ fontSize: 11 }} />
                     <Bar dataKey="gmv" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={500} />
                     <Bar dataKey="spend" fill="#f97316" radius={[4, 4, 0, 0]} animationDuration={500} />

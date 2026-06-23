@@ -140,6 +140,8 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
                       <YAxis yAxisId="money" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
                       <YAxis yAxisId="roi" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `x${v}`} />
                       <Tooltip
+                        contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                        labelStyle={{ color: 'var(--ink)' }}
                         formatter={(v, n) => {
                           if (n === 'roi') return [v != null ? `x${Number(v).toFixed(2)}` : '—', 'ROI'];
                           return [formatMoney(Number(v ?? 0)), n === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย'];
