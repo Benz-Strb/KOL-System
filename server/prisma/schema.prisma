@@ -195,6 +195,7 @@ model products {
   active               Boolean             @default(true)
   canonical_product_id Int?
   is_canonical         Boolean             @default(true)
+  image_url            String?
   kol_samples          kol_samples[]
   placements           placements[]
   products             products?           @relation("productsToproducts", fields: [canonical_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

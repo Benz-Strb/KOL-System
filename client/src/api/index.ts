@@ -1,5 +1,6 @@
 export type Platform = { id: number; name: string };
 export type ContentCategory = { id: number; name: string };
+export type ProductCategory = { id: number; name: string };
 export type UserOption = { id: number; full_name: string; is_active: boolean };
 export type Campaign = { id: number; code: string; label: string | null; year: number };
 export type Product = { id: number; model_code: string };
@@ -16,6 +17,7 @@ export type KolResult = {
 export type Dropdowns = {
   platforms: Platform[];
   contentCategories: ContentCategory[];
+  productCategories: ProductCategory[];
   users: UserOption[];
   campaigns: Campaign[];
   brands: Brand[];
@@ -451,6 +453,31 @@ export const getKolTrend = (kolId: number, params: { brand_id?: string } = {}) =
   const p = new URLSearchParams();
   if (params.brand_id) p.set('brand_id', params.brand_id);
   return api<KolTrendOverview>(`/api/dashboard/kol/${kolId}?${p}`);
+};
+
+export type ProductRankRow = {
+  canonical_id: number;
+  model_code: string;
+  category_id: number | null;
+  category_name: string | null;
+  image_url: string | null;
+  placement_count: number;
+  total_gmv: number;
+  total_orders: number;
+};
+export type ProductDashboardOverview = {
+  summary: { total_gmv: number; total_orders: number; total_placements: number; product_count: number };
+  ranking: ProductRankRow[];
+};
+
+export const getProductDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
+  const p = new URLSearchParams();
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.campaign_id) p.set('campaign_id', params.campaign_id);
+  if (params.category_id) p.set('category_id', params.category_id);
+  if (params.date_from) p.set('date_from', params.date_from);
+  if (params.date_to) p.set('date_to', params.date_to);
+  return api<ProductDashboardOverview>(`/api/dashboard/products?${p}`);
 };
 
 // Bulk import placements from Excel

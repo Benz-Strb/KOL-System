@@ -57,6 +57,17 @@ type KolRankRow = {
   byChannel: { channel: string; gmv: number }[];
 };
 
+type ProductRankRow = {
+  canonical_id: number;
+  model_code: string;
+  category_id: number | null;
+  category_name: string | null;
+  image_url: string | null;
+  placement_count: number;
+  total_gmv: number;
+  total_orders: number;
+};
+
 app.get('/', async c => {
   try {
     const prisma = c.get('prisma');
@@ -392,6 +403,94 @@ app.get('/kol/:id', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load kol trend' }, 500);
+  }
+});
+
+// ─── GET /products — rank every product (canonical model) by GMV ───
+app.get('/products', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const brand_id = c.req.query('brand_id');
+    const campaign_id = c.req.query('campaign_id');
+    const category_id = c.req.query('category_id');
+    const date_from = c.req.query('date_from');
+    const date_to = c.req.query('date_to');
+
+    const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
+
+    const where = {
+      ...brandFilter,
+      product_id: { not: null },
+      ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
+      ...(date_from || date_to ? {
+        publication_date: {
+          ...(date_from ? { gte: new Date(date_from) } : {}),
+          ...(date_to ? { lte: new Date(date_to) } : {}),
+        },
+      } : {}),
+    };
+
+    const matched = await prisma.placements.findMany({ where, select: { id: true } });
+
+    if (matched.length === 0) {
+      return c.json({
+        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0 },
+        ranking: [] as ProductRankRow[],
+      });
+    }
+
+    const ids = matched.map(p => p.id);
+    const categoryFilter = category_id ? Number(category_id) : null;
+
+    // resolve each placement's product to its canonical model (typo'd raw
+    // rows point to a canonical_product_id — see CLAUDE.md §4 "product_resolved")
+    // before grouping, so a model's sales aren't split across near-duplicate rows
+    const ranking = await prisma.$queryRaw<ProductRankRow[]>`
+      WITH resolved AS (
+        SELECT pl.id AS placement_id, COALESCE(pr.canonical_product_id, pr.id) AS canonical_id
+        FROM placements pl
+        JOIN products pr ON pr.id = pl.product_id
+        WHERE pl.id IN (${Prisma.join(ids)})
+      ),
+      metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        c.id::int                           AS canonical_id,
+        c.model_code,
+        c.product_category_id               AS category_id,
+        pc.name                              AS category_name,
+        c.image_url,
+        COUNT(DISTINCT r.placement_id)::int AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float     AS total_gmv,
+        COALESCE(SUM(ma.orders), 0)::int    AS total_orders
+      FROM resolved r
+      JOIN products c ON c.id = r.canonical_id
+      LEFT JOIN product_categories pc ON pc.id = c.product_category_id
+      LEFT JOIN metric_agg ma ON ma.placement_id = r.placement_id
+      WHERE ${categoryFilter}::int IS NULL OR c.product_category_id = ${categoryFilter}::int
+      GROUP BY c.id, c.model_code, c.product_category_id, pc.name, c.image_url
+      ORDER BY total_gmv DESC
+    `;
+
+    const summary = ranking.reduce(
+      (acc, r) => ({
+        total_gmv: acc.total_gmv + r.total_gmv,
+        total_orders: acc.total_orders + r.total_orders,
+        total_placements: acc.total_placements + r.placement_count,
+        product_count: acc.product_count + 1,
+      }),
+      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0 },
+    );
+
+    return c.json({ summary, ranking });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load product dashboard' }, 500);
   }
 });
 

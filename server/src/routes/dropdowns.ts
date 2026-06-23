@@ -13,9 +13,10 @@ app.get('/', async c => {
     const seesAllBrands = isAdmin || user.role === 'manager';
     const userBrandIds = user.brandIds;
 
-    const [platforms, contentCategories, users, campaigns, brands] = await Promise.all([
+    const [platforms, contentCategories, productCategories, users, campaigns, brands] = await Promise.all([
       prisma.platforms.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.content_categories.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+      prisma.product_categories.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
       prisma.users.findMany({
         where: {
           role: 'marketing',
@@ -38,7 +39,7 @@ app.get('/', async c => {
       }),
     ]);
 
-    return c.json({ platforms, contentCategories, users, campaigns, brands });
+    return c.json({ platforms, contentCategories, productCategories, users, campaigns, brands });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load dropdowns' }, 500);

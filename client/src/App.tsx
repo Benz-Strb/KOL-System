@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, LogOut } from 'lucide-react';
+import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
@@ -16,6 +16,7 @@ const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage.js'));
 const KolsPage = lazy(() => import('./pages/KolsPage.js'));
 const SamplesPage = lazy(() => import('./pages/SamplesPage.js'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage.js'));
+const ProductDashboardPage = lazy(() => import('./pages/ProductDashboardPage.js'));
 
 const Spinner = (
   <div className="flex items-center justify-center min-h-screen bg-canvas">
@@ -155,6 +156,12 @@ function Layout({ children }: { children: React.ReactNode }) {
                 Dashboard
               </NavLink>
             )}
+            {(appUser?.role === 'admin' || appUser?.role === 'manager') && (
+              <NavLink to="/dashboard/products" className={navLinkCls}>
+                <Boxes size={15} />
+                Dashboard สินค้า
+              </NavLink>
+            )}
             {appUser?.role === 'admin' && (
               <NavLink to="/admin/users" className={navLinkCls}>
                 <Users size={15} />
@@ -240,6 +247,13 @@ export default function App() {
             <ProtectedRoute>
               <RequireManagerOrAdmin>
                 <Layout><DashboardPage /></Layout>
+              </RequireManagerOrAdmin>
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard/products" element={
+            <ProtectedRoute>
+              <RequireManagerOrAdmin>
+                <Layout><ProductDashboardPage /></Layout>
               </RequireManagerOrAdmin>
             </ProtectedRoute>
           } />
