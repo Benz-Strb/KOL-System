@@ -374,6 +374,7 @@ export type DashboardSummary = {
 };
 export type DashboardChannelCampaignRow = { campaign_id: number | null; code: string | null; label: string | null; gmv: number };
 export type DashboardChannelRow = { channel: string; gmv: number; orders: number; visits: number; byCampaign: DashboardChannelCampaignRow[] };
+export type DashboardKolPlatformRow = { platform_id: number | null; name: string | null; gmv: number };
 export type DashboardKolRow = {
   kol_id: number;
   handle: string;
@@ -385,6 +386,7 @@ export type DashboardKolRow = {
   total_spend: number;
   total_orders: number;
   roi: number | null;
+  byPlatform: DashboardKolPlatformRow[];
 };
 export type DashboardCampaignTrendRow = {
   campaign_id: number | null;
@@ -403,10 +405,11 @@ export type DashboardOverview = {
   campaignTrend: DashboardCampaignTrendRow[];
 };
 
-export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: string; date_from?: string; date_to?: string }) => {
+export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
   const p = new URLSearchParams();
   if (params.brand_id) p.set('brand_id', params.brand_id);
   if (params.campaign_id) p.set('campaign_id', params.campaign_id);
+  if (params.category_id) p.set('category_id', params.category_id);
   if (params.date_from) p.set('date_from', params.date_from);
   if (params.date_to) p.set('date_to', params.date_to);
   return api<DashboardOverview>(`/api/dashboard?${p}`);

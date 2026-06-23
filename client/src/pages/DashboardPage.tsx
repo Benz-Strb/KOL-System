@@ -8,11 +8,12 @@ import {
 import { useAuth } from '../context/AuthContext.js';
 import {
   getDashboardOverview, getDropdowns, searchKols,
-  type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type KolResult,
+  type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import Select from '../components/Select.js';
 import { getCached, setCached } from '../lib/swrCache.js';
+import { getPlatformColor } from '../lib/platformColors.js';
 
 const HOVER_EXPAND_DELAY = 400;
 
@@ -134,30 +135,42 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
       onMouseLeave={handleLeave}
       onClick={() => onSelect(k.kol_id)}
       title="คลิกเพื่อดูเทรนด์ผลงานของ KOL คนนี้"
-      className={`flex items-center gap-3 py-2 px-2 rounded-lg border transition-all duration-200 cursor-pointer ${
+      className={`rounded-lg border transition-all duration-200 cursor-pointer ${
         expanded
           ? 'relative z-20 scale-[1.05] shadow-xl bg-surface border-accent/40'
           : 'border-transparent hover:bg-canvas'
       }`}
     >
-      <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{rank}</span>
-      <RankAvatar handle={k.handle} avatarUrl={k.avatar_url} />
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
-        {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
+      <div className="flex items-center gap-3 py-2 px-2">
+        <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{rank}</span>
+        <RankAvatar handle={k.handle} avatarUrl={k.avatar_url} />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
+          {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
+        </div>
+        <span className="text-xs text-muted tabular-nums shrink-0">{k.placement_count} placement</span>
+        {mode === 'roi' && (
+          <span className="text-xs font-semibold text-emerald-600 tabular-nums w-16 text-right shrink-0">
+            {k.roi != null ? `x${k.roi.toFixed(2)}` : '—'}
+          </span>
+        )}
+        <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
+        {k.profile_url && (
+          <a href={k.profile_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+            className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-accent hover:bg-canvas transition-colors shrink-0">
+            <ExternalLink size={11} />
+          </a>
+        )}
       </div>
-      <span className="text-xs text-muted tabular-nums shrink-0">{k.placement_count} placement</span>
-      {mode === 'roi' && (
-        <span className="text-xs font-semibold text-emerald-600 tabular-nums w-16 text-right shrink-0">
-          {k.roi != null ? `x${k.roi.toFixed(2)}` : '—'}
-        </span>
-      )}
-      <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
-      {k.profile_url && (
-        <a href={k.profile_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-accent hover:bg-canvas transition-colors shrink-0">
-          <ExternalLink size={11} />
-        </a>
+      {expanded && k.byPlatform.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-2 pb-2 -mt-0.5 pl-[44px]">
+          {k.byPlatform.map(p => (
+            <span key={`${p.platform_id ?? 'none'}`} className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-canvas text-muted">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getPlatformColor(p.name)}`} />
+              {p.name ?? 'ไม่ระบุ platform'} · {formatMoney(p.gmv)}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -297,19 +310,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [categories, setCategories] = useState<ContentCategory[]>([]);
   const [campaignId, setCampaignId] = useState('');
   const [brandId, setBrandId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
 
   useEffect(() => {
-    getDropdowns().then(d => { setCampaigns(d.campaigns); setBrands(d.brands); });
+    getDropdowns().then(d => { setCampaigns(d.campaigns); setBrands(d.brands); setCategories(d.contentCategories); });
   }, []);
 
   const load = useCallback(async () => {
-    const params = { brand_id: brandId, campaign_id: campaignId, date_from: dateFrom, date_to: dateTo };
+    const params = { brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo };
     const cacheKey = `dashboard:${JSON.stringify(params)}`;
     const cached = getCached<DashboardOverview>(cacheKey);
     if (cached) {
@@ -325,7 +340,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [brandId, campaignId, dateFrom, dateTo]);
+  }, [brandId, campaignId, categoryId, dateFrom, dateTo]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
@@ -355,6 +370,12 @@ export default function DashboardPage() {
             options={[{ id: '', label: 'ทุกแคมเปญ' }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
             value={campaignId}
             onChange={setCampaignId}
+          />
+          <Select
+            size="sm" className="min-w-[160px]"
+            options={[{ id: '', label: 'ทุกหมวดหมู่' }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
+            value={categoryId}
+            onChange={setCategoryId}
           />
 
           <div className="w-px h-4 bg-hairline shrink-0" />
@@ -477,6 +498,11 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
                 <Trophy size={14} className="text-accent" /> Ranking KOL (Top 10)
+                {categoryId && (
+                  <span className="text-xs font-normal text-muted">
+                    — เทียบเฉพาะหมวด {categories.find(c => String(c.id) === categoryId)?.name ?? ''}
+                  </span>
+                )}
               </h2>
               <div className="flex items-center gap-2 flex-wrap">
                 <KolSearchBox onSelect={setTrendKolId} />

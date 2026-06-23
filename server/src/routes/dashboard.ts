@@ -53,6 +53,7 @@ type KolRankRow = {
   total_spend: number;
   total_orders: number;
   roi: number | null;
+  byPlatform: { platform_id: number | null; name: string | null; gmv: number }[];
 };
 
 app.get('/', async c => {
@@ -61,6 +62,7 @@ app.get('/', async c => {
     const user = c.get('user');
     const brand_id = c.req.query('brand_id');
     const campaign_id = c.req.query('campaign_id');
+    const category_id = c.req.query('category_id');
     const date_from = c.req.query('date_from');
     const date_to = c.req.query('date_to');
 
@@ -69,6 +71,7 @@ app.get('/', async c => {
     const where = {
       ...brandFilter,
       ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
+      ...(category_id ? { kols: { content_category_id: Number(category_id) } } : {}),
       ...(date_from || date_to ? {
         publication_date: {
           ...(date_from ? { gte: new Date(date_from) } : {}),
@@ -193,9 +196,44 @@ app.get('/', async c => {
       GROUP BY k.id, k.handle, k.gen_name, k.profile_url, k.avatar_url
     `;
 
+    // per-KOL GMV split by the platform actually used on each placement
+    // (placements.platform_id is independent from kols.platform_id — a KOL
+    // can have placements across more than one platform, see CLAUDE.md §22)
+    const kolPlatformBreakdown = await prisma.$queryRaw<{
+      kol_id: number;
+      platform_id: number | null;
+      name: string | null;
+      gmv: number;
+    }[]>`
+      SELECT
+        p.kol_id::int                             AS kol_id,
+        p.platform_id                             AS platform_id,
+        pl.name                                    AS name,
+        COALESCE(SUM(pm.gmv), 0)::float           AS gmv
+      FROM placements p
+      LEFT JOIN platforms pl ON pl.id = p.platform_id
+      LEFT JOIN (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      ) pm ON pm.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)}) AND p.kol_id IS NOT NULL
+      GROUP BY p.kol_id, p.platform_id, pl.name
+    `;
+
+    const byPlatformMap = new Map<number, { platform_id: number | null; name: string | null; gmv: number }[]>();
+    for (const row of kolPlatformBreakdown) {
+      const arr = byPlatformMap.get(row.kol_id) ?? [];
+      arr.push({ platform_id: row.platform_id, name: row.name, gmv: row.gmv });
+      byPlatformMap.set(row.kol_id, arr);
+    }
+    for (const arr of byPlatformMap.values()) arr.sort((a, b) => b.gmv - a.gmv);
+
     const kolRows: KolRankRow[] = kolAgg.map(r => ({
       ...r,
       roi: r.total_spend > 0 ? r.total_gmv / r.total_spend : null,
+      byPlatform: byPlatformMap.get(r.kol_id) ?? [],
     }));
 
     const topKolsByGmv = [...kolRows].sort((a, b) => b.total_gmv - a.total_gmv).slice(0, 10);
