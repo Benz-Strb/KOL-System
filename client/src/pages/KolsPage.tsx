@@ -51,21 +51,21 @@ function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
       </span>
       {open && createPortal(
         <div style={style} onMouseEnter={show} onMouseLeave={hide}>
-          <div className="bg-ink rounded-lg shadow-xl w-60">
-            <div className="px-2.5 py-2 border-b border-white/10">
-              <span className="text-white text-[11px] font-semibold">{brand.brand_name} · สินค้าที่เคยรีวิว</span>
+          <div className="bg-surface border border-hairline rounded-lg shadow-xl w-60">
+            <div className="px-2.5 py-2 border-b border-hairline">
+              <span className="text-ink text-[11px] font-semibold">{brand.brand_name} · สินค้าที่เคยรีวิว</span>
             </div>
             <div className="max-h-56 overflow-y-auto px-2.5 py-2 flex flex-col gap-2 select-text">
               {brand.products.length === 0 ? (
-                <span className="text-white/50 text-[11px]">ไม่มีข้อมูล</span>
+                <span className="text-muted text-[11px]">ไม่มีข้อมูล</span>
               ) : brand.products.map(p => (
                 <div key={p.model_code}>
-                  <div className="text-white text-[11px] font-medium leading-snug">{p.model_code}</div>
+                  <div className="text-ink text-[11px] font-medium leading-snug">{p.model_code}</div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {p.campaigns.length === 0 ? (
-                      <span className="text-white/40 text-[10px]">ไม่มีแคมเปญ</span>
+                      <span className="text-muted text-[10px]">ไม่มีแคมเปญ</span>
                     ) : p.campaigns.map(c => (
-                      <span key={c.code} className="text-white/70 text-[10px] bg-white/10 px-1.5 py-px rounded-md" title={c.label ?? c.code}>
+                      <span key={c.code} className="text-muted text-[10px] bg-canvas px-1.5 py-px rounded-md" title={c.label ?? c.code}>
                         {c.code}
                       </span>
                     ))}
