@@ -3,7 +3,6 @@ import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, 
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  ScatterChart, Scatter,
   type TooltipContentProps,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext.js';
@@ -69,36 +68,7 @@ function formatAxisMoney(n: number) {
 }
 
 const TOOLTIP_TOP_N = 5;
-
-type ScatterAxis = 'price' | 'follower';
-type ScatterPoint = { kol_id: number; handle: string; x: number; y: number; placement_count: number };
-
-function ScatterTooltip({ active, payload, axis }: TooltipContentProps & { axis: ScatterAxis }) {
-  if (!active || !payload?.length) return null;
-  const p = payload[0]?.payload as ScatterPoint | undefined;
-  if (!p) return null;
-  return (
-    <div className="bg-surface border border-hairline rounded-xl shadow-lg px-3.5 py-2.5 text-xs min-w-[170px]">
-      <div className="font-semibold text-ink text-sm mb-1.5 truncate max-w-[200px]">{p.handle}</div>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-3 text-muted">
-          <span>{axis === 'price' ? 'ราคาเฉลี่ย/โพสต์' : 'Follower'}</span>
-          <span className="text-ink font-medium tabular-nums">
-            {axis === 'price' ? formatMoney(p.x) : p.x.toLocaleString('th-TH')}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-3 text-muted">
-          <span>GMV</span>
-          <span className="text-ink font-medium tabular-nums">{formatMoney(p.y)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-3 text-muted">
-          <span>Placement</span>
-          <span className="text-ink font-medium tabular-nums">{p.placement_count}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
+const PRICE_BAND_TOLERANCE = 0.2;
 
 function ChannelTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
@@ -347,7 +317,7 @@ export default function DashboardPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
-  const [scatterAxis, setScatterAxis] = useState<ScatterAxis>('price');
+  const [priceInput, setPriceInput] = useState('');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -380,16 +350,18 @@ export default function DashboardPage() {
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? 'ไม่มีแคมเปญ' }))
     : [];
-  const scatterData: ScatterPoint[] = data
-    ? data.kolValueScatter
-        .map(k => {
-          const x = scatterAxis === 'price'
-            ? (k.placement_count > 0 ? k.total_spend / k.placement_count : 0)
-            : k.follower_count;
-          return x == null ? null : { kol_id: k.kol_id, handle: k.handle, x, y: k.total_gmv, placement_count: k.placement_count };
-        })
-        .filter((p): p is ScatterPoint => p !== null)
+
+  const priceValue = Number(priceInput);
+  const priceBandKols = data && priceValue > 0
+    ? data.kolValueList
+        .filter(k => k.placement_count > 0 && k.total_spend > 0)
+        .map(k => ({ ...k, avgPrice: k.total_spend / k.placement_count }))
+        .filter(k => k.avgPrice >= priceValue * (1 - PRICE_BAND_TOLERANCE) && k.avgPrice <= priceValue * (1 + PRICE_BAND_TOLERANCE))
+        .sort((a, b) => b.total_gmv - a.total_gmv)
     : [];
+  const priceBandAvgGmv = priceBandKols.length > 0
+    ? priceBandKols.reduce((sum, k) => sum + k.total_gmv, 0) / priceBandKols.length
+    : null;
 
   return (
     <div className="px-6 py-6 max-w-screen-xl mx-auto">
@@ -579,44 +551,59 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Price/Follower vs GMV scatter */}
+          {/* Price benchmark — compare a hypothetical rate against KOLs who actually got paid near it */}
           <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-              <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-                <Scale size={14} className="text-accent" /> ราคา / Follower เทียบกับ GMV ต่อ KOL
-              </h2>
-              <div className="flex items-center gap-1 bg-canvas rounded-lg p-1">
-                <button
-                  onClick={() => setScatterAxis('price')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${scatterAxis === 'price' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                >
-                  ราคาเฉลี่ย/โพสต์
-                </button>
-                <button
-                  onClick={() => setScatterAxis('follower')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${scatterAxis === 'follower' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                >
-                  Follower
-                </button>
+            <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5 mb-1">
+              <Scale size={14} className="text-accent" /> เทียบเรทราคากับ GMV ที่เคยทำได้
+            </h2>
+            <p className="text-[11px] text-muted mb-3">
+              กรอกราคาที่จะจ้าง ระบบจะหา KOL ที่เคยได้ราคาใกล้เคียงกัน (±{Math.round(PRICE_BAND_TOLERANCE * 100)}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนต่อรอง/จ้างจริง
+            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs text-muted shrink-0">ราคาที่จะจ้าง</span>
+              <div className="relative">
+                <input
+                  type="number" min="0" step="1000"
+                  value={priceInput}
+                  onChange={e => setPriceInput(e.target.value)}
+                  placeholder="เช่น 30000"
+                  className="w-40 pl-3 pr-10 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">บาท</span>
               </div>
             </div>
-            <p className="text-[11px] text-muted mb-3">
-              {scatterAxis === 'price'
-                ? 'แต่ละจุด = 1 KOL — จ่ายแพงกว่าแล้วได้ GMV คุ้มจริงไหม จุดที่อยู่ซ้ายบน (ราคาต่ำ แต่ GMV สูง) คือ KOL ที่คุ้มค่าที่สุด'
-                : 'แต่ละจุด = 1 KOL — follower เยอะแล้วขายได้จริงไหม จุดที่อยู่ขวาล่าง (follower สูง แต่ GMV ต่ำ) คือ KOL ที่ reach ดีแต่ขายไม่ออก'}
-            </p>
-            {scatterData.length === 0 ? (
-              <p className="text-sm text-muted">ยังไม่มีข้อมูล</p>
+
+            {priceValue <= 0 ? (
+              <p className="text-sm text-muted">กรอกราคาด้านบนเพื่อเทียบกับ KOL ที่เคยได้ราคาใกล้เคียงกัน</p>
+            ) : priceBandKols.length === 0 ? (
+              <p className="text-sm text-muted">ไม่พบ KOL ที่เคยได้ราคาใกล้เคียง ฿{priceValue.toLocaleString('th-TH')} (±{Math.round(PRICE_BAND_TOLERANCE * 100)}%)</p>
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <ScatterChart margin={{ left: -16, right: 16, top: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline, #e5e7eb)" />
-                  <XAxis type="number" dataKey="x" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
-                  <YAxis type="number" dataKey="y" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
-                  <Tooltip content={(props: TooltipContentProps) => <ScatterTooltip {...props} axis={scatterAxis} />} cursor={{ strokeDasharray: '3 3' }} />
-                  <Scatter data={scatterData} fill="#6366f1" fillOpacity={0.65} animationDuration={500} />
-                </ScatterChart>
-              </ResponsiveContainer>
+              <>
+                <div className="flex items-center justify-between gap-3 mb-2 px-1">
+                  <span className="text-xs text-muted">
+                    พบ {priceBandKols.length} คน ในช่วงราคา ฿{Math.round(priceValue * (1 - PRICE_BAND_TOLERANCE)).toLocaleString('th-TH')}–฿{Math.round(priceValue * (1 + PRICE_BAND_TOLERANCE)).toLocaleString('th-TH')}
+                  </span>
+                  <span className="text-xs text-ink font-semibold shrink-0">เฉลี่ย GMV ช่วงนี้: {formatMoney(priceBandAvgGmv ?? 0)}</span>
+                </div>
+                <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
+                  {priceBandKols.map((k, i) => (
+                    <div
+                      key={k.kol_id}
+                      onClick={() => setTrendKolId(k.kol_id)}
+                      className="flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-canvas transition-colors"
+                    >
+                      <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                      <RankAvatar handle={k.handle} avatarUrl={k.avatar_url} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
+                        {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
+                      </div>
+                      <span className="text-xs text-muted tabular-nums shrink-0">ราคาเฉลี่ย {formatMoney(k.avgPrice)}</span>
+                      <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>

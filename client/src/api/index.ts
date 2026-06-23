@@ -381,7 +381,6 @@ export type DashboardKolRow = {
   gen_name: string | null;
   profile_url: string | null;
   avatar_url: string | null;
-  follower_count: number | null;
   placement_count: number;
   total_gmv: number;
   total_spend: number;
@@ -403,7 +402,7 @@ export type DashboardOverview = {
   channelBreakdown: DashboardChannelRow[];
   topKolsByGmv: DashboardKolRow[];
   topKolsByRoi: DashboardKolRow[];
-  kolValueScatter: DashboardKolRow[];
+  kolValueList: DashboardKolRow[];
   campaignTrend: DashboardCampaignTrendRow[];
 };
 

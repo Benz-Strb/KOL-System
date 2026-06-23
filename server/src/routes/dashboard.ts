@@ -31,7 +31,7 @@ const EMPTY_RESPONSE = {
   }[],
   topKolsByGmv: [] as KolRankRow[],
   topKolsByRoi: [] as KolRankRow[],
-  kolValueScatter: [] as KolRankRow[],
+  kolValueList: [] as KolRankRow[],
   campaignTrend: [] as {
     campaign_id: number | null;
     code: string | null;
@@ -49,7 +49,6 @@ type KolRankRow = {
   gen_name: string | null;
   profile_url: string | null;
   avatar_url: string | null;
-  follower_count: number | null;
   placement_count: number;
   total_gmv: number;
   total_spend: number;
@@ -166,7 +165,6 @@ app.get('/', async c => {
       gen_name: string | null;
       profile_url: string | null;
       avatar_url: string | null;
-      follower_count: number | null;
       placement_count: number;
       total_gmv: number;
       total_spend: number;
@@ -189,7 +187,6 @@ app.get('/', async c => {
         k.gen_name,
         k.profile_url,
         k.avatar_url,
-        k.follower_count,
         COUNT(DISTINCT ps.id)::int                AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float           AS total_gmv,
         COALESCE(SUM(ps.spend), 0)::float         AS total_spend,
@@ -197,7 +194,7 @@ app.get('/', async c => {
       FROM placement_spend ps
       JOIN kols k ON ps.kol_id = k.id
       LEFT JOIN metric_agg ma ON ma.placement_id = ps.id
-      GROUP BY k.id, k.handle, k.gen_name, k.profile_url, k.avatar_url, k.follower_count
+      GROUP BY k.id, k.handle, k.gen_name, k.profile_url, k.avatar_url
     `;
 
     // per-KOL GMV split by sales channel (shopee/lazada/website/tiktok/youtube/lamon8)
@@ -284,7 +281,7 @@ app.get('/', async c => {
       channelBreakdown: channelBreakdownWithCampaigns,
       topKolsByGmv,
       topKolsByRoi,
-      kolValueScatter: kolRows,
+      kolValueList: kolRows,
       campaignTrend,
     });
   } catch (err) {
