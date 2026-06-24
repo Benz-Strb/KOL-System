@@ -1,0 +1,86 @@
+{
+  "kols": [
+    {
+      "id": 612,
+      "gen_name": "pomchobtangbaan",
+      "content_category_id": 1,
+      "notes": null,
+      "created_at": "2026-06-10 08:41:52.718648+00:00",
+      "contact_info": null,
+      "audience_tags": null,
+      "custom_tags": null,
+      "main_selling_points": null
+    },
+    {
+      "id": 614,
+      "gen_name": "PhomChopTaengBanPhotoKit",
+      "content_category_id": 1,
+      "notes": null,
+      "created_at": "2026-06-10 08:41:52.718648+00:00",
+      "contact_info": null,
+      "audience_tags": null,
+      "custom_tags": null,
+      "main_selling_points": null
+    }
+  ],
+  "kol_platforms": [
+    {
+      "id": 71,
+      "kol_id": 612,
+      "platform_id": 1,
+      "handle": "ผมชอบแต่งบ้าน",
+      "handle_normalized": "ผมชอบแต่งบ้าน",
+      "follower_count": 29000,
+      "avatar_url": "https://graph.facebook.com/phomchobtaengban/picture?type=large",
+      "profile_url": "https://www.facebook.com/phomchobtaengban/",
+      "kol_tier_id": 2,
+      "is_primary": true,
+      "created_at": "2026-06-10 08:41:52.718648+00:00"
+    },
+    {
+      "id": 99,
+      "kol_id": 614,
+      "platform_id": 1,
+      "handle": "ผมชอบแต่งบ้าน-Photo-Kit",
+      "handle_normalized": "ผมชอบแต่งบ้าน-photo-kit",
+      "follower_count": 29000,
+      "avatar_url": null,
+      "profile_url": null,
+      "kol_tier_id": 2,
+      "is_primary": true,
+      "created_at": "2026-06-10 08:41:52.718648+00:00"
+    }
+  ],
+  "placements": [
+    {
+      "id": 519,
+      "placement_type": "online",
+      "campaign_id": 10,
+      "store_id": null,
+      "person_in_charge": "Fern",
+      "kol_id": 614,
+      "platform_id": 1,
+      "product_id": 79,
+      "payment_type": "barter",
+      "final_price": null,
+      "pay_amount": null,
+      "ads_cost": null,
+      "follower_at_time": 29000,
+      "target_pub_date": null,
+      "publication_date": "2026-03-22",
+      "post_url": "https://www.facebook.com/phomchobtaengban/posts/pfbid0tLb4nJMHAZ6raH2gAEkNTR6jNm8qwxW8YoJJwwYbT2TQacp7XyC8XLvvh6bsgTUbl",
+      "shopee_utm": "https://bit.ly/4lHRDHI",
+      "lazada_utm": "https://s.lazada.co.th/a.eDOxD",
+      "website_utm": "https://bit.ly/4lLg5bb",
+      "utm_campaign_name": "2026-44-RB-WaterHookupKit",
+      "ad_content_name": "2026-44-RB-PhomChopTaengBanPhotoKit-WaterHookupKit-FB",
+      "status": "posted",
+      "notes": null,
+      "created_at": "2026-06-10 08:41:52.718648+00:00",
+      "updated_at": "2026-06-12 10:24:17.295310+00:00",
+      "brand_id": 1,
+      "person_in_charge_id": 1,
+      "created_by_id": null
+    }
+  ]
+}
