@@ -6,12 +6,23 @@ export type Campaign = { id: number; code: string; label: string | null; year: n
 export type Product = { id: number; model_code: string };
 export type Shop = { name: string; has_branches: boolean };
 export type StoreBranch = { id: number; name: string; branch: string | null };
+export type KolPlatformAccount = {
+  id: number;
+  platform_id: number;
+  platform_name: string;
+  handle: string;
+  follower_count: number | null;
+  profile_url: string | null;
+  avatar_url: string | null;
+  is_primary: boolean;
+};
+
 export type KolResult = {
   id: number;
   handle: string;
   gen_name: string | null;
   follower_count: number | null;
-  platforms: { id: number; name: string } | null;
+  platforms: KolPlatformAccount[];
 };
 
 export type Dropdowns = {
@@ -245,16 +256,6 @@ export type KolBrandRow = {
   products: KolBrandProductRow[];
 };
 
-export type KolPlatformAccount = {
-  platform_id: number;
-  platform_name: string;
-  handle: string;
-  follower_count: number | null;
-  profile_url: string | null;
-  avatar_url: string | null;
-  is_primary: boolean;
-};
-
 export type KolDirectoryRow = {
   id: number;
   handle: string;
@@ -313,16 +314,49 @@ export const getKolDirectory = (params: { q?: string; platform_id?: string; cate
   return api<{ total: number; page: number; limit: number; rows: KolDirectoryRow[] }>(`/api/kols?${p}`);
 };
 
-// KOL profile update
+// KOL profile update (person-level fields — follower_count lives on a
+// specific platform now, see the platform functions below)
 export const updateKol = (id: number, body: {
   custom_tags?: string[];
   main_selling_points?: string | null;
   contact_info?: ContactInfo | null;
-  follower_count?: number | null;
-}) => api<{ id: number; handle: string; custom_tags: string[]; audience_tags: string[]; main_selling_points: string | null; contact_info: ContactInfo | null; follower_count: number | null }>(
+}) => api<{ id: number; custom_tags: string[]; audience_tags: string[]; main_selling_points: string | null; contact_info: ContactInfo | null }>(
   `/api/kols/${id}`,
   { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
 );
+
+// A kol can have several platform accounts — these three mutate one row at
+// a time and always get back the kol's full platform list + the flattened
+// primary-platform convenience fields, so callers can apply the result with
+// one onUpdated(bundle) without re-deriving "which one is primary" themselves.
+export type KolPlatformsBundle = {
+  platforms: KolPlatformAccount[];
+  handle: string;
+  follower_count: number | null;
+  avatar_url: string | null;
+  profile_url: string | null;
+  platform: { id: number; name: string } | null;
+};
+export const addKolPlatform = (kolId: number, body: { platform_id?: number; handle: string; follower_count?: number }) =>
+  api<KolPlatformsBundle>(`/api/kols/${kolId}/platforms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+export const updateKolPlatform = (platformId: number, body: { handle?: string; follower_count?: number | null; profile_url?: string | null; is_primary?: true }) =>
+  api<KolPlatformsBundle>(`/api/kols/platforms/${platformId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+export const deleteKolPlatform = (platformId: number) =>
+  api<KolPlatformsBundle>(`/api/kols/platforms/${platformId}`, { method: 'DELETE' });
+
+// Posts — every placement this kol actually has a post link for
+export type KolPost = {
+  id: number;
+  post_url: string;
+  publication_date: string | null;
+  status: string;
+  platforms: { name: string } | null;
+  brands: { id: number; name: string; logo_url: string | null };
+  campaigns: { code: string; label: string | null } | null;
+  products: { model_code: string } | null;
+  stores: { name: string; branch: string | null } | null;
+};
+export const getKolPosts = (kolId: number) => api<KolPost[]>(`/api/kols/${kolId}/posts`);
 
 // Commercial Terms
 export const getKolTerms = (kolId: number) => api<CommercialTerm[]>(`/api/kols/${kolId}/terms`);
@@ -402,6 +436,7 @@ export type DashboardKolRow = {
   gen_name: string | null;
   profile_url: string | null;
   avatar_url: string | null;
+  follower_count: number | null;
   placement_count: number;
   total_gmv: number;
   total_spend: number;
@@ -435,6 +470,38 @@ export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: 
   if (params.date_from) p.set('date_from', params.date_from);
   if (params.date_to) p.set('date_to', params.date_to);
   return api<DashboardOverview>(`/api/dashboard?${p}`);
+};
+
+// Shared by both dashboard export buttons — fetch with auth header (these
+// are file downloads, not JSON, so they bypass the api() wrapper) then
+// trigger a browser download via a synthetic <a download>, same pattern as
+// downloadImportTemplate() below.
+async function downloadFile(path: string, filename: string) {
+  const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
+  const res = await fetch(`${API_BASE_URL}${path}`, { headers: authHeader });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'ดาวน์โหลดไม่สำเร็จ' }));
+    throw new Error(err.error ?? 'ดาวน์โหลดไม่สำเร็จ');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export const exportDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
+  const p = new URLSearchParams();
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.campaign_id) p.set('campaign_id', params.campaign_id);
+  if (params.category_id) p.set('category_id', params.category_id);
+  if (params.date_from) p.set('date_from', params.date_from);
+  if (params.date_to) p.set('date_to', params.date_to);
+  return downloadFile(`/api/dashboard/export?${p}`, `dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
 export type KolTrendCampaignRow = {
@@ -497,6 +564,16 @@ export const getProductDashboard = (params: { brand_id?: string; campaign_id?: s
   if (params.date_from) p.set('date_from', params.date_from);
   if (params.date_to) p.set('date_to', params.date_to);
   return api<ProductDashboardOverview>(`/api/dashboard/products?${p}`);
+};
+
+export const exportProductDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
+  const p = new URLSearchParams();
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.campaign_id) p.set('campaign_id', params.campaign_id);
+  if (params.category_id) p.set('category_id', params.category_id);
+  if (params.date_from) p.set('date_from', params.date_from);
+  if (params.date_to) p.set('date_to', params.date_to);
+  return downloadFile(`/api/dashboard/products/export?${p}`, `product_dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
 // Bulk import placements from Excel

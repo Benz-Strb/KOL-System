@@ -1,10 +1,43 @@
 import { Hono } from 'hono';
-import { Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth.js';
 import type { AppEnv } from '../types.js';
 
 const app = new Hono<AppEnv>();
 app.use('*', requireAuth);
+
+// ─── shared: re-fetch a kol's full platform list + the flattened primary-
+// platform convenience fields after any kol_platforms mutation, so the
+// frontend can apply one consistent response shape everywhere instead of
+// re-deriving "which one is primary" itself ────────────────────────────
+async function platformsBundle(prisma: PrismaClient, kolId: number) {
+  const rows = await prisma.kol_platforms.findMany({
+    where: { kol_id: kolId },
+    select: {
+      id: true, handle: true, follower_count: true, profile_url: true, avatar_url: true, is_primary: true,
+      platforms: { select: { id: true, name: true } },
+    },
+    orderBy: { is_primary: 'desc' },
+  });
+  const primary = rows.find(p => p.is_primary) ?? rows[0];
+  return {
+    platforms: rows.map(p => ({
+      id: p.id,
+      platform_id: p.platforms?.id ?? null,
+      platform_name: p.platforms?.name ?? null,
+      handle: p.handle,
+      follower_count: p.follower_count,
+      profile_url: p.profile_url,
+      avatar_url: p.avatar_url,
+      is_primary: p.is_primary,
+    })),
+    handle: primary?.handle ?? '',
+    follower_count: primary?.follower_count ?? null,
+    avatar_url: primary?.avatar_url ?? null,
+    profile_url: primary?.profile_url ?? null,
+    platform: primary?.platforms ?? null,
+  };
+}
 
 // ─── GET / — KOL Directory ────────────────────────────────
 // handle/follower_count/platform_id now live on kol_platforms (a kol/person
@@ -62,6 +95,7 @@ app.get('/', async c => {
         content_categories: { select: { name: true } },
         kol_platforms: {
           select: {
+            id: true,
             handle: true,
             follower_count: true,
             profile_url: true,
@@ -131,6 +165,7 @@ app.get('/', async c => {
         platforms: k.kol_platforms
           .filter(p => p.platforms)
           .map(p => ({
+            id: p.id,
             platform_id: p.platforms!.id,
             platform_name: p.platforms!.name,
             handle: p.handle,
@@ -161,29 +196,67 @@ app.get('/', async c => {
 });
 
 // ─── GET /search ──────────────────────────────────────────
+// Matches against ANY of the kol's platform handles (not just the primary
+// one) so typing a KOL's TikTok handle finds them even if their primary
+// platform is Instagram — then returns every platform account they have,
+// not just the primary, so the picker can show/let the user choose among
+// them instead of being silently locked to whichever one is primary.
 app.get('/search', async c => {
   try {
     const prisma = c.get('prisma');
     const query = c.req.query('q')?.trim() ?? '';
-    const rows = await prisma.$queryRaw<{
-      id: number; handle: string; gen_name: string | null; follower_count: number | null;
-      platform_id: number | null; platform_name: string | null;
-    }[]>`
-      SELECT k.id, kp.handle, k.gen_name, kp.follower_count, kp.platform_id, p.name AS platform_name
+    const idRows = await prisma.$queryRaw<{ id: number }[]>`
+      SELECT k.id
       FROM kols k
       JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
-      LEFT JOIN platforms p ON p.id = kp.platform_id
-      ${query ? Prisma.sql`WHERE kp.handle ILIKE ${'%' + query + '%'} OR k.gen_name ILIKE ${'%' + query + '%'}` : Prisma.empty}
+      ${query ? Prisma.sql`
+        WHERE kp.handle ILIKE ${'%' + query + '%'} OR k.gen_name ILIKE ${'%' + query + '%'}
+           OR EXISTS (SELECT 1 FROM kol_platforms kp2 WHERE kp2.kol_id = k.id AND kp2.handle ILIKE ${'%' + query + '%'})
+      ` : Prisma.empty}
       ORDER BY kp.handle ASC
       LIMIT 10
     `;
-    return c.json(rows.map(r => ({
-      id: r.id,
-      handle: r.handle,
-      gen_name: r.gen_name,
-      follower_count: r.follower_count,
-      platforms: r.platform_id != null ? { id: r.platform_id, name: r.platform_name } : null,
-    })));
+    const ids = idRows.map(r => r.id);
+    if (ids.length === 0) return c.json([]);
+
+    const kols = await prisma.kols.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        gen_name: true,
+        kol_platforms: {
+          select: {
+            id: true, handle: true, follower_count: true, profile_url: true, avatar_url: true, is_primary: true,
+            platforms: { select: { id: true, name: true } },
+          },
+          orderBy: { is_primary: 'desc' },
+        },
+      },
+    });
+    const byId = new Map(kols.map(k => [k.id, k]));
+    const ordered = ids.map(id => byId.get(id)).filter((k): k is NonNullable<typeof k> => k != null);
+
+    return c.json(ordered.map(k => {
+      const primary = k.kol_platforms.find(p => p.is_primary) ?? k.kol_platforms[0];
+      return {
+        id: k.id,
+        handle: primary?.handle ?? '',
+        gen_name: k.gen_name,
+        follower_count: primary?.follower_count ?? null,
+        platforms: k.kol_platforms
+          .filter(p => p.platforms)
+          .map(p => ({
+            id: p.id,
+            platform_id: p.platforms!.id,
+            platform_name: p.platforms!.name,
+            handle: p.handle,
+            follower_count: p.follower_count,
+            profile_url: p.profile_url,
+            avatar_url: p.avatar_url,
+            is_primary: p.is_primary,
+          })),
+      };
+    }));
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to search kols' }, 500);
@@ -255,6 +328,137 @@ app.delete('/terms/:termId', async c => {
   }
 });
 
+// ─── POST /:id/platforms — add a platform account to an existing KOL ─────
+// New platforms never silently steal primary — the kol already has one from
+// creation, so this always starts as is_primary=false.
+app.post('/:id/platforms', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const kolId = Number(c.req.param('id'));
+    const { platform_id, handle, follower_count } = await c.req.json();
+    if (!handle?.trim()) return c.json({ error: 'handle required' }, 400);
+
+    const normalized = handle.trim().toLowerCase().replace(/\s+/g, '');
+    const existing = await prisma.kol_platforms.findUnique({ where: { handle_normalized: normalized }, select: { kol_id: true, handle: true } });
+    if (existing) return c.json({ error: 'Handle/platform นี้มีอยู่แล้ว', kol: { id: existing.kol_id, handle: existing.handle } }, 409);
+
+    await prisma.kol_platforms.create({
+      data: {
+        kol_id: kolId,
+        handle: handle.trim(),
+        handle_normalized: normalized,
+        platform_id: platform_id ? Number(platform_id) : null,
+        follower_count: follower_count ? Number(follower_count) : null,
+        is_primary: false,
+      },
+    });
+    return c.json(await platformsBundle(prisma, kolId), 201);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to add platform' }, 500);
+  }
+});
+
+// ─── PATCH /platforms/:platformId — edit a platform account ──────────────
+// platform_id (which platform this account is FOR) is intentionally not
+// editable here — if it's wrong, delete and re-add. is_primary:true clears
+// the kol's old primary first, in its own statement, before setting the new
+// one true — getting that order backwards trips idx_kol_platforms_primary_per_kol
+// (a partial unique index allowing only one is_primary=true row per kol_id).
+app.patch('/platforms/:platformId', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const platformId = Number(c.req.param('platformId'));
+    const existing = await prisma.kol_platforms.findUnique({ where: { id: platformId }, select: { kol_id: true } });
+    if (!existing) return c.json({ error: 'ไม่พบ platform นี้' }, 404);
+
+    const { handle, follower_count, profile_url, is_primary } = await c.req.json();
+    if (handle !== undefined && !handle.trim()) return c.json({ error: 'handle required' }, 400);
+
+    if (handle !== undefined) {
+      const normalized = handle.trim().toLowerCase().replace(/\s+/g, '');
+      const dup = await prisma.kol_platforms.findUnique({ where: { handle_normalized: normalized }, select: { id: true } });
+      if (dup && dup.id !== platformId) return c.json({ error: 'Handle/platform นี้มีอยู่แล้ว' }, 409);
+    }
+
+    if (is_primary === true) {
+      await prisma.kol_platforms.updateMany({ where: { kol_id: existing.kol_id }, data: { is_primary: false } });
+    }
+    await prisma.kol_platforms.update({
+      where: { id: platformId },
+      data: {
+        ...(handle !== undefined && { handle: handle.trim(), handle_normalized: handle.trim().toLowerCase().replace(/\s+/g, '') }),
+        ...(follower_count !== undefined && { follower_count: follower_count === '' || follower_count == null ? null : Number(follower_count) }),
+        ...(profile_url !== undefined && { profile_url: profile_url?.trim() || null }),
+        ...(is_primary === true && { is_primary: true }),
+      },
+    });
+    return c.json(await platformsBundle(prisma, existing.kol_id));
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to update platform' }, 500);
+  }
+});
+
+// ─── DELETE /platforms/:platformId — remove a platform account ───────────
+// Blocked if it's the kol's only platform. If it's the current primary and
+// others remain, auto-promote the highest-follower one first (same tie-break
+// rule used by the cross-platform merge script) so the kol is never left
+// without a primary.
+app.delete('/platforms/:platformId', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const platformId = Number(c.req.param('platformId'));
+    const target = await prisma.kol_platforms.findUnique({ where: { id: platformId }, select: { kol_id: true, is_primary: true } });
+    if (!target) return c.json({ error: 'ไม่พบ platform นี้' }, 404);
+
+    const siblings = await prisma.kol_platforms.findMany({
+      where: { kol_id: target.kol_id, id: { not: platformId } },
+      select: { id: true, follower_count: true },
+      orderBy: { follower_count: 'desc' },
+    });
+    if (siblings.length === 0) return c.json({ error: 'ต้องมีอย่างน้อย 1 platform ต่อ KOL — ลบตัวนี้ไม่ได้' }, 400);
+
+    if (target.is_primary) {
+      await prisma.kol_platforms.update({ where: { id: siblings[0].id }, data: { is_primary: true } });
+    }
+    await prisma.kol_platforms.delete({ where: { id: platformId } });
+    return c.json(await platformsBundle(prisma, target.kol_id));
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to delete platform' }, 500);
+  }
+});
+
+// ─── GET /:id/posts — every placement this kol has an actual post link for ─
+// Not brand-scoped, same as the rest of this directory (campaigns/products
+// shown to every role regardless of brand per CLAUDE.md §8) — a post_url is
+// a public link, not pricing/PIC detail.
+app.get('/:id/posts', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const posts = await prisma.placements.findMany({
+      where: { kol_id: Number(c.req.param('id')), post_url: { not: null } },
+      select: {
+        id: true,
+        post_url: true,
+        publication_date: true,
+        status: true,
+        platforms: { select: { name: true } },
+        brands: { select: { id: true, name: true, logo_url: true } },
+        campaigns: { select: { code: true, label: true } },
+        products: { select: { model_code: true } },
+        stores: { select: { name: true, branch: true } },
+      },
+      orderBy: [{ publication_date: 'desc' }, { created_at: 'desc' }],
+    });
+    return c.json(posts);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load posts' }, 500);
+  }
+});
+
 // ─── GET /:id/terms — list commercial terms for a KOL ─────
 app.get('/:id/terms', async c => {
   try {
@@ -309,15 +513,16 @@ app.post('/:id/terms', async c => {
   }
 });
 
-// ─── PATCH /:id — update KOL profile fields ───────────────
-// follower_count now lives on kol_platforms — redirect that one field to the
-// primary platform row (updateMany, not update: (kol_id, is_primary) isn't a
-// modeled unique key, just a partial unique index Prisma doesn't expose).
+// ─── PATCH /:id — update KOL (person-level) profile fields ────────────────
+// follower_count moved fully to the Platform tab (PATCH /platforms/:platformId)
+// now that a kol can have several platforms — editing it here would be
+// ambiguous about which platform it applies to, so this endpoint no longer
+// accepts it.
 app.patch('/:id', async c => {
   try {
     const prisma = c.get('prisma');
     const kolId = Number(c.req.param('id'));
-    const { custom_tags, main_selling_points, contact_info, follower_count } = await c.req.json();
+    const { custom_tags, main_selling_points, contact_info } = await c.req.json();
 
     const kol = await prisma.kols.update({
       where: { id: kolId },
@@ -328,16 +533,7 @@ app.patch('/:id', async c => {
       },
       select: { id: true, custom_tags: true, audience_tags: true, main_selling_points: true, contact_info: true },
     });
-
-    if (follower_count !== undefined) {
-      await prisma.kol_platforms.updateMany({
-        where: { kol_id: kolId, is_primary: true },
-        data: { follower_count: follower_count === '' || follower_count == null ? null : Number(follower_count) },
-      });
-    }
-    const primary = await prisma.kol_platforms.findFirst({ where: { kol_id: kolId, is_primary: true }, select: { handle: true, follower_count: true } });
-
-    return c.json({ ...kol, handle: primary?.handle ?? '', follower_count: primary?.follower_count ?? null });
+    return c.json(kol);
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to update kol' }, 500);
@@ -359,14 +555,14 @@ app.post('/', async c => {
     const existing = await prisma.kol_platforms.findUnique({ where: { handle_normalized: normalized }, select: { kol_id: true, handle: true, follower_count: true } });
     if (existing) return c.json({ error: 'KOL นี้มีอยู่แล้ว', kol: { id: existing.kol_id, handle: existing.handle, follower_count: existing.follower_count } }, 409);
 
-    const { kol, platform } = await prisma.$transaction(async tx => {
+    const kol = await prisma.$transaction(async tx => {
       const kol = await tx.kols.create({
         data: {
           gen_name: gen_name?.trim() || null,
           content_category_id: content_category_id ? Number(content_category_id) : null,
         },
       });
-      const platform = await tx.kol_platforms.create({
+      await tx.kol_platforms.create({
         data: {
           kol_id: kol.id,
           handle: handle.trim(),
@@ -375,17 +571,17 @@ app.post('/', async c => {
           follower_count: follower_count ? Number(follower_count) : null,
           is_primary: true,
         },
-        select: { handle: true, follower_count: true, platforms: { select: { id: true, name: true } } },
       });
-      return { kol, platform };
+      return kol;
     });
 
+    const bundle = await platformsBundle(prisma, kol.id);
     return c.json({
       id: kol.id,
-      handle: platform.handle,
+      handle: bundle.handle,
       gen_name: kol.gen_name,
-      follower_count: platform.follower_count,
-      platforms: platform.platforms,
+      follower_count: bundle.follower_count,
+      platforms: bundle.platforms,
     }, 201);
   } catch (err) {
     console.error(err);

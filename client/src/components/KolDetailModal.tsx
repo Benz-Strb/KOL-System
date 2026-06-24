@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, ExternalLink, Tag } from 'lucide-react';
-import type { KolDirectoryRow, CommercialTerm, ContactInfo } from '../api/index.js';
-import { updateKol, getKolTerms, createKolTerm, deleteKolTerm, getDropdowns } from '../api/index.js';
+import type { KolDirectoryRow, CommercialTerm, ContactInfo, KolPlatformAccount, KolPlatformsBundle, Platform, KolPost } from '../api/index.js';
+import { updateKol, getKolTerms, createKolTerm, deleteKolTerm, getDropdowns, addKolPlatform, updateKolPlatform, deleteKolPlatform, getKolPosts } from '../api/index.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
 import Select from './Select.js';
+import PlatformLogo from './PlatformLogo.js';
+import BrandLogo from './BrandLogo.js';
 
 type Props = {
   kol: KolDirectoryRow;
@@ -36,7 +38,6 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
   const [selling, setSelling] = useState(kol.main_selling_points ?? '');
   const [tags, setTags] = useState<string[]>(kol.custom_tags ?? []);
   const [tagInput, setTagInput] = useState('');
-  const [follower, setFollower] = useState(kol.follower_count != null ? String(kol.follower_count) : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -58,13 +59,11 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
         custom_tags: tags,
         main_selling_points: selling || null,
         contact_info: (contact.email || contact.whatsapp || contact.line || contact.other) ? contact : null,
-        follower_count: follower.trim() === '' ? null : Number(follower),
       });
       onUpdated({
         custom_tags: res.custom_tags,
         main_selling_points: res.main_selling_points,
         contact_info: res.contact_info,
-        follower_count: res.follower_count,
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
@@ -77,20 +76,6 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
 
   return (
     <div className="space-y-5">
-      {/* Follower Count */}
-      <div>
-        <label className={labelCls}>จำนวนผู้ติดตาม</label>
-        <input
-          type="number"
-          min="0"
-          value={follower}
-          onChange={e => setFollower(e.target.value)}
-          placeholder="เช่น 12000"
-          className={inputCls + ' max-w-[180px]'}
-        />
-        <p className="text-[11px] text-muted mt-1">อัปเดตได้เลยถ้าจำนวนเปลี่ยนแปลง — ระดับ Tier จะคำนวณใหม่อัตโนมัติ</p>
-      </div>
-
       {/* Contact Info */}
       <div>
         <p className={labelCls}>Contact Info</p>
@@ -186,6 +171,55 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
           {saving ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Posts Tab — every placement with an actual post link ───────────────
+function PostsTab({ kol }: { kol: KolDirectoryRow }) {
+  const [posts, setPosts] = useState<KolPost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getKolPosts(kol.id).then(setPosts).finally(() => setLoading(false));
+  }, [kol.id]);
+
+  if (loading) return (
+    <div className="py-10 flex justify-center">
+      <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (posts.length === 0) {
+    return <p className="text-sm text-muted text-center py-6">ยังไม่มีโพสต์ที่บันทึกลิงก์ไว้</p>;
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {posts.map(post => {
+        const subtitle = post.products?.model_code
+          ?? (post.stores ? [post.stores.name, post.stores.branch].filter(Boolean).join(' · ') : null);
+        return (
+          <a key={post.id} href={post.post_url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-3 bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 hover:border-accent/40 transition-colors group">
+            <BrandLogo name={post.brands.name} logoUrl={post.brands.logo_url} size={28} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-sm font-medium text-ink">{post.brands.name}</span>
+                {post.platforms && <PlatformLogo name={post.platforms.name} size={14} />}
+                {post.campaigns && (
+                  <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full">{post.campaigns.code}</span>
+                )}
+              </div>
+              <div className="text-xs text-muted mt-0.5 truncate">
+                {[subtitle, post.publication_date ? new Date(post.publication_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : null]
+                  .filter(Boolean).join(' · ') || '—'}
+              </div>
+            </div>
+            <ExternalLink size={14} className="text-muted group-hover:text-accent transition-colors shrink-0" />
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -360,10 +394,200 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
   );
 }
 
+// ─── Platform Tab ────────────────────────────────────────────
+// One card per platform account this kol has, each independently editable —
+// follower_count especially, since that's the field that genuinely changes
+// often (the tier trigger fires automatically on the DB side either way).
+function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canDelete: boolean; onChanged: (b: KolPlatformsBundle) => void }) {
+  const [handle, setHandle] = useState(p.handle);
+  const [follower, setFollower] = useState(p.follower_count != null ? String(p.follower_count) : '');
+  const [profileUrl, setProfileUrl] = useState(p.profile_url ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const dirty = handle !== p.handle
+    || follower !== (p.follower_count != null ? String(p.follower_count) : '')
+    || profileUrl !== (p.profile_url ?? '');
+
+  async function run(body: Parameters<typeof updateKolPlatform>[1]) {
+    setSaving(true); setError('');
+    try {
+      onChanged(await updateKolPlatform(p.id, body));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`ลบ ${p.platform_name} (${p.handle}) ออกจาก KOL นี้?`)) return;
+    setSaving(true); setError('');
+    try {
+      onChanged(await deleteKolPlatform(p.id));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-canvas border border-hairline rounded-xl px-4 py-3 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <PlatformLogo name={p.platform_name} size={20} />
+          {p.avatar_url && <img src={p.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />}
+          <span className="text-sm font-semibold text-ink">{p.platform_name}</span>
+          {p.is_primary ? (
+            <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full font-medium">หลัก</span>
+          ) : (
+            <button type="button" onClick={() => run({ is_primary: true })} disabled={saving}
+              className="text-[10px] px-1.5 py-px border border-hairline rounded-full text-muted hover:text-accent hover:border-accent/40 transition-colors disabled:opacity-50">
+              ตั้งเป็นหลัก
+            </button>
+          )}
+        </div>
+        <button type="button" onClick={handleDelete} disabled={saving || !canDelete}
+          title={!canDelete ? 'ต้องมีอย่างน้อย 1 platform ต่อ KOL' : 'ลบ platform นี้'}
+          className="text-muted hover:text-red-500 disabled:opacity-30 disabled:hover:text-muted transition-colors p-1">
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <label className="text-[11px] text-muted mb-0.5 block">Handle</label>
+          <input type="text" value={handle} onChange={e => setHandle(e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label className="text-[11px] text-muted mb-0.5 block">Followers</label>
+          <input type="number" min="0" value={follower} onChange={e => setFollower(e.target.value)} className={inputCls} />
+        </div>
+        <div className="col-span-2">
+          <label className="text-[11px] text-muted mb-0.5 block">Profile URL</label>
+          <input type="text" value={profileUrl} onChange={e => setProfileUrl(e.target.value)} placeholder="https://..." className={inputCls} />
+        </div>
+      </div>
+      <p className="text-[11px] text-muted">อัปเดต followers ได้เลยถ้าจำนวนเปลี่ยนแปลง — ระดับ Tier จะคำนวณใหม่อัตโนมัติ</p>
+
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {dirty && (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => run({
+            handle: handle.trim(),
+            follower_count: follower.trim() === '' ? null : Number(follower),
+            profile_url: profileUrl.trim() || null,
+          })}
+          className="w-full py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-all">
+          {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: Partial<KolDirectoryRow>) => void }) {
+  const [platforms, setPlatforms] = useState<KolPlatformAccount[]>(kol.platforms);
+  const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ platform_id: '', handle: '', follower_count: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => { getDropdowns().then(d => setAllPlatforms(d.platforms)); }, []);
+
+  function applyBundle(bundle: KolPlatformsBundle) {
+    setPlatforms(bundle.platforms);
+    onUpdated({
+      platforms: bundle.platforms,
+      handle: bundle.handle,
+      follower_count: bundle.follower_count,
+      avatar_url: bundle.avatar_url,
+      profile_url: bundle.profile_url,
+      platform: bundle.platform,
+    });
+  }
+
+  async function handleAdd() {
+    if (!form.handle.trim()) { setError('กรุณากรอก Handle'); return; }
+    setSaving(true); setError('');
+    try {
+      const bundle = await addKolPlatform(kol.id, {
+        platform_id: form.platform_id ? Number(form.platform_id) : undefined,
+        handle: form.handle.trim(),
+        follower_count: form.follower_count ? Number(form.follower_count) : undefined,
+      });
+      applyBundle(bundle);
+      setShowForm(false);
+      setForm({ platform_id: '', handle: '', follower_count: '' });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {platforms.map(p => (
+        <PlatformCard key={p.id} p={p} canDelete={platforms.length > 1} onChanged={applyBundle} />
+      ))}
+
+      {showForm && (
+        <div className="bg-canvas border border-accent/30 rounded-xl px-4 py-4 space-y-3">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">เพิ่ม platform ใหม่</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelCls}>Platform</label>
+              <Select
+                options={allPlatforms.map(p => ({ id: p.id, label: p.name }))}
+                value={form.platform_id}
+                onChange={v => setForm(f => ({ ...f, platform_id: v }))}
+                placeholder="เลือก"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Followers</label>
+              <input type="number" min="0" value={form.follower_count}
+                onChange={e => setForm(f => ({ ...f, follower_count: e.target.value }))} placeholder="0" className={inputCls} />
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Handle *</label>
+              <input type="text" value={form.handle}
+                onChange={e => setForm(f => ({ ...f, handle: e.target.value }))} placeholder="@username" className={inputCls} />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setShowForm(false); setError(''); }}
+              className="px-4 py-1.5 border border-hairline rounded-full text-sm text-muted hover:text-ink transition-colors">
+              ยกเลิก
+            </button>
+            <button type="button" onClick={handleAdd} disabled={saving}
+              className="px-4 py-1.5 bg-accent text-white rounded-full text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-all">
+              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showForm && (
+        <button type="button" onClick={() => setShowForm(true)}
+          className="w-full py-2 border border-dashed border-hairline rounded-xl text-sm text-muted hover:text-ink hover:border-ink/30 transition-colors flex items-center justify-center gap-1.5">
+          <Plus size={13} />
+          เพิ่ม platform ใหม่
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Modal ──────────────────────────────────────────────
 export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
   const { closed, requestClose } = useModalTransition(onClose);
-  const [tab, setTab] = useState<'profile' | 'terms'>('profile');
+  const [tab, setTab] = useState<'profile' | 'platform' | 'posts' | 'terms'>('profile');
   const [localKol, setLocalKol] = useState(kol);
 
   function handleUpdated(partial: Partial<KolDirectoryRow>) {
@@ -411,7 +635,10 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
                 </span>
               )}
               {localKol.platform && (
-                <span className="text-[11px] text-muted">{localKol.platform.name}</span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                  <PlatformLogo name={localKol.platform.name} size={14} />
+                  {localKol.platform.name}
+                </span>
               )}
             </div>
             {localKol.gen_name && <p className="text-xs text-muted mt-0.5">{localKol.gen_name}</p>}
@@ -425,15 +652,17 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
         {/* Tabs */}
         <div className="flex border-b border-hairline px-4 shrink-0">
           <button className={tabCls(tab === 'profile')} onClick={() => setTab('profile')}>โปรไฟล์</button>
+          <button className={tabCls(tab === 'platform')} onClick={() => setTab('platform')}>Platform</button>
+          <button className={tabCls(tab === 'posts')} onClick={() => setTab('posts')}>โพสต์</button>
           <button className={tabCls(tab === 'terms')} onClick={() => setTab('terms')}>ราคา / เงื่อนไข</button>
         </div>
 
         {/* Content */}
         <div className="overflow-y-auto flex-1 px-6 py-5">
-          {tab === 'profile'
-            ? <ProfileTab kol={localKol} onUpdated={handleUpdated} />
-            : <TermsTab kol={localKol} />
-          }
+          {tab === 'profile' && <ProfileTab kol={localKol} onUpdated={handleUpdated} />}
+          {tab === 'platform' && <PlatformTab kol={localKol} onUpdated={handleUpdated} />}
+          {tab === 'posts' && <PostsTab kol={localKol} />}
+          {tab === 'terms' && <TermsTab kol={localKol} />}
         </div>
       </div>
     </div>

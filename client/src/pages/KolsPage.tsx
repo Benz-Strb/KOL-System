@@ -7,7 +7,7 @@ import { getCached, setCached } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
-import { getPlatformColor } from '../lib/platformColors.js';
+import PlatformLogo from '../components/PlatformLogo.js';
 
 const LIMIT = 20;
 
@@ -83,28 +83,72 @@ function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
 
 const HOVER_EXPAND_DELAY = 400;
 
-// ─── Platform badge — click opens that platform's profile in a new tab ────
-// No real brand-logo assets for platforms (unlike brands, which have a
-// self-service logo_url) — colored initial badge instead, same fallback
-// spirit as BrandLogo/KolAvatar elsewhere in this file.
+// ─── Platform badge — hover shows a URL preview before you commit to a
+// click, same portal-popup pattern as BrandHoverChip above ───────────────
 function PlatformBadge({ p }: { p: KolPlatformAccount }) {
-  const initial = p.platform_name.slice(0, 1).toUpperCase();
-  const tooltip = [p.platform_name, p.handle, p.follower_count ? `${p.follower_count.toLocaleString('th-TH')} followers` : null]
+  const [open, setOpen] = useState(false);
+  const [avatarErrored, setAvatarErrored] = useState(false);
+  const [style, setStyle] = useState<React.CSSProperties>({});
+  const ref = useRef<HTMLSpanElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const subtitle = [p.handle, p.follower_count ? `${p.follower_count.toLocaleString('th-TH')} followers` : null]
     .filter(Boolean).join(' · ');
 
+  const show = () => {
+    clearTimeout(timer.current);
+    if (ref.current) {
+      const r = ref.current.getBoundingClientRect();
+      const above = r.top > 200;
+      const left = Math.min(r.left, window.innerWidth - 280);
+      setStyle(above
+        ? { position: 'fixed', bottom: window.innerHeight - r.top + 8, left, zIndex: 9999 }
+        : { position: 'fixed', top: r.bottom + 8, left, zIndex: 9999 });
+    }
+    setOpen(true);
+  };
+  const hide = () => { timer.current = setTimeout(() => setOpen(false), 120); };
+
   const badge = (
-    <span
-      className={`inline-flex items-center justify-center w-6 h-6 rounded-full border border-hairline text-[10px] font-bold text-white shrink-0 transition-transform ${getPlatformColor(p.platform_name)} ${p.profile_url ? 'hover:scale-110' : 'opacity-50'}`}
-    >
-      {initial}
+    <span ref={ref}
+      className={`transition-transform inline-flex ${p.profile_url ? 'hover:scale-110' : 'opacity-50'}`}
+      onMouseEnter={show} onMouseLeave={hide}>
+      <PlatformLogo name={p.platform_name} size={24} />
     </span>
   );
 
-  if (!p.profile_url) return <span title={tooltip}>{badge}</span>;
+  const preview = open && p.profile_url && createPortal(
+    <div style={style} onMouseEnter={show} onMouseLeave={hide}>
+      <div className="bg-surface border border-hairline rounded-lg shadow-xl w-64 overflow-hidden">
+        {p.avatar_url && !avatarErrored && (
+          <img
+            src={p.avatar_url}
+            alt={p.handle}
+            onError={() => setAvatarErrored(true)}
+            className="w-full h-36 object-cover bg-canvas border-b border-hairline"
+          />
+        )}
+        <div className="px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <PlatformLogo name={p.platform_name} size={16} />
+            <span className="text-ink text-[11px] font-semibold">{p.platform_name}</span>
+          </div>
+          {subtitle && <div className="text-muted text-[11px] mt-0.5">{subtitle}</div>}
+          <div className="text-accent text-[11px] mt-1.5 break-all select-text">{p.profile_url}</div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+
+  if (!p.profile_url) return badge;
   return (
-    <a href={p.profile_url} target="_blank" rel="noopener noreferrer" title={tooltip} onClick={e => e.stopPropagation()}>
-      {badge}
-    </a>
+    <>
+      <a href={p.profile_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+        {badge}
+      </a>
+      {preview}
+    </>
   );
 }
 
@@ -159,8 +203,11 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
 
         {/* Platform accounts — one badge per platform this kol has, click opens that platform's profile */}
         {r.platforms.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            {r.platforms.map(p => <PlatformBadge key={p.platform_id} p={p} />)}
+          <div>
+            <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">ช่องทางโซเชียล</div>
+            <div className="flex items-center gap-1.5">
+              {r.platforms.map(p => <PlatformBadge key={p.platform_id} p={p} />)}
+            </div>
           </div>
         )}
 

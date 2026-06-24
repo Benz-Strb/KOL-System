@@ -7,6 +7,7 @@ import {
 } from '../api/index.js';
 import KolPicker from '../components/KolPicker.js';
 import Select from '../components/Select.js';
+import PlatformLogo from '../components/PlatformLogo.js';
 import Modal from '../components/Modal.js';
 import Toast from '../components/Toast.js';
 
@@ -236,12 +237,37 @@ export default function NewPlacementPage() {
                 onChange={k => {
                   setKol(k);
                   if (k?.follower_count != null) set('follower_at_time', String(k.follower_count));
-                  if (k?.platforms) set('platform_id', String(k.platforms.id));
+                  const primary = k?.platforms.find(p => p.is_primary) ?? k?.platforms[0];
+                  if (primary) set('platform_id', String(primary.platform_id));
                 }}
                 platforms={dropdowns.platforms}
                 onAdded={handle => setToast(`เพิ่ม KOL "${handle}" สำเร็จแล้ว`)}
               />
             </div>
+            {kol && kol.platforms.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted">เลือก platform สำหรับ placement นี้:</span>
+                {kol.platforms.map(p => {
+                  const active = form.platform_id === String(p.platform_id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        set('platform_id', String(p.platform_id));
+                        set('follower_at_time', p.follower_count != null ? String(p.follower_count) : '');
+                      }}
+                      className={`flex items-center gap-1.5 text-xs pl-1.5 pr-2.5 py-1 rounded-full border transition-colors ${
+                        active ? 'bg-accent text-white border-accent' : 'border-hairline text-muted hover:border-accent/40 hover:text-ink'
+                      }`}
+                    >
+                      <PlatformLogo name={p.platform_name} size={16} />
+                      {p.platform_name}{p.follower_count != null ? ` · ${p.follower_count.toLocaleString()}` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Platform</label>

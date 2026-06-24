@@ -156,7 +156,9 @@ function CreateSampleModal({
                         onClick={() => { setSelectedKol(k); setKolQuery(''); setKolResults([]); }}>
                         <span className="font-medium text-ink">{k.handle}</span>
                         {k.gen_name && <span className="text-muted ml-2 text-xs">{k.gen_name}</span>}
-                        {k.platforms && <span className="ml-2 text-xs text-muted">· {k.platforms.name}</span>}
+                        {k.platforms.length > 0 && (
+                          <span className="ml-2 text-xs text-muted">· {k.platforms.map(p => p.platform_name).join(', ')}</span>
+                        )}
                       </button>
                     ))}
                   </div>

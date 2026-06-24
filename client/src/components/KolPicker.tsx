@@ -3,6 +3,18 @@ import { Search, X, Plus, Users } from 'lucide-react';
 import { searchKols, createKol, type KolResult, type Platform } from '../api/index.js';
 import Modal from './Modal.js';
 import Select, { DropdownPanel } from './Select.js';
+import PlatformLogo from './PlatformLogo.js';
+
+// Small logo chips listing every platform a kol has (not just primary) —
+// enough to see at a glance "this one has TikTok + Instagram" while picking.
+function PlatformChips({ platforms, className }: { platforms: KolResult['platforms']; className?: string }) {
+  if (platforms.length === 0) return null;
+  return (
+    <div className={`flex items-center gap-1 flex-wrap ${className ?? ''}`}>
+      {platforms.map(p => <PlatformLogo key={p.id} name={p.platform_name} size={16} />)}
+    </div>
+  );
+}
 
 interface Props {
   value: KolResult | null;
@@ -84,6 +96,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
           {value.follower_count != null && (
             <div className="text-xs text-muted tabular-nums">{value.follower_count.toLocaleString()} followers</div>
           )}
+          <PlatformChips platforms={value.platforms} className="mt-1" />
         </div>
         <button type="button" onClick={clear} className="text-muted hover:text-red-400 transition-colors flex-shrink-0">
           <X size={14} />
@@ -128,13 +141,11 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
                       <span className="font-medium text-ink text-sm">{kol.handle}</span>
                       {kol.gen_name && <span className="text-sm text-muted ml-1.5">{kol.gen_name}</span>}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       {kol.follower_count != null && (
                         <span className="text-xs text-muted tabular-nums">{kol.follower_count.toLocaleString()}</span>
                       )}
-                      {kol.platforms && (
-                        <span className="text-xs text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">{kol.platforms.name}</span>
-                      )}
+                      <PlatformChips platforms={kol.platforms} />
                     </div>
                   </div>
                 </button>
