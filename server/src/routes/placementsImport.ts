@@ -92,7 +92,7 @@ interface Lookups {
 
 async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookups> {
   const isAdmin = user.role === 'admin';
-  const seesAllBrands = isAdmin || user.role === 'manager';
+  const seesAllBrands = isAdmin;
   const currentYear = new Date().getFullYear();
 
   const [brands, platforms, campaigns, products, productBrandRows, stores, kols] = await Promise.all([

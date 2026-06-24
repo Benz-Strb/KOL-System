@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, ShoppingCart, ListChecks, Layers, X, Trophy, Image as ImageIcon } from 'lucide-react';
+import { TrendingUp, ShoppingCart, ListChecks, Layers, X, Trophy, Image as ImageIcon, Download } from 'lucide-react';
 import {
-  getProductDashboard, getDropdowns,
+  getProductDashboard, getDropdowns, exportProductDashboard,
   type ProductDashboardOverview, type ProductRankRow, type Campaign, type Brand, type ProductCategory,
 } from '../api/index.js';
 import Select from '../components/Select.js';
+import Toast from '../components/Toast.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 
 function formatMoney(n: number) {
@@ -99,6 +100,19 @@ export default function ProductDashboardPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortMode, setSortMode] = useState<'gmv' | 'orders'>('gmv');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  async function handleExport() {
+    setExporting(true); setExportError('');
+    try {
+      await exportProductDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo });
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : 'ดาวน์โหลดไม่สำเร็จ');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     getDropdowns().then(d => { setCampaigns(d.campaigns); setBrands(d.brands); setCategories(d.productCategories); });
@@ -168,8 +182,20 @@ export default function ProductDashboardPage() {
               <X size={11} /> ล้างวันที่
             </button>
           )}
+
+          <div className="w-px h-4 bg-hairline shrink-0" />
+
+          <button
+            onClick={handleExport}
+            disabled={exporting || loading || !data}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-hairline text-ink hover:border-accent/40 hover:text-accent disabled:opacity-50 transition-colors"
+          >
+            <Download size={12} /> {exporting ? 'กำลังดาวน์โหลด...' : 'Export Excel'}
+          </button>
         </div>
       </div>
+
+      {exportError && <Toast message={exportError} onClose={() => setExportError('')} />}
 
       {loading || !data ? (
         <div className="flex flex-col gap-6">

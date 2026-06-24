@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { Prisma } from '@prisma/client';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import ExcelJS from 'exceljs';
+import { requireAuth, requireRole, type AuthUser } from '../middleware/auth.js';
 import type { AppEnv } from '../types.js';
 
 const app = new Hono<AppEnv>();
@@ -8,7 +9,7 @@ app.use('*', requireAuth, requireRole('admin', 'manager'));
 
 function buildDashboardBrandFilter(role: string, brandIds: number[], brand_id?: string) {
   const bid = brand_id ? Number(brand_id) : null;
-  const seesAll = role === 'admin' || role === 'manager';
+  const seesAll = role === 'admin';
   if (seesAll) return bid ? { brand_id: bid } : {};
   return { brand_id: bid && brandIds.includes(bid) ? bid : { in: brandIds } };
 }
@@ -49,6 +50,7 @@ type KolRankRow = {
   gen_name: string | null;
   profile_url: string | null;
   avatar_url: string | null;
+  follower_count: number | null;
   placement_count: number;
   total_gmv: number;
   total_spend: number;
@@ -68,15 +70,12 @@ type ProductRankRow = {
   total_orders: number;
 };
 
-app.get('/', async c => {
-  try {
-    const prisma = c.get('prisma');
-    const user = c.get('user');
-    const brand_id = c.req.query('brand_id');
-    const campaign_id = c.req.query('campaign_id');
-    const category_id = c.req.query('category_id');
-    const date_from = c.req.query('date_from');
-    const date_to = c.req.query('date_to');
+// Shared by GET / (JSON) and GET /export (.xlsx) — same data, two renderings.
+async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, query: {
+  brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string;
+}) {
+  {
+    const { brand_id, campaign_id, category_id, date_from, date_to } = query;
 
     const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
 
@@ -98,7 +97,7 @@ app.get('/', async c => {
     });
 
     if (matched.length === 0) {
-      return c.json(EMPTY_RESPONSE);
+      return EMPTY_RESPONSE;
     }
 
     const ids = matched.map(p => p.id);
@@ -176,6 +175,7 @@ app.get('/', async c => {
       gen_name: string | null;
       profile_url: string | null;
       avatar_url: string | null;
+      follower_count: number | null;
       placement_count: number;
       total_gmv: number;
       total_spend: number;
@@ -198,6 +198,7 @@ app.get('/', async c => {
         k.gen_name,
         kp.profile_url,
         kp.avatar_url,
+        kp.follower_count,
         COUNT(DISTINCT ps.id)::int                AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float           AS total_gmv,
         COALESCE(SUM(ps.spend), 0)::float         AS total_spend,
@@ -206,7 +207,7 @@ app.get('/', async c => {
       JOIN kols k ON ps.kol_id = k.id
       JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
       LEFT JOIN metric_agg ma ON ma.placement_id = ps.id
-      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url, kp.avatar_url
+      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url, kp.avatar_url, kp.follower_count
     `;
 
     // per-KOL GMV split by sales channel (shopee/lazada/website/tiktok/youtube/lamon8)
@@ -278,7 +279,7 @@ app.get('/', async c => {
 
     const totalSpendWithAds = totalSpend + totalAdsCost;
 
-    return c.json({
+    return {
       summary: {
         total_placements: matched.length,
         posted_count: postedCount,
@@ -295,10 +296,113 @@ app.get('/', async c => {
       topKolsByRoi,
       kolValueList: kolRows,
       campaignTrend,
+    };
+  }
+}
+
+app.get('/', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const result = await buildDashboardOverview(prisma, user, {
+      brand_id: c.req.query('brand_id'),
+      campaign_id: c.req.query('campaign_id'),
+      category_id: c.req.query('category_id'),
+      date_from: c.req.query('date_from'),
+      date_to: c.req.query('date_to'),
     });
+    return c.json(result);
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load dashboard overview' }, 500);
+  }
+});
+
+const EXPORT_CHANNEL_LABEL: Record<string, string> = {
+  shopee: 'Shopee', lazada: 'Lazada', website: 'Website', tiktok: 'TikTok', youtube: 'YouTube', lamon8: 'Lemon8',
+};
+
+function styleExportHeaderRow(ws: ExcelJS.Worksheet) {
+  const row = ws.getRow(1);
+  row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+  row.alignment = { vertical: 'middle' };
+  row.height = 20;
+}
+
+// ─── GET /export — same data as GET /, rendered as a multi-sheet .xlsx ──
+// so the download always matches whatever filters are currently on screen.
+app.get('/export', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const data = await buildDashboardOverview(prisma, user, {
+      brand_id: c.req.query('brand_id'),
+      campaign_id: c.req.query('campaign_id'),
+      category_id: c.req.query('category_id'),
+      date_from: c.req.query('date_from'),
+      date_to: c.req.query('date_to'),
+    });
+
+    const wb = new ExcelJS.Workbook();
+
+    const summaryWs = wb.addWorksheet('สรุป');
+    summaryWs.addRow(['รายการ', 'ค่า']);
+    summaryWs.addRows([
+      ['Placement ทั้งหมด', data.summary.total_placements],
+      ['โพสต์แล้ว', data.summary.posted_count],
+      ['วางแผนไว้', data.summary.planned_count],
+      ['ยกเลิก', data.summary.cancelled_count],
+      ['ค่าใช้จ่าย KOL (บาท)', data.summary.total_spend],
+      ['Ads Cost (บาท)', data.summary.total_ads_cost],
+      ['GMV รวม (บาท)', data.summary.total_gmv],
+      ['Orders รวม', data.summary.total_orders],
+      ['ROI รวม (รวม Ads Cost)', data.summary.roi],
+    ]);
+    summaryWs.columns = [{ width: 28 }, { width: 18 }];
+    styleExportHeaderRow(summaryWs);
+
+    const channelWs = wb.addWorksheet('แยกตามช่องทาง');
+    channelWs.addRow(['ช่องทาง', 'GMV (บาท)', 'Orders', 'Visits']);
+    for (const ch of data.channelBreakdown) {
+      channelWs.addRow([EXPORT_CHANNEL_LABEL[ch.channel] ?? ch.channel, ch.gmv, ch.orders, ch.visits]);
+    }
+    channelWs.columns = [{ width: 18 }, { width: 16 }, { width: 12 }, { width: 12 }];
+    channelWs.getColumn(2).numFmt = '#,##0.00';
+    styleExportHeaderRow(channelWs);
+
+    const kolWs = wb.addWorksheet('Ranking KOL (GMV)');
+    kolWs.addRow(['อันดับ', 'Handle', 'ชื่อ', 'Follower', 'Placement', 'GMV (บาท)', 'ค่าใช้จ่าย (บาท)', 'Orders', 'ROI']);
+    data.topKolsByGmv.forEach((k, i) => {
+      kolWs.addRow([i + 1, k.handle, k.gen_name ?? '', k.follower_count ?? '', k.placement_count, k.total_gmv, k.total_spend, k.total_orders, k.roi ?? '']);
+    });
+    kolWs.columns = [{ width: 8 }, { width: 24 }, { width: 24 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 10 }];
+    kolWs.getColumn(6).numFmt = '#,##0.00';
+    kolWs.getColumn(7).numFmt = '#,##0.00';
+    kolWs.getColumn(9).numFmt = '0.00';
+    styleExportHeaderRow(kolWs);
+
+    const campaignWs = wb.addWorksheet('Trend ต่อแคมเปญ');
+    campaignWs.addRow(['แคมเปญ', 'Placement', 'GMV (บาท)', 'ค่าใช้จ่าย (บาท)']);
+    for (const c2 of data.campaignTrend) {
+      campaignWs.addRow([c2.code ?? 'ไม่มีแคมเปญ', c2.placement_count, c2.gmv, c2.spend]);
+    }
+    campaignWs.columns = [{ width: 16 }, { width: 12 }, { width: 16 }, { width: 16 }];
+    campaignWs.getColumn(3).numFmt = '#,##0.00';
+    campaignWs.getColumn(4).numFmt = '#,##0.00';
+    styleExportHeaderRow(campaignWs);
+
+    const buf = await wb.xlsx.writeBuffer();
+    const bytes = Uint8Array.from(buf as unknown as Uint8Array);
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to export dashboard' }, 500);
   }
 });
 
@@ -412,15 +516,12 @@ app.get('/kol/:id', async c => {
 });
 
 // ─── GET /products — rank every product (canonical model) by GMV ───
-app.get('/products', async c => {
-  try {
-    const prisma = c.get('prisma');
-    const user = c.get('user');
-    const brand_id = c.req.query('brand_id');
-    const campaign_id = c.req.query('campaign_id');
-    const category_id = c.req.query('category_id');
-    const date_from = c.req.query('date_from');
-    const date_to = c.req.query('date_to');
+// Shared by GET /products (JSON) and GET /products/export (.xlsx).
+async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query: {
+  brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string;
+}) {
+  {
+    const { brand_id, campaign_id, category_id, date_from, date_to } = query;
 
     const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
 
@@ -439,10 +540,10 @@ app.get('/products', async c => {
     const matched = await prisma.placements.findMany({ where, select: { id: true } });
 
     if (matched.length === 0) {
-      return c.json({
+      return {
         summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0 },
         ranking: [] as ProductRankRow[],
-      });
+      };
     }
 
     const ids = matched.map(p => p.id);
@@ -492,10 +593,62 @@ app.get('/products', async c => {
       { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0 },
     );
 
-    return c.json({ summary, ranking });
+    return { summary, ranking };
+  }
+}
+
+app.get('/products', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const result = await buildProductDashboard(prisma, user, {
+      brand_id: c.req.query('brand_id'),
+      campaign_id: c.req.query('campaign_id'),
+      category_id: c.req.query('category_id'),
+      date_from: c.req.query('date_from'),
+      date_to: c.req.query('date_to'),
+    });
+    return c.json(result);
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load product dashboard' }, 500);
+  }
+});
+
+// ─── GET /products/export — same data as GET /products, as a .xlsx ──────
+app.get('/products/export', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const data = await buildProductDashboard(prisma, user, {
+      brand_id: c.req.query('brand_id'),
+      campaign_id: c.req.query('campaign_id'),
+      category_id: c.req.query('category_id'),
+      date_from: c.req.query('date_from'),
+      date_to: c.req.query('date_to'),
+    });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Ranking สินค้า');
+    ws.addRow(['อันดับ', 'รุ่นสินค้า', 'หมวดหมู่', 'Placement', 'GMV (บาท)', 'Orders']);
+    data.ranking.forEach((r, i) => {
+      ws.addRow([i + 1, r.model_code, r.category_name ?? '', r.placement_count, r.total_gmv, r.total_orders]);
+    });
+    ws.columns = [{ width: 8 }, { width: 24 }, { width: 20 }, { width: 12 }, { width: 16 }, { width: 10 }];
+    ws.getColumn(5).numFmt = '#,##0.00';
+    styleExportHeaderRow(ws);
+
+    const buf = await wb.xlsx.writeBuffer();
+    const bytes = Uint8Array.from(buf as unknown as Uint8Array);
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="product_dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to export product dashboard' }, 500);
   }
 });
 

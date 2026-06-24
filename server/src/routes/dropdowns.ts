@@ -10,7 +10,7 @@ app.get('/', async c => {
     const prisma = c.get('prisma');
     const user = c.get('user');
     const isAdmin = user.role === 'admin';
-    const seesAllBrands = isAdmin || user.role === 'manager';
+    const seesAllBrands = isAdmin;
     const userBrandIds = user.brandIds;
 
     const [platforms, contentCategories, productCategories, users, campaigns, brands] = await Promise.all([

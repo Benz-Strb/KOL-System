@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -7,11 +7,12 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext.js';
 import {
-  getDashboardOverview, getDropdowns, searchKols,
+  getDashboardOverview, getDropdowns, searchKols, exportDashboard,
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import Select from '../components/Select.js';
+import Toast from '../components/Toast.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 
 const HOVER_EXPAND_DELAY = 400;
@@ -68,7 +69,94 @@ function formatAxisMoney(n: number) {
 }
 
 const TOOLTIP_TOP_N = 5;
-const PRICE_BAND_TOLERANCE = 0.2;
+const BAND_TOLERANCE = 0.2;
+
+// Generic "type a value, see KOLs who were near it, and what GMV they
+// delivered" card — same shape for price and follower-count benchmarking,
+// just a different accessor/formatter on the same kolValueList.
+function MetricBenchmarkCard({
+  title, description, unitSuffix, placeholder, step, kolValueList, getValue, formatValue, onSelectKol,
+}: {
+  title: string;
+  description: (tolerancePercent: number) => string;
+  unitSuffix: string;
+  placeholder: string;
+  step: number;
+  kolValueList: DashboardKolRow[];
+  getValue: (k: DashboardKolRow) => number | null;
+  formatValue: (v: number) => string;
+  onSelectKol: (kolId: number) => void;
+}) {
+  const [input, setInput] = useState('');
+  const value = Number(input);
+  const tolerancePercent = Math.round(BAND_TOLERANCE * 100);
+
+  const bandKols = value > 0
+    ? kolValueList
+        .map(k => ({ ...k, metricValue: getValue(k) }))
+        .filter((k): k is typeof k & { metricValue: number } => k.metricValue != null && k.metricValue > 0)
+        .filter(k => k.metricValue >= value * (1 - BAND_TOLERANCE) && k.metricValue <= value * (1 + BAND_TOLERANCE))
+        .sort((a, b) => b.total_gmv - a.total_gmv)
+    : [];
+  const bandAvgGmv = bandKols.length > 0
+    ? bandKols.reduce((sum, k) => sum + k.total_gmv, 0) / bandKols.length
+    : null;
+
+  return (
+    <div className="bg-surface border border-hairline rounded-xl p-5">
+      <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5 mb-1">
+        <Scale size={14} className="text-accent" /> {title}
+      </h2>
+      <p className="text-[11px] text-muted mb-3">{description(tolerancePercent)}</p>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs text-muted shrink-0">ค่าที่จะเทียบ</span>
+        <div className="relative">
+          <input
+            type="number" min="0" step={step}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder={placeholder}
+            className="w-40 pl-3 pr-16 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">{unitSuffix}</span>
+        </div>
+      </div>
+
+      {value <= 0 ? (
+        <p className="text-sm text-muted">กรอกค่าด้านบนเพื่อเทียบกับ KOL ที่เคยมีค่าใกล้เคียงกัน</p>
+      ) : bandKols.length === 0 ? (
+        <p className="text-sm text-muted">ไม่พบ KOL ที่เคยมีค่าใกล้เคียง {formatValue(value)} (±{tolerancePercent}%)</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3 mb-2 px-1">
+            <span className="text-xs text-muted">
+              พบ {bandKols.length} คน ในช่วง {formatValue(value * (1 - BAND_TOLERANCE))}–{formatValue(value * (1 + BAND_TOLERANCE))}
+            </span>
+            <span className="text-xs text-ink font-semibold shrink-0">เฉลี่ย GMV ช่วงนี้: <span className="font-mono">{formatMoney(bandAvgGmv ?? 0)}</span></span>
+          </div>
+          <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
+            {bandKols.map((k, i) => (
+              <div
+                key={k.kol_id}
+                onClick={() => onSelectKol(k.kol_id)}
+                className="flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-canvas transition-colors"
+              >
+                <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                <RankAvatar handle={k.handle} avatarUrl={k.avatar_url} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
+                  {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
+                </div>
+                <span className="text-xs text-muted tabular-nums shrink-0">{formatValue(k.metricValue)}</span>
+                <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function ChannelTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
@@ -317,8 +405,20 @@ export default function DashboardPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
-  const [priceInput, setPriceInput] = useState('');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  async function handleExport() {
+    setExporting(true); setExportError('');
+    try {
+      await exportDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo });
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : 'ดาวน์โหลดไม่สำเร็จ');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     getDropdowns().then(d => { setCampaigns(d.campaigns); setBrands(d.brands); setCategories(d.contentCategories); });
@@ -350,18 +450,6 @@ export default function DashboardPage() {
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? 'ไม่มีแคมเปญ' }))
     : [];
-
-  const priceValue = Number(priceInput);
-  const priceBandKols = data && priceValue > 0
-    ? data.kolValueList
-        .filter(k => k.placement_count > 0 && k.total_spend > 0)
-        .map(k => ({ ...k, avgPrice: k.total_spend / k.placement_count }))
-        .filter(k => k.avgPrice >= priceValue * (1 - PRICE_BAND_TOLERANCE) && k.avgPrice <= priceValue * (1 + PRICE_BAND_TOLERANCE))
-        .sort((a, b) => b.total_gmv - a.total_gmv)
-    : [];
-  const priceBandAvgGmv = priceBandKols.length > 0
-    ? priceBandKols.reduce((sum, k) => sum + k.total_gmv, 0) / priceBandKols.length
-    : null;
 
   return (
     <div className="px-6 py-6 max-w-screen-xl mx-auto">
@@ -401,8 +489,20 @@ export default function DashboardPage() {
               <X size={11} /> ล้างวันที่
             </button>
           )}
+
+          <div className="w-px h-4 bg-hairline shrink-0" />
+
+          <button
+            onClick={handleExport}
+            disabled={exporting || loading || !data}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-hairline text-ink hover:border-accent/40 hover:text-accent disabled:opacity-50 transition-colors"
+          >
+            <Download size={12} /> {exporting ? 'กำลังดาวน์โหลด...' : 'Export Excel'}
+          </button>
         </div>
       </div>
+
+      {exportError && <Toast message={exportError} onClose={() => setExportError('')} />}
 
       {loading || !data ? (
         <div className="flex flex-col gap-6">
@@ -555,61 +655,29 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Price benchmark — compare a hypothetical rate against KOLs who actually got paid near it */}
-          <div className="bg-surface border border-hairline rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5 mb-1">
-              <Scale size={14} className="text-accent" /> เทียบเรทราคากับ GMV ที่เคยทำได้
-            </h2>
-            <p className="text-[11px] text-muted mb-3">
-              กรอกราคาที่จะจ้าง ระบบจะหา KOL ที่เคยได้ราคาใกล้เคียงกัน (±{Math.round(PRICE_BAND_TOLERANCE * 100)}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนต่อรอง/จ้างจริง
-            </p>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs text-muted shrink-0">ราคาที่จะจ้าง</span>
-              <div className="relative">
-                <input
-                  type="number" min="0" step="1000"
-                  value={priceInput}
-                  onChange={e => setPriceInput(e.target.value)}
-                  placeholder="เช่น 30000"
-                  className="w-40 pl-3 pr-10 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">บาท</span>
-              </div>
-            </div>
+          <MetricBenchmarkCard
+            title="เทียบเรทราคากับ GMV ที่เคยทำได้"
+            description={pct => `กรอกราคาที่จะจ้าง ระบบจะหา KOL ที่เคยได้ราคาใกล้เคียงกัน (±${pct}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนต่อรอง/จ้างจริง`}
+            unitSuffix="บาท"
+            placeholder="เช่น 30000"
+            step={1000}
+            kolValueList={data.kolValueList}
+            getValue={k => (k.placement_count > 0 && k.total_spend > 0) ? k.total_spend / k.placement_count : null}
+            formatValue={formatMoney}
+            onSelectKol={setTrendKolId}
+          />
 
-            {priceValue <= 0 ? (
-              <p className="text-sm text-muted">กรอกราคาด้านบนเพื่อเทียบกับ KOL ที่เคยได้ราคาใกล้เคียงกัน</p>
-            ) : priceBandKols.length === 0 ? (
-              <p className="text-sm text-muted">ไม่พบ KOL ที่เคยได้ราคาใกล้เคียง ฿{priceValue.toLocaleString('th-TH')} (±{Math.round(PRICE_BAND_TOLERANCE * 100)}%)</p>
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-3 mb-2 px-1">
-                  <span className="text-xs text-muted">
-                    พบ {priceBandKols.length} คน ในช่วงราคา ฿{Math.round(priceValue * (1 - PRICE_BAND_TOLERANCE)).toLocaleString('th-TH')}–฿{Math.round(priceValue * (1 + PRICE_BAND_TOLERANCE)).toLocaleString('th-TH')}
-                  </span>
-                  <span className="text-xs text-ink font-semibold shrink-0">เฉลี่ย GMV ช่วงนี้: <span className="font-mono">{formatMoney(priceBandAvgGmv ?? 0)}</span></span>
-                </div>
-                <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
-                  {priceBandKols.map((k, i) => (
-                    <div
-                      key={k.kol_id}
-                      onClick={() => setTrendKolId(k.kol_id)}
-                      className="flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-canvas transition-colors"
-                    >
-                      <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
-                      <RankAvatar handle={k.handle} avatarUrl={k.avatar_url} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
-                        {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
-                      </div>
-                      <span className="text-xs text-muted tabular-nums shrink-0">ราคาเฉลี่ย <span className="font-mono">{formatMoney(k.avgPrice)}</span></span>
-                      <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          <MetricBenchmarkCard
+            title="เทียบ Follower กับ GMV ที่เคยทำได้"
+            description={pct => `กรอกจำนวน Follower ระบบจะหา KOL ที่เคยมี Follower ใกล้เคียงกัน (±${pct}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนเลือก KOL`}
+            unitSuffix="Followers"
+            placeholder="เช่น 100000"
+            step={1000}
+            kolValueList={data.kolValueList}
+            getValue={k => k.follower_count}
+            formatValue={v => Math.round(v).toLocaleString('th-TH')}
+            onSelectKol={setTrendKolId}
+          />
         </div>
       )}
 
