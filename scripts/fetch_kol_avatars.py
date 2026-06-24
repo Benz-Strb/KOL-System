@@ -58,7 +58,7 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
 }
 
-MIGRATION_SQL = 'ALTER TABLE kols ADD COLUMN IF NOT EXISTS avatar_url TEXT;'
+MIGRATION_SQL = None  # avatar_url already lives on kol_platforms (added in the 2026-06-23 kols/kol_platforms split) — no migration needed anymore
 
 def fetch_og_image(url, cookies={}):
     try:
@@ -197,20 +197,16 @@ def main():
     conn.autocommit = True
     cur = conn.cursor()
 
-    print('[migration] เพิ่ม avatar_url column (ถ้ายังไม่มี)...')
-    cur.execute(MIGRATION_SQL)
-    print('[migration] OK\n')
-
-    skip_cond = '' if FORCE else 'AND k.avatar_url IS NULL'
+    skip_cond = '' if FORCE else 'AND kp.avatar_url IS NULL'
     cur.execute(f"""
-        SELECT k.id, k.handle, k.profile_url,
+        SELECT kp.id, kp.handle, kp.profile_url,
                LOWER(COALESCE(p.name, '')) AS platform_key,
                COALESCE(p.name, 'Unknown')  AS platform_name
-        FROM kols k
-        LEFT JOIN platforms p ON k.platform_id = p.id
-        WHERE k.profile_url IS NOT NULL
+        FROM kol_platforms kp
+        LEFT JOIN platforms p ON kp.platform_id = p.id
+        WHERE kp.profile_url IS NOT NULL
         {skip_cond}
-        ORDER BY p.name NULLS LAST, k.handle
+        ORDER BY p.name NULLS LAST, kp.handle
     """)
     kols = cur.fetchall()
 
@@ -249,7 +245,7 @@ def main():
 
         subset = group[:LIMIT] if LIMIT else group
         print(f'[{name}] {len(subset)}/{len(group)} KOL')
-        for kol_id, handle, profile_url, _, _ in subset:
+        for platform_row_id, handle, profile_url, _, _ in subset:
             print(f'  {handle:<32}', end='', flush=True)
 
             if platform_key == 'facebook':
@@ -264,7 +260,7 @@ def main():
             if img_url and not str(img_url).startswith('__'):
                 print('OK')
                 if not DRY_RUN:
-                    cur.execute('UPDATE kols SET avatar_url = %s WHERE id = %s', (img_url, kol_id))
+                    cur.execute('UPDATE kol_platforms SET avatar_url = %s WHERE id = %s', (img_url, platform_row_id))
                 results['ok'] += 1
             else:
                 reason = img_url or 'no url'
@@ -283,13 +279,6 @@ def main():
     print(f"OK:   {results['ok']}")
     print(f"FAIL: {results['fail']}")
     print(f"SKIP: {results['skip']}")
-
-    if not DRY_RUN and results['ok'] > 0:
-        print()
-        print('ขั้นต่อไป:')
-        print('  1. หยุด server')
-        print('  2. cd server && npx prisma db pull && npx prisma generate')
-        print('  3. start server ใหม่')
 
     cur.close()
     conn.close()
