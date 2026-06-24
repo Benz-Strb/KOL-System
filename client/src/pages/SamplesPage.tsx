@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Search, X, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import {
   getSamples, createSample, updateSample, deleteSample,
@@ -56,6 +56,7 @@ function CreateSampleModal({
   const [kolQuery, setKolQuery] = useState('');
   const [kolResults, setKolResults] = useState<KolResult[]>([]);
   const [selectedKol, setSelectedKol] = useState<KolResult | null>(null);
+  const kolSearchSeq = useRef(0);
   const [form, setForm] = useState({
     brand_id: defaultBrandId ? String(defaultBrandId) : '',
     product_id: '',
@@ -86,8 +87,11 @@ function CreateSampleModal({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!kolQuery.trim() || selectedKol) { setKolResults([]); return; }
+    const seq = ++kolSearchSeq.current;
     const t = setTimeout(() => {
-      searchKols(kolQuery).then(setKolResults);
+      searchKols(kolQuery).then(r => {
+        if (kolSearchSeq.current === seq) setKolResults(r);
+      });
     }, 250);
     return () => clearTimeout(t);
   }, [kolQuery, selectedKol]);
@@ -273,7 +277,9 @@ export default function SamplesPage() {
   // ถ้ามีแค่ brand เดียว → auto-select ไม่ต้องให้เลือก
   const defaultBrandId = userBrands.length === 1 ? userBrands[0].id : null;
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const params = { status: statusFilter || undefined, brand_id: brandFilter || undefined, page };
     const cacheKey = `samples:${JSON.stringify(params)}`;
     const cached = getCached<{ rows: KolSample[]; total: number }>(cacheKey);
@@ -286,11 +292,12 @@ export default function SamplesPage() {
     }
     try {
       const res = await getSamples(params);
+      if (loadSeq.current !== seq) return;
       setCached(cacheKey, res);
       setRows(res.rows);
       setTotal(res.total);
     } finally {
-      setLoading(false);
+      if (loadSeq.current === seq) setLoading(false);
     }
   }, [statusFilter, brandFilter, page]);
 

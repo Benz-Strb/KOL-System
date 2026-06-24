@@ -39,12 +39,19 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
   const [newKol, setNewKol] = useState({ handle: '', gen_name: '', platform_id: '', follower_count: '' });
   const [addError, setAddError] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchSeq = useRef(0);
 
   useEffect(() => {
+    const seq = ++searchSeq.current;
     const t = setTimeout(async () => {
       setLoading(true);
-      try { setResults(await searchKols(query)); }
-      finally { setLoading(false); }
+      try {
+        const r = await searchKols(query);
+        if (searchSeq.current !== seq) return; // a newer keystroke already started a fetch
+        setResults(r);
+      } finally {
+        if (searchSeq.current === seq) setLoading(false);
+      }
     }, query.length === 0 ? 0 : 300);
     return () => clearTimeout(t);
   }, [query]);

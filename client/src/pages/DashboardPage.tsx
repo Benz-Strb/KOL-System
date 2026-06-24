@@ -270,14 +270,21 @@ function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const searchSeq = useRef(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!query) { setResults([]); return; }
+    const seq = ++searchSeq.current;
     const t = setTimeout(async () => {
       setLoading(true);
-      try { setResults(await searchKols(query)); }
-      finally { setLoading(false); }
+      try {
+        const r = await searchKols(query);
+        if (searchSeq.current !== seq) return; // a newer keystroke already started a fetch
+        setResults(r);
+      } finally {
+        if (searchSeq.current === seq) setLoading(false);
+      }
     }, 300);
     return () => clearTimeout(t);
   }, [query]);
@@ -424,7 +431,9 @@ export default function DashboardPage() {
     getDropdowns().then(d => { setCampaigns(d.campaigns); setBrands(d.brands); setCategories(d.contentCategories); });
   }, []);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const params = { brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo };
     const cacheKey = `dashboard:${JSON.stringify(params)}`;
     const cached = getCached<DashboardOverview>(cacheKey);
@@ -436,10 +445,11 @@ export default function DashboardPage() {
     }
     try {
       const res = await getDashboardOverview(params);
+      if (loadSeq.current !== seq) return;
       setCached(cacheKey, res);
       setData(res);
     } finally {
-      setLoading(false);
+      if (loadSeq.current === seq) setLoading(false);
     }
   }, [brandId, campaignId, categoryId, dateFrom, dateTo]);
 

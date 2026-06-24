@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, Pencil, ClipboardList, BarChart2, ExternalLink, List, TrendingUp } from 'lucide-react';
 import { getPlacements, getKolGmv, getDropdowns, getProducts, type PlacementRow, type KolGmvRow, type Product, type Campaign, type UserOption, type Brand } from '../api/index.js';
 import { useAuth } from '../context/AuthContext.js';
@@ -156,7 +156,9 @@ export default function PlacementsPage() {
     return () => clearTimeout(t);
   }, [priceMax]);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const params = {
       status, placement_type: type, q: debouncedQ,
       product_id: productId, campaign_id: campaignId,
@@ -175,16 +177,21 @@ export default function PlacementsPage() {
     }
     try {
       const res = await getPlacements(params);
+      // ignore stale responses — a newer load() may have already resolved
+      // while this older one was still in flight
+      if (loadSeq.current !== seq) return;
       setCached(cacheKey, res);
       setRows(res.rows);
       setTotal(res.total);
     } finally {
-      setLoading(false);
+      if (loadSeq.current === seq) setLoading(false);
     }
   }, [status, type, debouncedQ, productId, campaignId, paymentType, debouncedPriceMin, debouncedPriceMax, picId, brandId, page]);
 
+  const loadGmvSeq = useRef(0);
   const loadGmv = useCallback(async () => {
     if (viewMode !== 'gmv') return;
+    const seq = ++loadGmvSeq.current;
     const params = {
       status, placement_type: type, q: debouncedQ,
       product_id: productId, campaign_id: campaignId,
@@ -202,10 +209,11 @@ export default function PlacementsPage() {
     }
     try {
       const data = await getKolGmv(params);
+      if (loadGmvSeq.current !== seq) return;
       setCached(cacheKey, data);
       setKolGmv(data);
     } finally {
-      setGmvLoading(false);
+      if (loadGmvSeq.current === seq) setGmvLoading(false);
     }
   }, [viewMode, status, type, debouncedQ, productId, campaignId, paymentType, debouncedPriceMin, debouncedPriceMax, picId, brandId]);
 

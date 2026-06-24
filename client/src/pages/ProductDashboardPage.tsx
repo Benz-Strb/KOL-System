@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TrendingUp, ShoppingCart, ListChecks, Layers, X, Trophy, Image as ImageIcon, Download } from 'lucide-react';
 import {
   getProductDashboard, getDropdowns, exportProductDashboard,
@@ -118,7 +118,9 @@ export default function ProductDashboardPage() {
     getDropdowns().then(d => { setCampaigns(d.campaigns); setBrands(d.brands); setCategories(d.productCategories); });
   }, []);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const params = { brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo };
     const cacheKey = `product-dashboard:${JSON.stringify(params)}`;
     const cached = getCached<ProductDashboardOverview>(cacheKey);
@@ -130,10 +132,11 @@ export default function ProductDashboardPage() {
     }
     try {
       const res = await getProductDashboard(params);
+      if (loadSeq.current !== seq) return;
       setCached(cacheKey, res);
       setData(res);
     } finally {
-      setLoading(false);
+      if (loadSeq.current === seq) setLoading(false);
     }
   }, [brandId, campaignId, categoryId, dateFrom, dateTo]);
 

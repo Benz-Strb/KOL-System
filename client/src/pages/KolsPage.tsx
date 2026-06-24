@@ -276,7 +276,9 @@ export default function KolsPage() {
     return () => clearTimeout(t);
   }, [q]);
 
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const params = { q: debouncedQ, platform_id: platformId, category_id: categoryId, page };
     const cacheKey = `kols:${JSON.stringify(params)}`;
     const cached = getCached<{ rows: KolDirectoryRow[]; total: number }>(cacheKey);
@@ -289,11 +291,15 @@ export default function KolsPage() {
     }
     try {
       const res = await getKolDirectory(params);
+      // a newer load() may have started (and even resolved) while this one
+      // was in flight — applying this stale response would silently undo
+      // whatever the user is currently looking at
+      if (loadSeq.current !== seq) return;
       setCached(cacheKey, res);
       setRows(res.rows);
       setTotal(res.total);
     } finally {
-      setLoading(false);
+      if (loadSeq.current === seq) setLoading(false);
     }
   }, [debouncedQ, platformId, categoryId, page]);
 
