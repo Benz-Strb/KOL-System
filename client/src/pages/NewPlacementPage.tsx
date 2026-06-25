@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, Globe, Store, User, Package, Tag, CreditCard, FileText, AlertCircle, X, FileSpreadsheet } from 'lucide-react';
 import {
@@ -11,8 +12,8 @@ import PlatformLogo from '../components/PlatformLogo.js';
 import Modal from '../components/Modal.js';
 import Toast from '../components/Toast.js';
 
-const PAYMENT_LABELS = { paid: 'จ่ายเงิน', free: 'Free', barter: 'Barter' } as const;
-type PaymentType = keyof typeof PAYMENT_LABELS;
+type PaymentType = 'paid' | 'free' | 'barter';
+const PAYMENT_TYPES: PaymentType[] = ['paid', 'free', 'barter'];
 
 interface FormState {
   placement_type: 'online' | 'offline_shop';
@@ -53,6 +54,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 }
 
 export default function NewPlacementPage() {
+  const { t } = useTranslation();
   const [dropdowns, setDropdowns] = useState<Dropdowns | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -74,8 +76,8 @@ export default function NewPlacementPage() {
       if (d.brands.length === 1) {
         setForm(f => ({ ...f, brand_id: String(d.brands[0].id) }));
       }
-    }).catch(() => setError('โหลดข้อมูลไม่ได้ — เซิร์ฟเวอร์ทำงานอยู่หรือเปล่า?'));
-  }, []);
+    }).catch(() => setError(t('newPlacement.loadError')));
+  }, [t]);
 
   // โหลดสินค้าตาม brand ที่เลือก — สินค้าของแบรนด์นี้เท่านั้น (กัน Model ของแบรนด์อื่นปนเข้ามา)
   useEffect(() => {
@@ -102,24 +104,24 @@ export default function NewPlacementPage() {
   }
 
   async function handleAddBranch() {
-    if (!newBranch.trim()) { setBranchError('กรุณากรอกชื่อสาขา'); return; }
+    if (!newBranch.trim()) { setBranchError(t('newPlacement.branchNameRequired')); return; }
     setBranchError('');
     try {
       const created = await createStoreBranch({ shop_name: form.shop_name, branch: newBranch.trim() });
       setBranches(prev => [...prev, created]);
       set('store_id', String(created.id));
       setNewBranch(''); setShowAddBranch(false);
-      setToast(`เพิ่มสาขา "${created.branch}" สำเร็จแล้ว`);
+      setToast(t('newPlacement.branchAdded', { branch: created.branch }));
     } catch (err: unknown) {
-      setBranchError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setBranchError(err instanceof Error ? err.message : t('common.error'));
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!kol) { setError('กรุณาเลือก KOL'); return; }
-    if (form.placement_type === 'offline_shop' && !form.store_id) { setError('กรุณาเลือกสาขา'); return; }
-    if (!form.brand_id) { setError('กรุณาเลือกแบรนด์'); return; }
+    if (!kol) { setError(t('newPlacement.kolRequired')); return; }
+    if (form.placement_type === 'offline_shop' && !form.store_id) { setError(t('newPlacement.branchRequired')); return; }
+    if (!form.brand_id) { setError(t('newPlacement.brandRequired')); return; }
     setError(''); setSubmitting(true);
     try {
       await createPlacement({
@@ -137,11 +139,11 @@ export default function NewPlacementPage() {
         target_pub_date: form.target_pub_date || null,
         notes: form.notes || null,
       });
-      setToast('บันทึก Placement สำเร็จแล้ว');
+      setToast(t('newPlacement.saved'));
       setKol(null); setForm(initForm);
       window.scrollTo({ top: 0, behavior: 'instant' });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setSubmitting(false);
     }
@@ -163,17 +165,17 @@ export default function NewPlacementPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-6">
         <Link to="/placements" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink transition-colors mb-3">
-          <ChevronLeft size={14} /> กลับ
+          <ChevronLeft size={14} /> {t('newPlacement.back')}
         </Link>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-ink tracking-tight">เพิ่ม Placement ใหม่</h1>
-            <p className="text-sm text-muted mt-0.5">สถานะเริ่มต้น: Planned</p>
+            <h1 className="text-xl font-semibold text-ink tracking-tight">{t('newPlacement.title')}</h1>
+            <p className="text-sm text-muted mt-0.5">{t('newPlacement.defaultStatus')}</p>
           </div>
           <Link to="/placements/import"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 transition-all whitespace-nowrap shadow-sm">
             <FileSpreadsheet size={13} />
-            นำเข้าจาก Excel
+            {t('newPlacement.importFromExcel')}
           </Link>
         </div>
       </div>
@@ -194,12 +196,12 @@ export default function NewPlacementPage() {
         {/* Brand — แสดงเฉพาะเมื่อ user มีหลาย brand */}
         {dropdowns.brands.length > 1 && (
           <div className="bg-surface border border-hairline rounded-2xl p-5">
-            <SectionHeader icon={<Tag size={15} />} title="แบรนด์" />
+            <SectionHeader icon={<Tag size={15} />} title={t('newPlacement.brandSection')} />
             <Select
               options={dropdowns.brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))}
               value={form.brand_id}
               onChange={v => { set('brand_id', v); set('product_id', ''); }}
-              placeholder="เลือกแบรนด์"
+              placeholder={t('newPlacement.selectBrand')}
             />
           </div>
         )}
@@ -208,19 +210,19 @@ export default function NewPlacementPage() {
         <div className="bg-surface border border-hairline rounded-2xl p-5">
           <SectionHeader
             icon={form.placement_type === 'online' ? <Globe size={15} /> : <Store size={15} />}
-            title="ประเภท Placement"
+            title={t('newPlacement.typeSection')}
           />
           <div className="flex gap-2">
-            {(['online', 'offline_shop'] as const).map(t => (
-              <button key={t} type="button"
-                onClick={() => { set('placement_type', t); set('product_id', ''); set('shop_name', ''); set('store_id', ''); }}
+            {(['online', 'offline_shop'] as const).map(pt => (
+              <button key={pt} type="button"
+                onClick={() => { set('placement_type', pt); set('product_id', ''); set('shop_name', ''); set('store_id', ''); }}
                 className={`flex-1 py-2 rounded-full border text-sm font-medium transition-all active:scale-95 ${
-                  form.placement_type === t
+                  form.placement_type === pt
                     ? 'bg-accent text-white border-accent'
                     : 'bg-transparent text-ink border-hairline hover:border-accent/40 hover:text-accent'
                 }`}
               >
-                {t === 'online' ? 'Online' : 'Offline (ห้าง/สาขา)'}
+                {pt === 'online' ? 'Online' : t('newPlacement.offlineLabel')}
               </button>
             ))}
           </div>
@@ -228,7 +230,7 @@ export default function NewPlacementPage() {
 
         {/* KOL */}
         <div className="bg-surface border border-hairline rounded-2xl p-5">
-          <SectionHeader icon={<User size={15} />} title="KOL" />
+          <SectionHeader icon={<User size={15} />} title={t('newPlacement.kolSection')} />
           <div className="space-y-4">
             <div>
               <label className={labelCls}>KOL <span className="text-red-400 normal-case">*</span></label>
@@ -241,12 +243,12 @@ export default function NewPlacementPage() {
                   if (primary) set('platform_id', String(primary.platform_id));
                 }}
                 platforms={dropdowns.platforms}
-                onAdded={handle => setToast(`เพิ่ม KOL "${handle}" สำเร็จแล้ว`)}
+                onAdded={handle => setToast(t('newPlacement.kolAdded', { handle }))}
               />
             </div>
             {kol && kol.platforms.length > 1 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-muted">เลือก platform สำหรับ placement นี้:</span>
+                <span className="text-[11px] text-muted">{t('newPlacement.selectPlatformForPlacement')}</span>
                 {kol.platforms.map(p => {
                   const active = form.platform_id === String(p.platform_id);
                   return (
@@ -275,14 +277,14 @@ export default function NewPlacementPage() {
                   options={dropdowns.platforms.map(p => ({ id: p.id, label: p.name }))}
                   value={form.platform_id}
                   onChange={v => set('platform_id', v)}
-                  placeholder="เลือก Platform"
+                  placeholder={t('newPlacement.selectPlatform')}
                 />
               </div>
               <div>
                 <label className={labelCls}>Follower</label>
                 <input type="number" value={form.follower_at_time}
                   onChange={e => set('follower_at_time', e.target.value)}
-                  placeholder="จำนวน followers" className={inputCls} />
+                  placeholder={t('newPlacement.followerPlaceholder')} className={inputCls} />
               </div>
             </div>
           </div>
@@ -292,7 +294,7 @@ export default function NewPlacementPage() {
         <div className="bg-surface border border-hairline rounded-2xl p-5">
           <SectionHeader
             icon={<Package size={15} />}
-            title={form.placement_type === 'online' ? 'Model' : 'Store / Branch'}
+            title={form.placement_type === 'online' ? t('newPlacement.productSection') : t('newPlacement.storeSection')}
           />
           {form.placement_type === 'online' ? (
             <div>
@@ -301,52 +303,52 @@ export default function NewPlacementPage() {
                 options={products.map(p => ({ id: p.id, label: p.model_code }))}
                 value={form.product_id}
                 onChange={v => set('product_id', v)}
-                placeholder={loadingProducts ? 'กำลังโหลด...' : 'เลือกสินค้า'}
+                placeholder={loadingProducts ? t('common.loading') : t('newPlacement.selectProduct')}
                 disabled={!form.brand_id || loadingProducts}
               />
               {form.brand_id && !loadingProducts && products.length === 0 && (
                 <p className="text-xs text-amber-500 mt-1.5">
-                  ยังไม่มีรายการสินค้าของแบรนด์นี้ในระบบ — แจ้งแอดมินให้เพิ่มสินค้าก่อนสร้าง Placement แบบ Online
+                  {t('newPlacement.noProductsWarning')}
                 </p>
               )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>ห้าง</label>
+                <label className={labelCls}>{t('newPlacement.shop')}</label>
                 <Select
                   options={shops.map(s => ({ id: s.name, label: s.name }))}
                   value={form.shop_name}
                   onChange={v => set('shop_name', v)}
-                  placeholder="เลือกห้าง"
+                  placeholder={t('newPlacement.selectShop')}
                 />
               </div>
               <div>
-                <label className={labelCls}>สาขา <span className="text-red-400 normal-case">*</span></label>
+                <label className={labelCls}>{t('newPlacement.branch')} <span className="text-red-400 normal-case">*</span></label>
                 <Select
-                  options={branches.map(b => ({ id: b.id, label: b.branch ?? '(ไม่ระบุสาขา)' }))}
+                  options={branches.map(b => ({ id: b.id, label: b.branch ?? t('newPlacement.unspecifiedBranch') }))}
                   value={form.store_id}
                   onChange={v => set('store_id', v)}
-                  placeholder="เลือกสาขา"
-                  addLabel="เพิ่มสาขาใหม่"
+                  placeholder={t('newPlacement.selectBranch')}
+                  addLabel={t('newPlacement.addNewBranch')}
                   onAddClick={() => setShowAddBranch(true)}
                   disabled={!form.shop_name}
                 />
                 {showAddBranch && (
-                  <Modal title={`เพิ่มสาขาใหม่ — ${form.shop_name}`}
+                  <Modal title={t('newPlacement.addNewBranchTitle', { shop: form.shop_name })}
                     onClose={() => { setShowAddBranch(false); setBranchError(''); setNewBranch(''); }}>
                     <div className="space-y-3">
                       <div>
-                        <label className={labelCls}>ชื่อสาขา <span className="text-red-400 normal-case">*</span></label>
-                        <input type="text" placeholder="เช่น สยาม, ลาดพร้าว" value={newBranch}
+                        <label className={labelCls}>{t('newPlacement.branchName')} <span className="text-red-400 normal-case">*</span></label>
+                        <input type="text" placeholder={t('newPlacement.branchNamePlaceholder')} value={newBranch}
                           onChange={e => setNewBranch(e.target.value)} className={inputCls} />
                       </div>
                       {branchError && <p className="text-red-500 text-sm">{branchError}</p>}
                       <div className="flex gap-2 pt-1">
                         <button type="button" onClick={handleAddBranch}
-                          className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">บันทึก</button>
+                          className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">{t('common.save')}</button>
                         <button type="button" onClick={() => { setShowAddBranch(false); setBranchError(''); setNewBranch(''); }}
-                          className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">ยกเลิก</button>
+                          className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">{t('common.cancel')}</button>
                       </div>
                     </div>
                   </Modal>
@@ -358,7 +360,7 @@ export default function NewPlacementPage() {
 
         {/* Campaign + PIC */}
         <div className="bg-surface border border-hairline rounded-2xl p-5">
-          <SectionHeader icon={<Tag size={15} />} title="แคมเปญและรายละเอียด" />
+          <SectionHeader icon={<Tag size={15} />} title={t('newPlacement.campaignSection')} />
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -367,7 +369,7 @@ export default function NewPlacementPage() {
                   options={dropdowns.campaigns.map(c => ({ id: c.id, label: c.label ?? c.code }))}
                   value={form.campaign_id}
                   onChange={v => set('campaign_id', v)}
-                  placeholder="เลือกแคมเปญ (ถ้ามี)"
+                  placeholder={t('newPlacement.selectCampaignOptional')}
                 />
               </div>
               <div>
@@ -381,10 +383,10 @@ export default function NewPlacementPage() {
 
         {/* ค่าตอบแทน */}
         <div className="bg-surface border border-hairline rounded-2xl p-5">
-          <SectionHeader icon={<CreditCard size={15} />} title="ค่าตอบแทน" />
+          <SectionHeader icon={<CreditCard size={15} />} title={t('newPlacement.paymentSection')} />
           <div className="space-y-4">
             <div className="flex gap-2">
-              {(Object.entries(PAYMENT_LABELS) as [PaymentType, string][]).map(([val, label]) => (
+              {PAYMENT_TYPES.map(val => (
                 <button key={val} type="button" onClick={() => set('payment_type', val)}
                   className={`flex-1 py-2 rounded-full border text-sm font-medium transition-all active:scale-95 ${
                     form.payment_type === val
@@ -392,20 +394,20 @@ export default function NewPlacementPage() {
                       : 'bg-transparent text-ink border-hairline hover:border-accent/40 hover:text-accent'
                   }`}
                 >
-                  {label}
+                  {t(`payment.${val}`)}
                 </button>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Final Price (บาท)</label>
+                <label className={labelCls}>Final Price ({t('common.currency')})</label>
                 <input type="number" value={form.final_price}
                   onChange={e => set('final_price', e.target.value)}
                   disabled={!isPaidType} placeholder={isPaidType ? '0' : '—'}
                   className={`${inputCls} disabled:opacity-40 disabled:cursor-not-allowed`} />
               </div>
               <div>
-                <label className={labelCls}>Ads Cost (บาท)</label>
+                <label className={labelCls}>Ads Cost ({t('common.currency')})</label>
                 <input type="number" value={form.ads_cost}
                   onChange={e => set('ads_cost', e.target.value)}
                   placeholder="0" className={inputCls} />
@@ -416,15 +418,15 @@ export default function NewPlacementPage() {
 
         {/* หมายเหตุ */}
         <div className="bg-surface border border-hairline rounded-2xl p-5">
-          <SectionHeader icon={<FileText size={15} />} title="หมายเหตุ" />
+          <SectionHeader icon={<FileText size={15} />} title={t('newPlacement.notesSection')} />
           <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
-            rows={3} placeholder="หมายเหตุเพิ่มเติม..."
+            rows={3} placeholder={t('newPlacement.notesPlaceholder')}
             className={`${inputCls} resize-none`} />
         </div>
 
         <button type="submit" disabled={submitting}
           className="w-full py-3 bg-accent text-white font-medium rounded-full hover:bg-accent-hover disabled:opacity-50 active:scale-[0.99] transition-all text-sm">
-          {submitting ? 'กำลังบันทึก...' : 'บันทึก Placement'}
+          {submitting ? t('common.saving') : t('newPlacement.submit')}
         </button>
       </form>
     </div>

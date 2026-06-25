@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Plus, Trash2, ExternalLink, Tag } from 'lucide-react';
 import type { KolDirectoryRow, CommercialTerm, ContactInfo, KolPlatformAccount, KolPlatformsBundle, Platform, KolPost } from '../api/index.js';
 import { updateKol, getKolTerms, createKolTerm, deleteKolTerm, getDropdowns, addKolPlatform, updateKolPlatform, deleteKolPlatform, getKolPosts } from '../api/index.js';
@@ -6,6 +7,7 @@ import { useModalTransition } from '../hooks/useModalTransition.js';
 import Select from './Select.js';
 import PlatformLogo from './PlatformLogo.js';
 import BrandLogo from './BrandLogo.js';
+import { numberLocale } from '../i18n/locale.js';
 
 type Props = {
   kol: KolDirectoryRow;
@@ -20,20 +22,16 @@ const inputCls = [
 ].join(' ');
 const labelCls = 'block text-xs font-medium text-muted mb-1 tracking-wide uppercase';
 
-const PRICING_TYPE_LABELS: Record<string, string> = {
-  single_cooperation: 'โพสต์เดี่ยว',
-  contracted_package: 'แพ็คเกจสัญญา',
-  pure_exchange: 'แลกสินค้า',
-  commission: 'ค่าคอมมิชชั่น',
-};
+const PRICING_TYPES = ['single_cooperation', 'contracted_package', 'pure_exchange', 'commission'] as const;
 
 function formatPrice(v: string | null) {
   if (!v) return '—';
-  return Number(v).toLocaleString('th-TH') + ' ฿';
+  return Number(v).toLocaleString(numberLocale()) + ' ฿';
 }
 
 // ─── Profile Tab ────────────────────────────────────────────
 function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: Partial<KolDirectoryRow>) => void }) {
+  const { t } = useTranslation();
   const [contact, setContact] = useState<ContactInfo>(kol.contact_info ?? {});
   const [selling, setSelling] = useState(kol.main_selling_points ?? '');
   const [tags, setTags] = useState<string[]>(kol.custom_tags ?? []);
@@ -43,13 +41,13 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
   const [success, setSuccess] = useState(false);
 
   function addTag() {
-    const t = tagInput.trim();
-    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
+    const tag = tagInput.trim();
+    if (tag && !tags.includes(tag)) setTags(prev => [...prev, tag]);
     setTagInput('');
   }
 
-  function removeTag(t: string) {
-    setTags(prev => prev.filter(x => x !== t));
+  function removeTag(tag: string) {
+    setTags(prev => prev.filter(x => x !== tag));
   }
 
   async function handleSave() {
@@ -68,7 +66,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -96,7 +94,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
               onChange={e => setContact(c => ({ ...c, line: e.target.value }))} className={inputCls} />
           </div>
           <div>
-            <label className="text-[11px] text-muted mb-0.5 block">อื่นๆ</label>
+            <label className="text-[11px] text-muted mb-0.5 block">{t('kolDetail.otherContact')}</label>
             <input type="text" value={contact.other ?? ''} placeholder="..."
               onChange={e => setContact(c => ({ ...c, other: e.target.value }))} className={inputCls} />
           </div>
@@ -110,7 +108,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
           rows={3}
           value={selling}
           onChange={e => setSelling(e.target.value)}
-          placeholder="จุดเด่นของ KOL เช่น Beauty, Tech, Lifestyle..."
+          placeholder={t('kolDetail.mainSellingPointsPlaceholder')}
           className={inputCls + ' resize-none'}
         />
       </div>
@@ -119,17 +117,17 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
       <div>
         <label className={labelCls}>Custom Tags</label>
         <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
-          {tags.map(t => (
-            <span key={t}
+          {tags.map(tag => (
+            <span key={tag}
               className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent/10 text-accent text-[11px] rounded-full">
               <Tag size={9} />
-              {t}
-              <button type="button" onClick={() => removeTag(t)} className="hover:text-red-500 transition-colors">
+              {tag}
+              <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500 transition-colors">
                 <X size={9} />
               </button>
             </span>
           ))}
-          {tags.length === 0 && <span className="text-xs text-muted">ยังไม่มี tag</span>}
+          {tags.length === 0 && <span className="text-xs text-muted">{t('kolDetail.noTags')}</span>}
         </div>
         <div className="flex gap-2">
           <input
@@ -137,7 +135,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
             value={tagInput}
             onChange={e => setTagInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-            placeholder="พิมพ์ tag แล้ว Enter"
+            placeholder={t('kolDetail.tagInputPlaceholder')}
             className={inputCls + ' flex-1'}
           />
           <button type="button" onClick={addTag}
@@ -150,12 +148,12 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
       {/* Audience Tags (read-only) */}
       {(kol.audience_tags?.length ?? 0) > 0 && (
         <div>
-          <label className={labelCls}>Audience Tags (ระบบติดอัตโนมัติ)</label>
+          <label className={labelCls}>{t('kolDetail.audienceTagsAuto')}</label>
           <div className="flex flex-wrap gap-1.5">
-            {kol.audience_tags.map(t => (
-              <span key={t}
+            {kol.audience_tags.map(tag => (
+              <span key={tag}
                 className="inline-flex items-center gap-1 px-2 py-0.5 bg-canvas border border-hairline text-muted text-[11px] rounded-full">
-                {t}
+                {tag}
               </span>
             ))}
           </div>
@@ -165,10 +163,10 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       <div className="flex items-center gap-2 pt-1">
-        {success && <span className="text-xs text-green-600 font-medium">บันทึกแล้ว</span>}
+        {success && <span className="text-xs text-green-600 font-medium">{t('kolDetail.saved')}</span>}
         <button type="button" onClick={handleSave} disabled={saving}
           className="ml-auto px-5 py-2 bg-accent text-white rounded-full text-sm font-medium hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all">
-          {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+          {saving ? t('common.saving') : t('common.save')}
         </button>
       </div>
     </div>
@@ -177,6 +175,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
 
 // ─── Posts Tab — every placement with an actual post link ───────────────
 function PostsTab({ kol }: { kol: KolDirectoryRow }) {
+  const { t } = useTranslation();
   const [posts, setPosts] = useState<KolPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -191,7 +190,7 @@ function PostsTab({ kol }: { kol: KolDirectoryRow }) {
   );
 
   if (posts.length === 0) {
-    return <p className="text-sm text-muted text-center py-6">ยังไม่มีโพสต์ที่บันทึกลิงก์ไว้</p>;
+    return <p className="text-sm text-muted text-center py-6">{t('kolDetail.noPostsYet')}</p>;
   }
 
   return (
@@ -212,7 +211,7 @@ function PostsTab({ kol }: { kol: KolDirectoryRow }) {
                 )}
               </div>
               <div className="text-xs text-muted mt-0.5 truncate">
-                {[subtitle, post.publication_date ? new Date(post.publication_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : null]
+                {[subtitle, post.publication_date ? new Date(post.publication_date).toLocaleDateString(numberLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) : null]
                   .filter(Boolean).join(' · ') || '—'}
               </div>
             </div>
@@ -226,6 +225,7 @@ function PostsTab({ kol }: { kol: KolDirectoryRow }) {
 
 // ─── Commercial Terms Tab ────────────────────────────────────
 function TermsTab({ kol }: { kol: KolDirectoryRow }) {
+  const { t } = useTranslation();
   const [terms, setTerms] = useState<CommercialTerm[]>([]);
   const [loading, setLoading] = useState(true);
   const [brands, setBrands] = useState<{ id: number; name: string; logo_url: string | null }[]>([]);
@@ -264,16 +264,16 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
       setShowForm(false);
       setForm({ pricing_type: 'single_cooperation', brand_id: '', single_post_price: '', package_price: '', multi_platform_price: '', is_barter: false, notes: '' });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(termId: number) {
-    if (!confirm('ลบเงื่อนไขนี้?')) return;
+    if (!confirm(t('kolDetail.confirmDeleteTerm'))) return;
     await deleteKolTerm(termId);
-    setTerms(prev => prev.filter(t => t.id !== termId));
+    setTerms(prev => prev.filter(term => term.id !== termId));
   }
 
   if (loading) return (
@@ -285,36 +285,36 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
   return (
     <div className="space-y-3">
       {terms.length === 0 && !showForm && (
-        <p className="text-sm text-muted text-center py-6">ยังไม่มีเงื่อนไขราคา</p>
+        <p className="text-sm text-muted text-center py-6">{t('kolDetail.noTermsYet')}</p>
       )}
 
-      {terms.map(t => (
-        <div key={t.id} className="bg-canvas border border-hairline rounded-xl px-4 py-3">
+      {terms.map(term => (
+        <div key={term.id} className="bg-canvas border border-hairline rounded-xl px-4 py-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-ink">{PRICING_TYPE_LABELS[t.pricing_type] ?? t.pricing_type}</span>
-                {t.is_barter && (
+                <span className="text-sm font-semibold text-ink">{t(`pricingType.${term.pricing_type}`, { defaultValue: term.pricing_type })}</span>
+                {term.is_barter && (
                   <span className="text-[10px] px-1.5 py-px bg-orange-500/10 text-orange-600 rounded-full font-medium">Barter</span>
                 )}
-                {t.brands && (
-                  <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full">{t.brands.name}</span>
+                {term.brands && (
+                  <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full">{term.brands.name}</span>
                 )}
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
-                {t.single_post_price && (
-                  <span className="text-xs text-muted">ต่อโพสต์ <span className="text-ink font-medium">{formatPrice(t.single_post_price)}</span></span>
+                {term.single_post_price && (
+                  <span className="text-xs text-muted">{t('kolDetail.perPost')} <span className="text-ink font-medium">{formatPrice(term.single_post_price)}</span></span>
                 )}
-                {t.package_price && (
-                  <span className="text-xs text-muted">แพ็คเกจ <span className="text-ink font-medium">{formatPrice(t.package_price)}</span></span>
+                {term.package_price && (
+                  <span className="text-xs text-muted">{t('kolDetail.packageLabel')} <span className="text-ink font-medium">{formatPrice(term.package_price)}</span></span>
                 )}
-                {t.multi_platform_price && (
-                  <span className="text-xs text-muted">Multi-plat <span className="text-ink font-medium">{formatPrice(t.multi_platform_price)}</span></span>
+                {term.multi_platform_price && (
+                  <span className="text-xs text-muted">Multi-plat <span className="text-ink font-medium">{formatPrice(term.multi_platform_price)}</span></span>
                 )}
               </div>
-              {t.notes && <p className="text-xs text-muted mt-1">{t.notes}</p>}
+              {term.notes && <p className="text-xs text-muted mt-1">{term.notes}</p>}
             </div>
-            <button onClick={() => handleDelete(t.id)}
+            <button onClick={() => handleDelete(term.id)}
               className="text-muted hover:text-red-500 transition-colors p-1 shrink-0">
               <Trash2 size={13} />
             </button>
@@ -324,12 +324,12 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
 
       {showForm && (
         <div className="bg-canvas border border-accent/30 rounded-xl px-4 py-4 space-y-3">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">เพิ่มเงื่อนไขใหม่</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{t('kolDetail.addNewTerm')}</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className={labelCls}>รูปแบบ *</label>
+              <label className={labelCls}>{t('kolDetail.pricingTypeLabel')}</label>
               <Select
-                options={Object.entries(PRICING_TYPE_LABELS).map(([k, v]) => ({ id: k, label: v }))}
+                options={PRICING_TYPES.map(k => ({ id: k, label: t(`pricingType.${k}`) }))}
                 value={form.pricing_type}
                 onChange={v => setForm(f => ({ ...f, pricing_type: v }))}
               />
@@ -337,23 +337,23 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
             <div>
               <label className={labelCls}>Brand</label>
               <Select
-                options={[{ id: '', label: 'ทุก Brand' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
+                options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
                 value={form.brand_id}
                 onChange={v => setForm(f => ({ ...f, brand_id: v }))}
               />
             </div>
             <div>
-              <label className={labelCls}>ราคา/โพสต์ (฿)</label>
+              <label className={labelCls}>{t('kolDetail.pricePerPost')}</label>
               <input type="number" min="0" value={form.single_post_price}
                 onChange={e => setForm(f => ({ ...f, single_post_price: e.target.value }))} placeholder="0" className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>แพ็คเกจ (฿)</label>
+              <label className={labelCls}>{t('kolDetail.packagePrice')}</label>
               <input type="number" min="0" value={form.package_price}
                 onChange={e => setForm(f => ({ ...f, package_price: e.target.value }))} placeholder="0" className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Multi-platform (฿)</label>
+              <label className={labelCls}>{t('kolDetail.multiPlatformPrice')}</label>
               <input type="number" min="0" value={form.multi_platform_price}
                 onChange={e => setForm(f => ({ ...f, multi_platform_price: e.target.value }))} placeholder="0" className={inputCls} />
             </div>
@@ -365,7 +365,7 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
             </div>
           </div>
           <div>
-            <label className={labelCls}>หมายเหตุ</label>
+            <label className={labelCls}>{t('kolDetail.notesLabel')}</label>
             <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
               placeholder="..." className={inputCls} />
           </div>
@@ -373,11 +373,11 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowForm(false)}
               className="px-4 py-1.5 border border-hairline rounded-full text-sm text-muted hover:text-ink transition-colors">
-              ยกเลิก
+              {t('common.cancel')}
             </button>
             <button type="button" onClick={handleCreate} disabled={saving}
               className="px-4 py-1.5 bg-accent text-white rounded-full text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-all">
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>
@@ -387,7 +387,7 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
         <button type="button" onClick={() => setShowForm(true)}
           className="w-full py-2 border border-dashed border-hairline rounded-xl text-sm text-muted hover:text-ink hover:border-ink/30 transition-colors flex items-center justify-center gap-1.5">
           <Plus size={13} />
-          เพิ่มเงื่อนไขใหม่
+          {t('kolDetail.addNewTerm')}
         </button>
       )}
     </div>
@@ -399,6 +399,7 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
 // follower_count especially, since that's the field that genuinely changes
 // often (the tier trigger fires automatically on the DB side either way).
 function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canDelete: boolean; onChanged: (b: KolPlatformsBundle) => void }) {
+  const { t } = useTranslation();
   const [handle, setHandle] = useState(p.handle);
   const [follower, setFollower] = useState(p.follower_count != null ? String(p.follower_count) : '');
   const [profileUrl, setProfileUrl] = useState(p.profile_url ?? '');
@@ -414,19 +415,19 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
     try {
       onChanged(await updateKolPlatform(p.id, body));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!confirm(`ลบ ${p.platform_name} (${p.handle}) ออกจาก KOL นี้?`)) return;
+    if (!confirm(t('kolDetail.confirmDeletePlatform', { platform: p.platform_name, handle: p.handle }))) return;
     setSaving(true); setError('');
     try {
       onChanged(await deleteKolPlatform(p.id));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
       setSaving(false);
     }
   }
@@ -439,16 +440,16 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
           {p.avatar_url && <img src={p.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />}
           <span className="text-sm font-semibold text-ink">{p.platform_name}</span>
           {p.is_primary ? (
-            <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full font-medium">หลัก</span>
+            <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full font-medium">{t('kolDetail.primary')}</span>
           ) : (
             <button type="button" onClick={() => run({ is_primary: true })} disabled={saving}
               className="text-[10px] px-1.5 py-px border border-hairline rounded-full text-muted hover:text-accent hover:border-accent/40 transition-colors disabled:opacity-50">
-              ตั้งเป็นหลัก
+              {t('kolDetail.setAsPrimary')}
             </button>
           )}
         </div>
         <button type="button" onClick={handleDelete} disabled={saving || !canDelete}
-          title={!canDelete ? 'ต้องมีอย่างน้อย 1 platform ต่อ KOL' : 'ลบ platform นี้'}
+          title={!canDelete ? t('kolDetail.minOnePlatform') : t('kolDetail.deleteThisPlatform')}
           className="text-muted hover:text-red-500 disabled:opacity-30 disabled:hover:text-muted transition-colors p-1">
           <Trash2 size={13} />
         </button>
@@ -468,7 +469,7 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
           <input type="text" value={profileUrl} onChange={e => setProfileUrl(e.target.value)} placeholder="https://..." className={inputCls} />
         </div>
       </div>
-      <p className="text-[11px] text-muted">อัปเดต followers ได้เลยถ้าจำนวนเปลี่ยนแปลง — ระดับ Tier จะคำนวณใหม่อัตโนมัติ</p>
+      <p className="text-[11px] text-muted">{t('kolDetail.followerUpdateHint')}</p>
 
       {error && <p className="text-xs text-red-500">{error}</p>}
       {dirty && (
@@ -481,7 +482,7 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
             profile_url: profileUrl.trim() || null,
           })}
           className="w-full py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-all">
-          {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+          {saving ? t('common.saving') : t('common.save')}
         </button>
       )}
     </div>
@@ -489,6 +490,7 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
 }
 
 function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: Partial<KolDirectoryRow>) => void }) {
+  const { t } = useTranslation();
   const [platforms, setPlatforms] = useState<KolPlatformAccount[]>(kol.platforms);
   const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -511,7 +513,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
   }
 
   async function handleAdd() {
-    if (!form.handle.trim()) { setError('กรุณากรอก Handle'); return; }
+    if (!form.handle.trim()) { setError(t('kolDetail.handleRequired')); return; }
     setSaving(true); setError('');
     try {
       const bundle = await addKolPlatform(kol.id, {
@@ -523,7 +525,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
       setShowForm(false);
       setForm({ platform_id: '', handle: '', follower_count: '' });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -537,7 +539,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
 
       {showForm && (
         <div className="bg-canvas border border-accent/30 rounded-xl px-4 py-4 space-y-3">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider">เพิ่ม platform ใหม่</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wider">{t('kolDetail.addNewPlatform')}</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className={labelCls}>Platform</label>
@@ -545,7 +547,6 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
                 options={allPlatforms.map(p => ({ id: p.id, label: p.name }))}
                 value={form.platform_id}
                 onChange={v => setForm(f => ({ ...f, platform_id: v }))}
-                placeholder="เลือก"
               />
             </div>
             <div>
@@ -563,11 +564,11 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
           <div className="flex gap-2">
             <button type="button" onClick={() => { setShowForm(false); setError(''); }}
               className="px-4 py-1.5 border border-hairline rounded-full text-sm text-muted hover:text-ink transition-colors">
-              ยกเลิก
+              {t('common.cancel')}
             </button>
             <button type="button" onClick={handleAdd} disabled={saving}
               className="px-4 py-1.5 bg-accent text-white rounded-full text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-all">
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>
@@ -577,7 +578,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
         <button type="button" onClick={() => setShowForm(true)}
           className="w-full py-2 border border-dashed border-hairline rounded-xl text-sm text-muted hover:text-ink hover:border-ink/30 transition-colors flex items-center justify-center gap-1.5">
           <Plus size={13} />
-          เพิ่ม platform ใหม่
+          {t('kolDetail.addNewPlatform')}
         </button>
       )}
     </div>
@@ -586,6 +587,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
 
 // ─── Main Modal ──────────────────────────────────────────────
 export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
+  const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
   const [tab, setTab] = useState<'profile' | 'platform' | 'posts' | 'terms'>('profile');
   const [localKol, setLocalKol] = useState(kol);
@@ -651,10 +653,10 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-hairline px-4 shrink-0">
-          <button className={tabCls(tab === 'profile')} onClick={() => setTab('profile')}>โปรไฟล์</button>
+          <button className={tabCls(tab === 'profile')} onClick={() => setTab('profile')}>{t('kolDetail.tabProfile')}</button>
           <button className={tabCls(tab === 'platform')} onClick={() => setTab('platform')}>Platform</button>
-          <button className={tabCls(tab === 'posts')} onClick={() => setTab('posts')}>โพสต์</button>
-          <button className={tabCls(tab === 'terms')} onClick={() => setTab('terms')}>ราคา / เงื่อนไข</button>
+          <button className={tabCls(tab === 'posts')} onClick={() => setTab('posts')}>{t('kolDetail.tabPosts')}</button>
+          <button className={tabCls(tab === 'terms')} onClick={() => setTab('terms')}>{t('kolDetail.tabTerms')}</button>
         </div>
 
         {/* Content */}

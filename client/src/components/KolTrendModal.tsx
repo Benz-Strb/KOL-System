@@ -1,10 +1,12 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, ExternalLink, TrendingUp, Wallet, Gauge, PackageCheck, CalendarClock, XCircle } from 'lucide-react';
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import { getKolTrend, type KolTrendOverview } from '../api/index.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
+import { numberLocale } from '../i18n/locale.js';
 
 type Props = {
   kolId: number;
@@ -13,7 +15,7 @@ type Props = {
 };
 
 function formatMoney(n: number) {
-  return '฿' + Math.round(n).toLocaleString('th-TH');
+  return '฿' + Math.round(n).toLocaleString(numberLocale());
 }
 
 function formatAxisMoney(n: number) {
@@ -44,6 +46,7 @@ function StatChip({ icon, label, value, tone = 'neutral' }: { icon: ReactNode; l
 }
 
 export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
+  const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
   const [data, setData] = useState<KolTrendOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,11 +58,11 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
     setError('');
     getKolTrend(kolId, { brand_id: brandId })
       .then(setData)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด'))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : t('common.error')))
       .finally(() => setLoading(false));
-  }, [kolId, brandId]);
+  }, [kolId, brandId, t]);
 
-  const chartData = data ? data.trend.map(t => ({ ...t, name: t.code ?? 'ไม่มีแคมเปญ' })) : [];
+  const chartData = data ? data.trend.map(tr => ({ ...tr, name: tr.code ?? t('kolTrend.noCampaign') })) : [];
 
   return (
     <div
@@ -91,7 +94,7 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
                 {data.kol.platform && <span className="text-[11px] text-muted">{data.kol.platform.name}</span>}
               </div>
             ) : (
-              <span className="font-semibold text-ink">กำลังโหลด...</span>
+              <span className="font-semibold text-ink">{t('kolTrend.loading')}</span>
             )}
             {data?.kol.gen_name && <p className="text-xs text-muted mt-0.5">{data.kol.gen_name}</p>}
           </div>
@@ -113,25 +116,25 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
             <>
               {/* Stat chips */}
               <div className="flex flex-wrap gap-2">
-                <StatChip icon={<TrendingUp size={12} />} label="GMV รวม" value={formatMoney(data.totals.total_gmv)} />
-                <StatChip icon={<Wallet size={12} />} label="ค่าใช้จ่ายรวม" value={formatMoney(data.totals.total_spend)} />
-                <StatChip icon={<Gauge size={12} />} label="ROI" value={data.totals.roi != null ? `x${data.totals.roi.toFixed(2)}` : '—'} />
-                <StatChip icon={<PackageCheck size={12} />} label="โพสต์แล้ว" value={String(data.reliability.posted_count)} tone="good" />
-                <StatChip icon={<CalendarClock size={12} />} label="วางแผน" value={String(data.reliability.planned_count)} />
-                <StatChip icon={<XCircle size={12} />} label="ยกเลิก" value={String(data.reliability.cancelled_count)} tone={data.reliability.cancelled_count > 0 ? 'bad' : 'neutral'} />
+                <StatChip icon={<TrendingUp size={12} />} label={t('kolTrend.totalGmv')} value={formatMoney(data.totals.total_gmv)} />
+                <StatChip icon={<Wallet size={12} />} label={t('kolTrend.totalSpend')} value={formatMoney(data.totals.total_spend)} />
+                <StatChip icon={<Gauge size={12} />} label={t('kolTrend.roi')} value={data.totals.roi != null ? `x${data.totals.roi.toFixed(2)}` : '—'} />
+                <StatChip icon={<PackageCheck size={12} />} label={t('kolTrend.posted')} value={String(data.reliability.posted_count)} tone="good" />
+                <StatChip icon={<CalendarClock size={12} />} label={t('kolTrend.planned')} value={String(data.reliability.planned_count)} />
+                <StatChip icon={<XCircle size={12} />} label={t('kolTrend.cancelled')} value={String(data.reliability.cancelled_count)} tone={data.reliability.cancelled_count > 0 ? 'bad' : 'neutral'} />
               </div>
-              <p className="text-[11px] text-muted">ค่าใช้จ่ายรวม/ROI ที่นี่นับเฉพาะค่าจ้าง KOL (ไม่รวม Ads Cost) — ดูความคุ้มค่าตัว KOL เอง</p>
+              <p className="text-[11px] text-muted">{t('kolTrend.spendDisclaimer')}</p>
               {data.reliability.delivery_rate != null && (
                 <p className="text-xs text-muted">
-                  อัตราทำตามนัด (โพสต์ ÷ โพสต์+ยกเลิก): <span className="font-semibold text-ink font-mono">{(data.reliability.delivery_rate * 100).toFixed(0)}%</span>
+                  {t('kolTrend.deliveryRate')} <span className="font-semibold text-ink font-mono">{(data.reliability.delivery_rate * 100).toFixed(0)}%</span>
                 </p>
               )}
 
               {/* Trend chart */}
               <div>
-                <h3 className="text-sm font-semibold text-ink mb-3">เทรนด์ GMV / ค่าใช้จ่าย / ROI ต่อแคมเปญ</h3>
+                <h3 className="text-sm font-semibold text-ink mb-3">{t('kolTrend.trendTitle')}</h3>
                 {chartData.length === 0 ? (
-                  <p className="text-sm text-muted">ยังไม่มีข้อมูลแคมเปญ</p>
+                  <p className="text-sm text-muted">{t('kolTrend.noCampaignData')}</p>
                 ) : (
                   <ResponsiveContainer width="100%" height={240}>
                     <ComposedChart data={chartData} margin={{ left: -16, right: 8 }}>
@@ -143,11 +146,11 @@ export default function KolTrendModal({ kolId, brandId, onClose }: Props) {
                         contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
                         labelStyle={{ color: 'var(--ink)' }}
                         formatter={(v, n) => {
-                          if (n === 'roi') return [v != null ? `x${Number(v).toFixed(2)}` : '—', 'ROI'];
-                          return [formatMoney(Number(v ?? 0)), n === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย'];
+                          if (n === 'roi') return [v != null ? `x${Number(v).toFixed(2)}` : '—', t('kolTrend.roi')];
+                          return [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')];
                         }}
                       />
-                      <Legend formatter={(v: string) => (v === 'gmv' ? 'GMV' : v === 'spend' ? 'ค่าใช้จ่าย' : 'ROI')} wrapperStyle={{ fontSize: 11 }} />
+                      <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : v === 'spend' ? t('kolTrend.spend') : t('kolTrend.roi'))} wrapperStyle={{ fontSize: 11 }} />
                       <Bar yAxisId="money" dataKey="gmv" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={500} />
                       <Bar yAxisId="money" dataKey="spend" fill="#f97316" radius={[4, 4, 0, 0]} animationDuration={500} />
                       <Line yAxisId="roi" dataKey="roi" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} connectNulls animationDuration={500} />

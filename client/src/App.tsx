@@ -1,10 +1,12 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
-import { ROLE_LABELS } from './lib/roleLabels.js';
+import LanguageSwitcher from './components/LanguageSwitcher.js';
+import { roleLabel } from './lib/roleLabels.js';
 
 // Code-split everything behind login — keeps the initial bundle (login page)
 // small and defers heavy per-page deps (recharts, exceljs-adjacent import UI) until visited.
@@ -84,6 +86,7 @@ function RequireManagerOrAdmin({ children }: { children: React.ReactNode }) {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { appUser, signOut, deactivated } = useAuth();
   const location = useLocation();
   const [dark, setDark] = useState(() =>
@@ -117,13 +120,13 @@ function Layout({ children }: { children: React.ReactNode }) {
             <div className="inline-flex items-center justify-center w-12 h-12 bg-red-500/10 rounded-2xl mb-4">
               <ShieldOff size={22} className="text-red-500" />
             </div>
-            <h2 className="text-base font-semibold text-ink mb-1">บัญชีถูกปิดใช้งาน</h2>
-            <p className="text-sm text-muted mb-6">กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งานบัญชีของคุณอีกครั้ง</p>
+            <h2 className="text-base font-semibold text-ink mb-1">{t('deactivated.title')}</h2>
+            <p className="text-sm text-muted mb-6">{t('deactivated.message')}</p>
             <button
               onClick={signOut}
               className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-full active:scale-95 transition-all"
             >
-              ออกจากระบบ
+              {t('common.signOut')}
             </button>
           </div>
         </div>
@@ -140,14 +143,14 @@ function Layout({ children }: { children: React.ReactNode }) {
               className="flex items-center justify-center gap-1.5 px-3 py-2 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent-hover active:scale-95 transition-all"
             >
               <Plus size={14} />
-              เพิ่ม Placement
+              {t('nav.addPlacement')}
             </Link>
           </div>
 
           <nav className="flex-1 px-3 flex flex-col gap-0.5 overflow-y-auto">
             <NavLink to="/placements" className={navLinkCls}>
               <LayoutList size={15} />
-              รายการ
+              {t('nav.placements')}
             </NavLink>
             <NavLink to="/kols" className={navLinkCls}>
               <BookUser size={15} />
@@ -178,7 +181,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                     </NavLink>
                     <NavLink to="/dashboard/products" className={navLinkCls}>
                       <Boxes size={14} />
-                      สินค้า
+                      {t('nav.dashboardProducts')}
                     </NavLink>
                   </div>
                 )}
@@ -187,7 +190,7 @@ function Layout({ children }: { children: React.ReactNode }) {
             {appUser?.role === 'admin' && (
               <NavLink to="/admin/users" className={navLinkCls}>
                 <Users size={15} />
-                ผู้ใช้
+                {t('nav.users')}
               </NavLink>
             )}
           </nav>
@@ -198,20 +201,21 @@ function Layout({ children }: { children: React.ReactNode }) {
                 <UserAvatar name={appUser.full_name} size={32} />
                 <div className="flex-1 min-w-0">
                   <div className="text-white text-sm font-medium truncate">{appUser.full_name}</div>
-                  <div className="text-white/50 text-[11px] truncate">{ROLE_LABELS[appUser.role] ?? appUser.role}</div>
+                  <div className="text-white/50 text-[11px] truncate">{roleLabel(t, appUser.role)}</div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <LanguageSwitcher openUp />
                   <button
                     onClick={toggleDark}
                     className="text-white/50 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
-                    aria-label="Toggle dark mode"
+                    aria-label={t('common.toggleDarkMode')}
                   >
                     {dark ? <Sun size={14} /> : <Moon size={14} />}
                   </button>
                   <button
                     onClick={signOut}
                     className="text-white/50 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
-                    aria-label="ออกจากระบบ"
+                    aria-label={t('common.signOut')}
                   >
                     <LogOut size={14} />
                   </button>

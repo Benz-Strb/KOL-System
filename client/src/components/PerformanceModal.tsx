@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { PlacementRow } from '../api/index.js';
 import { updatePerformance } from '../api/index.js';
@@ -16,6 +17,7 @@ const labelCls = 'block text-xs font-medium text-muted mb-1 tracking-wide upperc
 type ManualMetric = { vdo_view: string; likes: string; comments: string; saves: string; shares: string };
 
 export default function PerformanceModal({ placement, onClose, onSaved }: Props) {
+  const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
   const platformName = placement.platforms?.name?.toLowerCase() ?? '';
   const isYoutube = platformName === 'youtube';
@@ -74,7 +76,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
       });
       onSaved();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -87,7 +89,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
     >
       <div className={`bg-surface border border-hairline rounded-2xl shadow-2xl w-full max-w-lg transition-all duration-200 ${closed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
-          <h3 className="font-semibold text-ink tracking-tight">บันทึกผลงาน</h3>
+          <h3 className="font-semibold text-ink tracking-tight">{t('performance.title')}</h3>
           <button type="button" onClick={requestClose}
             className="text-muted hover:text-ink hover:bg-canvas rounded-lg p-1 transition-colors">
             <X size={15} />
@@ -111,10 +113,10 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
               </div>
               {placement.payment_type === 'paid' && (
                 <div>
-                  <label className={labelCls}>Pay Amount (บาท)</label>
+                  <label className={labelCls}>Pay Amount ({t('common.currency')})</label>
                   <input type="number" value={form.pay_amount}
                     onChange={e => set('pay_amount', e.target.value)}
-                    placeholder={placement.final_price ? `ตกลง ${Number(placement.final_price).toLocaleString()}` : ''}
+                    placeholder={placement.final_price ? t('performance.agreedPrice', { price: Number(placement.final_price).toLocaleString() }) : ''}
                     className={inputCls} />
                 </div>
               )}
@@ -129,7 +131,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
             {showManualMetrics && (
               <div>
                 <p className="text-xs font-medium text-muted uppercase tracking-wider mb-2">
-                  {isYoutube ? 'YouTube Stats' : 'Lemon8 Stats'} (ไม่บังคับ)
+                  {isYoutube ? 'YouTube Stats' : 'Lemon8 Stats'} {t('performance.optional')}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {isYoutube && (
@@ -185,11 +187,11 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
           <div className="flex gap-2 mt-4">
             <button type="button" onClick={requestClose}
               className="flex-1 px-4 py-2 border border-hairline rounded-full text-sm text-ink hover:bg-canvas active:scale-95 transition-all">
-              ยกเลิก
+              {t('common.cancel')}
             </button>
             <button type="button" onClick={handleSave} disabled={saving}
               className="flex-1 px-4 py-2 bg-accent text-white rounded-full text-sm font-medium hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all">
-              {saving ? 'กำลังบันทึก...' : 'บันทึกผล'}
+              {saving ? t('common.saving') : t('performance.save')}
             </button>
           </div>
         </div>

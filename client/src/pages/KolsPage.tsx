@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, ChevronLeft, ChevronRight, X, Users } from 'lucide-react';
 import { getKolDirectory, getDropdowns, type KolDirectoryRow, type KolBrandRow, type KolPlatformAccount, type Platform, type ContentCategory } from '../api/index.js';
 import KolDetailModal from '../components/KolDetailModal.js';
@@ -8,6 +9,7 @@ import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
 import PlatformLogo from '../components/PlatformLogo.js';
+import { numberLocale } from '../i18n/locale.js';
 
 const LIMIT = 20;
 
@@ -22,6 +24,7 @@ function formatFollower(n: number | null) {
 // hover a brand → shows every product reviewed for that brand, each
 // annotated with which campaign(s) it was reviewed in
 function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [style, setStyle] = useState<React.CSSProperties>({});
   const ref = useRef<HTMLSpanElement>(null);
@@ -53,17 +56,17 @@ function BrandHoverChip({ brand }: { brand: KolBrandRow }) {
         <div style={style} onMouseEnter={show} onMouseLeave={hide}>
           <div className="bg-surface border border-hairline rounded-lg shadow-xl w-60">
             <div className="px-2.5 py-2 border-b border-hairline">
-              <span className="text-ink text-[11px] font-semibold">{brand.brand_name} · สินค้าที่เคยรีวิว</span>
+              <span className="text-ink text-[11px] font-semibold">{brand.brand_name} · {t('kols.reviewedProducts')}</span>
             </div>
             <div className="max-h-56 overflow-y-auto px-2.5 py-2 flex flex-col gap-2 select-text">
               {brand.products.length === 0 ? (
-                <span className="text-muted text-[11px]">ไม่มีข้อมูล</span>
+                <span className="text-muted text-[11px]">{t('kols.noData')}</span>
               ) : brand.products.map(p => (
                 <div key={p.model_code}>
                   <div className="text-ink text-[11px] font-medium leading-snug">{p.model_code}</div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {p.campaigns.length === 0 ? (
-                      <span className="text-muted text-[10px]">ไม่มีแคมเปญ</span>
+                      <span className="text-muted text-[10px]">{t('kols.noCampaign')}</span>
                     ) : p.campaigns.map(c => (
                       <span key={c.code} className="text-muted text-[10px] bg-canvas px-1.5 py-px rounded-md" title={c.label ?? c.code}>
                         {c.code}
@@ -92,7 +95,7 @@ function PlatformBadge({ p }: { p: KolPlatformAccount }) {
   const ref = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const subtitle = [p.handle, p.follower_count ? `${p.follower_count.toLocaleString('th-TH')} followers` : null]
+  const subtitle = [p.handle, p.follower_count ? `${p.follower_count.toLocaleString(numberLocale())} followers` : null]
     .filter(Boolean).join(' · ');
 
   const show = () => {
@@ -154,6 +157,7 @@ function PlatformBadge({ p }: { p: KolPlatformAccount }) {
 
 // ─── KOL Card ─────────────────────────────────────────────────
 function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -193,7 +197,7 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
             {r.follower_count && (
               <span
                 className="inline-flex items-center gap-1 text-[11px] font-medium text-muted tabular-nums bg-canvas border border-hairline px-1.5 py-0.5 rounded-md"
-                title={r.follower_count.toLocaleString('th-TH') + ' followers'}>
+                title={r.follower_count.toLocaleString(numberLocale()) + ' followers'}>
                 <Users size={9} className="shrink-0" />
                 {formatFollower(r.follower_count)}
               </span>
@@ -204,7 +208,7 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
         {/* Platform accounts — one badge per platform this kol has, click opens that platform's profile */}
         {r.platforms.length > 0 && (
           <div>
-            <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">ช่องทางโซเชียล</div>
+            <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">{t('kols.socialChannels')}</div>
             <div className="flex items-center gap-1.5">
               {r.platforms.map(p => <PlatformBadge key={p.platform_id} p={p} />)}
             </div>
@@ -213,7 +217,7 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
 
         {/* Brands reviewed — hover a brand to see products + which campaign */}
         <div className="flex-1">
-          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">แบรนด์ที่เคยรีวิว</div>
+          <div className="text-[10px] font-semibold text-muted uppercase tracking-wider mb-1">{t('kols.brandsReviewed')}</div>
           {r.brands.length === 0 ? (
             <span className="text-muted text-xs">—</span>
           ) : (
@@ -250,6 +254,7 @@ function SkeletonCard() {
 
 // ─── Main Page ────────────────────────────────────────────────
 export default function KolsPage() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<KolDirectoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -272,8 +277,8 @@ export default function KolsPage() {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => { setDebouncedQ(q); setPage(1); }, 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { setDebouncedQ(q); setPage(1); }, 300);
+    return () => clearTimeout(timer);
   }, [q]);
 
   const loadSeq = useRef(0);
@@ -317,7 +322,7 @@ export default function KolsPage() {
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-ink tracking-tight">KOL Directory</h1>
-          <p className="text-sm text-muted mt-0.5">{total.toLocaleString()} KOL ทั้งหมด</p>
+          <p className="text-sm text-muted mt-0.5">{t('kols.totalCount', { count: total })}</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -326,7 +331,7 @@ export default function KolsPage() {
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             <input
               type="text"
-              placeholder="ค้นหา KOL"
+              placeholder={t('placements.searchKol')}
               value={q}
               onChange={e => setQ(e.target.value)}
               className="pl-8 pr-7 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent w-44 transition-colors"
@@ -342,21 +347,21 @@ export default function KolsPage() {
 
           <Select
             size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: 'ทุก Platform' }, ...platforms.map(p => ({ id: p.id, label: p.name }))]}
+            options={[{ id: '', label: t('kols.allPlatform') }, ...platforms.map(p => ({ id: p.id, label: p.name }))]}
             value={platformId}
             onChange={v => { setPlatformId(v); setPage(1); }}
           />
 
           <Select
             size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: 'ทุก Category' }, ...categories.map(c => ({ id: c.id, label: c.name }))]}
+            options={[{ id: '', label: t('kols.allCategory') }, ...categories.map(c => ({ id: c.id, label: c.name }))]}
             value={categoryId}
             onChange={v => { setCategoryId(v); setPage(1); }}
           />
 
           {hasFilters && (
             <button onClick={clearAll} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors">
-              <X size={11} /> ล้างทั้งหมด
+              <X size={11} /> {t('placements.clearAll')}
             </button>
           )}
         </div>
@@ -370,10 +375,10 @@ export default function KolsPage() {
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Users size={36} className="text-muted mb-3" />
-          <p className="text-sm font-medium text-ink">ไม่พบ KOL</p>
-          <p className="text-xs text-muted mt-1">ลองเปลี่ยนเงื่อนไขการค้นหา</p>
+          <p className="text-sm font-medium text-ink">{t('kols.noResults')}</p>
+          <p className="text-xs text-muted mt-1">{t('kols.tryDifferentSearch')}</p>
           {hasFilters && (
-            <button onClick={clearAll} className="mt-4 text-xs text-accent hover:underline">ล้างตัวกรอง</button>
+            <button onClick={clearAll} className="mt-4 text-xs text-accent hover:underline">{t('kols.clearFilters')}</button>
           )}
         </div>
       ) : (
@@ -388,7 +393,7 @@ export default function KolsPage() {
       {totalPages > 1 && (
         <div className="mt-6 flex items-center justify-between gap-3">
           <span className="text-xs text-muted tabular-nums shrink-0">
-            {total.toLocaleString('th-TH')} KOL · หน้า {page}/{totalPages}
+            {t('kols.paginationLabel', { total: total.toLocaleString(numberLocale()), page, totalPages })}
           </span>
           <div className="flex items-center gap-1">
             <button

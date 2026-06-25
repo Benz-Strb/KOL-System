@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase.js';
 import { setAuthToken, setDeactivatedHandler, API_BASE_URL, type AppUser } from '../api/index.js';
 
@@ -19,6 +20,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [session, setSession] = useState<Session | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.status === 403) {
         await supabase.auth.signOut();
         setDeactivated(true);
-        throw new Error('บัญชีนี้ถูกปิดใช้งานแล้ว — กรุณาติดต่อผู้ดูแลระบบ');
+        throw new Error(t('login.deactivatedMessage'));
       }
     } finally {
       setSigningIn(false);

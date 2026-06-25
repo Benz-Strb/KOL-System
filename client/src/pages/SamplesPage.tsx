@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search, X, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import {
   getSamples, createSample, updateSample, deleteSample,
@@ -10,22 +11,17 @@ import { useModalTransition } from '../hooks/useModalTransition.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
+import { numberLocale } from '../i18n/locale.js';
 
 const LIMIT = 25;
 
-const STATUS_LABELS: Record<string, string> = {
-  to_be_shipped: 'รอส่ง',
-  shipped: 'ส่งแล้ว',
-  signed_for: 'รับแล้ว',
-};
+const SAMPLE_STATUSES = ['to_be_shipped', 'shipped', 'signed_for'] as const;
+const RETURN_POLICIES = ['return_required', 'no_return_required'] as const;
+
 const STATUS_COLORS: Record<string, string> = {
   to_be_shipped: 'bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/25',
   shipped: 'bg-blue-100 text-blue-800 ring-1 ring-blue-200 dark:bg-accent/15 dark:text-accent-bright dark:ring-accent/25',
   signed_for: 'bg-green-100 text-green-800 ring-1 ring-green-200 dark:bg-green-500/15 dark:text-green-300 dark:ring-green-500/25',
-};
-const RETURN_LABELS: Record<string, string> = {
-  return_required: 'ต้องคืน',
-  no_return_required: 'ไม่ต้องคืน',
 };
 
 const STATUS_NEXT: Record<string, string> = {
@@ -52,6 +48,7 @@ function CreateSampleModal({
   onClose: () => void;
   onCreated: (s: KolSample) => void;
 }) {
+  const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
   const [kolQuery, setKolQuery] = useState('');
   const [kolResults, setKolResults] = useState<KolResult[]>([]);
@@ -88,17 +85,17 @@ function CreateSampleModal({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!kolQuery.trim() || selectedKol) { setKolResults([]); return; }
     const seq = ++kolSearchSeq.current;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       searchKols(kolQuery).then(r => {
         if (kolSearchSeq.current === seq) setKolResults(r);
       });
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [kolQuery, selectedKol]);
 
   async function handleCreate() {
-    if (!selectedKol) { setError('กรุณาเลือก KOL'); return; }
-    if (!form.brand_id) { setError('กรุณาเลือก Brand'); return; }
+    if (!selectedKol) { setError(t('samples.kolRequired')); return; }
+    if (!form.brand_id) { setError(t('samples.brandRequired')); return; }
     setSaving(true); setError('');
     try {
       const sample = await createSample({
@@ -111,7 +108,7 @@ function CreateSampleModal({
       });
       onCreated(sample);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
+      setError(e instanceof Error ? e.message : t('common.error'));
       setSaving(false);
     }
   }
@@ -128,7 +125,7 @@ function CreateSampleModal({
       <div className={`bg-surface border border-hairline rounded-2xl shadow-2xl w-full max-w-md transition-all duration-200 ${closed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
-          <h3 className="font-semibold text-ink tracking-tight">เพิ่ม Sample</h3>
+          <h3 className="font-semibold text-ink tracking-tight">{t('samples.createTitle')}</h3>
           <button type="button" onClick={requestClose} className="text-muted hover:text-ink p-1 rounded-lg transition-colors">
             <X size={15} />
           </button>
@@ -151,7 +148,7 @@ function CreateSampleModal({
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
                 <input type="text" value={kolQuery} onChange={e => setKolQuery(e.target.value)}
-                  placeholder="ค้นหา KOL..." className={inputCls + ' pl-8'} />
+                  placeholder={t('samples.searchKolPlaceholder')} className={inputCls + ' pl-8'} />
                 {kolResults.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-hairline rounded-lg shadow-lg z-20 overflow-hidden max-h-40 overflow-y-auto">
                     {kolResults.map(k => (
@@ -181,7 +178,7 @@ function CreateSampleModal({
                 </div>
               ) : (
                 <Select
-                  options={[{ id: '', label: 'เลือก Brand *' }, ...availableBrands.map(b => ({ id: b.id, label: b.name }))]}
+                  options={[{ id: '', label: t('samples.selectBrandPlaceholder') }, ...availableBrands.map(b => ({ id: b.id, label: b.name }))]}
                   value={form.brand_id}
                   onChange={handleBrandChange}
                 />
@@ -191,14 +188,14 @@ function CreateSampleModal({
             {/* Product — เปิดได้เมื่อมี brand */}
             <div>
               <label className={labelCls}>
-                สินค้า
+                {t('samples.product')}
                 {loadingProducts && (
                   <span className="ml-1 inline-block w-3 h-3 border border-accent border-t-transparent rounded-full animate-spin align-middle" />
                 )}
               </label>
               <Select
                 options={[
-                  { id: '', label: !form.brand_id ? 'เลือก Brand ก่อน' : loadingProducts ? 'กำลังโหลด...' : 'เลือกสินค้า (ไม่บังคับ)' },
+                  { id: '', label: !form.brand_id ? t('samples.selectBrandFirst') : loadingProducts ? t('common.loading') : t('samples.selectProductOptional') },
                   ...brandProducts.map(p => ({ id: p.id, label: p.model_code })),
                 ]}
                 value={form.product_id}
@@ -206,21 +203,21 @@ function CreateSampleModal({
                 disabled={!form.brand_id || loadingProducts}
               />
               {form.brand_id && !loadingProducts && brandProducts.length === 0 && (
-                <p className="text-[11px] text-muted mt-1">ยังไม่มีสินค้าของ brand นี้</p>
+                <p className="text-[11px] text-muted mt-1">{t('samples.noProductsForBrand')}</p>
               )}
             </div>
             <div>
-              <label className={labelCls}>สถานะเริ่มต้น</label>
+              <label className={labelCls}>{t('samples.initialStatus')}</label>
               <Select
-                options={Object.entries(STATUS_LABELS).map(([k, v]) => ({ id: k, label: v }))}
+                options={SAMPLE_STATUSES.map(k => ({ id: k, label: t(`sampleStatus.${k}`) }))}
                 value={form.sample_status}
                 onChange={v => setForm(f => ({ ...f, sample_status: v }))}
               />
             </div>
             <div>
-              <label className={labelCls}>นโยบายคืน</label>
+              <label className={labelCls}>{t('samples.returnPolicyLabel')}</label>
               <Select
-                options={Object.entries(RETURN_LABELS).map(([k, v]) => ({ id: k, label: v }))}
+                options={RETURN_POLICIES.map(k => ({ id: k, label: t(`returnPolicy.${k}`) }))}
                 value={form.return_policy}
                 onChange={v => setForm(f => ({ ...f, return_policy: v }))}
               />
@@ -228,7 +225,7 @@ function CreateSampleModal({
           </div>
 
           <div>
-            <label className={labelCls}>หมายเหตุ</label>
+            <label className={labelCls}>{t('samples.notes')}</label>
             <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
               placeholder="..." className={inputCls} />
           </div>
@@ -238,11 +235,11 @@ function CreateSampleModal({
           <div className="flex gap-2">
             <button type="button" onClick={requestClose}
               className="flex-1 py-2 border border-hairline rounded-full text-sm text-ink hover:bg-canvas transition-colors">
-              ยกเลิก
+              {t('common.cancel')}
             </button>
             <button type="button" onClick={handleCreate} disabled={saving}
               className="flex-1 py-2 bg-accent text-white rounded-full text-sm font-medium hover:bg-accent-hover disabled:opacity-50 transition-all">
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>
@@ -253,6 +250,7 @@ function CreateSampleModal({
 
 // ─── Main Page ───────────────────────────────────────────────
 export default function SamplesPage() {
+  const { t } = useTranslation();
   const { appUser } = useAuth();
   const [rows, setRows] = useState<KolSample[]>([]);
   const [total, setTotal] = useState(0);
@@ -317,10 +315,10 @@ export default function SamplesPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('ลบ sample นี้?')) return;
+    if (!confirm(t('samples.confirmDelete'))) return;
     await deleteSample(id);
     setRows(prev => prev.filter(r => r.id !== id));
-    setTotal(t => t - 1);
+    setTotal(n => n - 1);
   }
 
   const totalPages = Math.ceil(total / LIMIT);
@@ -330,20 +328,20 @@ export default function SamplesPage() {
       {/* Header + Filters */}
       <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-ink tracking-tight">จัดการ Sample</h1>
-          <p className="text-sm text-muted mt-0.5">{total.toLocaleString()} รายการทั้งหมด</p>
+          <h1 className="text-xl font-bold text-ink tracking-tight">{t('samples.pageTitle')}</h1>
+          <p className="text-sm text-muted mt-0.5">{t('samples.totalCount', { count: total })}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select
             size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: 'ทุกสถานะ' }, ...Object.entries(STATUS_LABELS).map(([k, v]) => ({ id: k, label: v }))]}
+            options={[{ id: '', label: t('samples.allStatus') }, ...SAMPLE_STATUSES.map(k => ({ id: k, label: t(`sampleStatus.${k}`) }))]}
             value={statusFilter}
             onChange={v => { setStatusFilter(v); setPage(1); }}
           />
           {brands.length > 1 && (
             <Select
               size="sm" className="min-w-[140px]"
-              options={[{ id: '', label: 'ทุก Brand' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
+              options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
               value={brandFilter}
               onChange={v => { setBrandFilter(v); setPage(1); }}
             />
@@ -351,13 +349,13 @@ export default function SamplesPage() {
           {(statusFilter || brandFilter) && (
             <button onClick={() => { setStatusFilter(''); setBrandFilter(''); setPage(1); }}
               className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors">
-              <X size={11} /> ล้าง
+              <X size={11} /> {t('samples.clear')}
             </button>
           )}
           <button onClick={() => setShowCreate(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">
             <Plus size={13} />
-            เพิ่ม Sample
+            {t('samples.addSample')}
           </button>
         </div>
       </div>
@@ -369,11 +367,11 @@ export default function SamplesPage() {
             <thead>
               <tr className="border-b border-hairline bg-canvas">
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">KOL</th>
-                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">สินค้า</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">{t('samples.colProduct')}</th>
                 <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">Brand</th>
-                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">สถานะ</th>
-                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">คืน</th>
-                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">วันส่ง / รับ</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">{t('samples.colStatus')}</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">{t('samples.colReturn')}</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">{t('samples.colShippedSigned')}</th>
                 <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider w-8" />
               </tr>
             </thead>
@@ -386,8 +384,8 @@ export default function SamplesPage() {
               {!loading && rows.length === 0 && (
                 <tr><td colSpan={7} className="py-16 text-center">
                   <Package size={28} className="text-muted mx-auto mb-2" />
-                  <p className="text-sm font-medium text-ink">ยังไม่มี sample</p>
-                  <p className="text-xs text-muted mt-1">กด "เพิ่ม Sample" เพื่อเริ่มต้น</p>
+                  <p className="text-sm font-medium text-ink">{t('samples.noSamplesYet')}</p>
+                  <p className="text-xs text-muted mt-1">{t('samples.pressAddToStart')}</p>
                 </td></tr>
               )}
               {!loading && rows.map(r => (
@@ -408,20 +406,20 @@ export default function SamplesPage() {
                     <button
                       onClick={() => handleStatusAdvance(r)}
                       disabled={!STATUS_NEXT[r.sample_status]}
-                      title={STATUS_NEXT[r.sample_status] ? `คลิกเพื่ออัปเป็น "${STATUS_LABELS[STATUS_NEXT[r.sample_status]]}"` : undefined}
+                      title={STATUS_NEXT[r.sample_status] ? t('samples.advanceTo', { status: t(`sampleStatus.${STATUS_NEXT[r.sample_status]}`) }) : undefined}
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium transition-all ${STATUS_COLORS[r.sample_status]} ${STATUS_NEXT[r.sample_status] ? 'cursor-pointer hover:opacity-70 active:scale-95' : 'cursor-default'}`}
                     >
-                      {STATUS_LABELS[r.sample_status] ?? r.sample_status}
+                      {t(`sampleStatus.${r.sample_status}`, { defaultValue: r.sample_status })}
                     </button>
                   </td>
                   <td className="px-3 py-3">
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${r.return_policy === 'return_required' ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/25' : 'bg-canvas text-muted border border-hairline'}`}>
-                      {RETURN_LABELS[r.return_policy] ?? r.return_policy}
+                      {t(`returnPolicy.${r.return_policy}`, { defaultValue: r.return_policy })}
                     </span>
                   </td>
                   <td className="px-3 py-3 text-xs text-muted">
-                    {r.shipped_at && <div>ส่ง {r.shipped_at}</div>}
-                    {r.signed_at && <div>รับ {r.signed_at}</div>}
+                    {r.shipped_at && <div>{t('samples.shippedOn', { date: r.shipped_at })}</div>}
+                    {r.signed_at && <div>{t('samples.signedOn', { date: r.signed_at })}</div>}
                     {!r.shipped_at && !r.signed_at && '—'}
                   </td>
                   <td className="px-3 py-3">
@@ -439,7 +437,7 @@ export default function SamplesPage() {
         {totalPages > 1 && (
           <div className="px-5 py-3 border-t border-hairline flex items-center justify-between gap-3">
             <span className="text-xs text-muted tabular-nums">
-              {total.toLocaleString('th-TH')} รายการ · หน้า {page}/{totalPages}
+              {t('samples.paginationLabel', { total: total.toLocaleString(numberLocale()), page, totalPages })}
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, Plus, Copy, Check, Eye, EyeOff, RefreshCw, Pencil, Tag, X, Check as CheckIcon } from 'lucide-react';
 import {
   getAdminUsers, createAdminUser, updateAdminUser, resetUserPassword,
@@ -11,7 +12,7 @@ import Select from '../components/Select.js';
 import UserAvatar from '../components/UserAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
 import { getCached, setCached } from '../lib/swrCache.js';
-import { ROLE_LABELS } from '../lib/roleLabels.js';
+import { roleLabel } from '../lib/roleLabels.js';
 
 const ROLE_ORDER: Record<string, number> = { admin: 0, manager: 1, marketing: 2 };
 
@@ -33,6 +34,7 @@ function generatePassword() {
 }
 
 function CopyButton({ text, copyKey }: { text: string; copyKey: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   async function handleCopy() {
     await navigator.clipboard.writeText(text);
@@ -41,13 +43,14 @@ function CopyButton({ text, copyKey }: { text: string; copyKey: string }) {
   }
   return (
     <button type="button" onClick={handleCopy}
-      className="text-muted hover:text-accent transition-colors flex-shrink-0" title="คัดลอก" key={copyKey}>
+      className="text-muted hover:text-accent transition-colors flex-shrink-0" title={t('adminUsers.copy')} key={copyKey}>
       {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
     </button>
   );
 }
 
 export default function AdminUsersPage() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [tableLoading, setTableLoading] = useState(true);
@@ -136,7 +139,7 @@ export default function AdminUsersPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreateError('');
-    if (selectedBrandIds.length === 0) { setCreateError('กรุณาเลือกอย่างน้อย 1 แบรนด์'); return; }
+    if (selectedBrandIds.length === 0) { setCreateError(t('adminUsers.brandRequired')); return; }
     setCreateLoading(true);
     try {
       await createAdminUser({ ...form, brand_ids: selectedBrandIds });
@@ -145,7 +148,7 @@ export default function AdminUsersPage() {
       setSelectedBrandIds([]);
       await load();
     } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setCreateError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setCreateLoading(false);
     }
@@ -158,13 +161,13 @@ export default function AdminUsersPage() {
   async function handleToggleUser(user: AdminUser) {
     const next = !user.is_active;
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: next } : u));
-    setToast(`กำลังบันทึก...`);
+    setToast(t('common.saving'));
     try {
       await updateAdminUser(user.id, { is_active: next });
-      setToast(`${user.full_name}: ${next ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}แล้ว`);
+      setToast(`${user.full_name}: ${next ? t('adminUsers.activated') : t('adminUsers.deactivated')}`);
     } catch (err: unknown) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: user.is_active } : u));
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      alert(err instanceof Error ? err.message : t('common.error'));
     }
   }
 
@@ -174,11 +177,11 @@ export default function AdminUsersPage() {
     setResetLoading(true);
     try {
       await resetUserPassword(resetTarget.id, resetPwd);
-      setToast(`รีเซ็ตรหัสผ่านของ ${resetTarget.full_name} แล้ว`);
+      setToast(t('adminUsers.passwordResetFor', { name: resetTarget.full_name }));
       setResetTarget(null);
       setResetPwd('');
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      alert(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setResetLoading(false);
     }
@@ -198,10 +201,10 @@ export default function AdminUsersPage() {
     try {
       const updated = await updateAdminUser(userId, { brand_ids: editingUserBrandIds });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, user_brands: updated.user_brands } : u));
-      setToast('อัปเดตแบรนด์แล้ว');
+      setToast(t('adminUsers.brandsUpdated'));
       setEditingUserBrandsId(null);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      alert(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setSavingUserBrands(false);
     }
@@ -219,9 +222,9 @@ export default function AdminUsersPage() {
       setSelectedBrandIds([]);
       setNewBrandName('');
       setNewBrandLogoUrl('');
-      setToast(`เพิ่มแบรนด์ "${brand.name}" สำเร็จแล้ว`);
+      setToast(t('adminUsers.brandAdded', { name: brand.name }));
     } catch (err: unknown) {
-      setNewBrandError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setNewBrandError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setNewBrandLoading(false);
     }
@@ -243,10 +246,10 @@ export default function AdminUsersPage() {
         ...(logoChanged ? { logo_url: trimmedLogo || null } : {}),
       });
       setBrands(prev => prev.map(b => b.id === updated.id ? updated : b).sort((a, b) => a.name.localeCompare(b.name)));
-      setToast(`บันทึกแบรนด์ "${updated.name}" แล้ว`);
+      setToast(t('adminUsers.brandSaved', { name: updated.name }));
       setEditingBrandId(null);
     } catch (err: unknown) {
-      setToast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setToast(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setEditBrandLoading(false);
     }
@@ -255,13 +258,13 @@ export default function AdminUsersPage() {
   async function handleToggleBrandActive(brand: Brand) {
     const next = !brand.active;
     setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, active: next } : b));
-    setToast(`กำลังบันทึก...`);
+    setToast(t('common.saving'));
     try {
       await updateAdminBrand(brand.id, { active: next });
-      setToast(`${brand.name}: ${next ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}แล้ว`);
+      setToast(`${brand.name}: ${next ? t('adminUsers.activated') : t('adminUsers.deactivated')}`);
     } catch (err: unknown) {
       setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, active: brand.active } : b));
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      alert(err instanceof Error ? err.message : t('common.error'));
     }
   }
 
@@ -276,14 +279,14 @@ export default function AdminUsersPage() {
             <Users size={18} className="text-accent" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-ink tracking-tight">จัดการผู้ใช้</h1>
-            <p className="text-xs text-muted">{users.length} บัญชี</p>
+            <h1 className="text-lg font-semibold text-ink tracking-tight">{t('adminUsers.pageTitle')}</h1>
+            <p className="text-xs text-muted">{t('adminUsers.accountCount', { count: users.length })}</p>
           </div>
         </div>
         <button onClick={openCreate}
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-accent text-white text-xs font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">
           <Plus size={13} />
-          เพิ่มผู้ใช้
+          {t('adminUsers.addUser')}
         </button>
       </div>
 
@@ -296,11 +299,11 @@ export default function AdminUsersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-hairline">
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">ชื่อ</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">อีเมล</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">บทบาท</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">แบรนด์</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">สถานะ</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.colName')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.colEmail')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.colRole')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.colBrand')}</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.colStatus')}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -316,7 +319,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-muted font-mono text-xs">{user.email ?? '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${ROLE_STYLE[user.role] ?? 'bg-canvas text-muted'}`}>
-                      {ROLE_LABELS[user.role] ?? user.role}
+                      {roleLabel(t, user.role)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -372,14 +375,14 @@ export default function AdminUsersPage() {
                           ? 'bg-green-100 text-green-800 ring-1 ring-green-200 dark:bg-green-500/15 dark:text-green-300 dark:ring-green-500/25 hover:opacity-80'
                           : 'bg-canvas text-muted border border-hairline hover:bg-surface'
                       }`}>
-                      {user.is_active ? 'ใช้งาน' : 'ปิด'}
+                      {user.is_active ? t('adminUsers.active') : t('adminUsers.inactive')}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => { setResetTarget(user); setResetPwd(generatePassword()); }}
-                      className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent whitespace-nowrap transition-colors" title="รีเซ็ตรหัสผ่าน">
+                      className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent whitespace-nowrap transition-colors" title={t('adminUsers.resetPassword')}>
                       <RefreshCw size={11} />
-                      รหัสผ่าน
+                      {t('adminUsers.passwordLabel')}
                     </button>
                   </td>
                 </tr>
@@ -396,7 +399,7 @@ export default function AdminUsersPage() {
           <div className="w-72 bg-surface border border-hairline rounded-2xl shadow-xl overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
-              <span className="text-sm font-semibold text-ink">แบรนด์ ({brands.length})</span>
+              <span className="text-sm font-semibold text-ink">{t('adminUsers.brandsPanelTitle', { count: brands.length })}</span>
               <button onClick={() => { setShowBrandsPanel(false); setEditingBrandId(null); }}
                 className="text-muted hover:text-ink transition-colors">
                 <X size={15} />
@@ -406,7 +409,7 @@ export default function AdminUsersPage() {
             {/* Brand list */}
             <div className="max-h-64 overflow-y-auto">
               {brands.length === 0 ? (
-                <p className="text-xs text-muted text-center py-6">ยังไม่มีแบรนด์</p>
+                <p className="text-xs text-muted text-center py-6">{t('adminUsers.noBrandsYet')}</p>
               ) : (
                 brands.map(brand => (
                   <div key={brand.id} className="flex items-center gap-2 px-4 py-2.5 border-b border-hairline last:border-0 hover:bg-canvas transition-colors">
@@ -421,7 +424,7 @@ export default function AdminUsersPage() {
                               if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
                               if (e.key === 'Escape') setEditingBrandId(null);
                             }}
-                            placeholder="ชื่อแบรนด์"
+                            placeholder={t('adminUsers.brandNamePlaceholder')}
                             className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink focus:outline-none focus:ring-2 focus:ring-accent"
                           />
                           <input
@@ -431,7 +434,7 @@ export default function AdminUsersPage() {
                               if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
                               if (e.key === 'Escape') setEditingBrandId(null);
                             }}
-                            placeholder="URL โลโก้ (ไม่บังคับ)"
+                            placeholder={t('adminUsers.logoUrlPlaceholder')}
                             className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
                           />
                         </div>
@@ -456,7 +459,7 @@ export default function AdminUsersPage() {
                               ? 'bg-green-100 text-green-800 ring-1 ring-green-200 dark:bg-green-500/15 dark:text-green-300 dark:ring-green-500/25 hover:opacity-80'
                               : 'bg-canvas text-muted border border-hairline hover:bg-surface'
                           }`}>
-                          {brand.active ? 'เปิด' : 'ปิด'}
+                          {brand.active ? t('adminUsers.brandOn') : t('adminUsers.brandOff')}
                         </button>
                         <button
                           onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name); setEditBrandLogoUrl(brand.logo_url ?? ''); }}
@@ -477,7 +480,7 @@ export default function AdminUsersPage() {
                   type="text"
                   value={newBrandName}
                   onChange={e => { setNewBrandName(e.target.value); setNewBrandError(''); }}
-                  placeholder="ชื่อแบรนด์ใหม่"
+                  placeholder={t('adminUsers.newBrandNamePlaceholder')}
                   className="px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
                 />
                 <div className="flex gap-2">
@@ -485,13 +488,13 @@ export default function AdminUsersPage() {
                     type="text"
                     value={newBrandLogoUrl}
                     onChange={e => setNewBrandLogoUrl(e.target.value)}
-                    placeholder="URL โลโก้ (ไม่บังคับ)"
+                    placeholder={t('adminUsers.logoUrlPlaceholder')}
                     className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
                   />
                   <button type="submit" disabled={!newBrandName.trim() || newBrandLoading}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all shrink-0">
                     <Plus size={11} />
-                    เพิ่ม
+                    {t('adminUsers.add')}
                   </button>
                 </div>
               </form>
@@ -510,54 +513,54 @@ export default function AdminUsersPage() {
           }`}
         >
           <Tag size={15} />
-          แบรนด์
+          {t('adminUsers.brandsFab')}
         </button>
       </div>
 
       {/* Create user modal */}
       {showCreate && (
-        <Modal title="เพิ่มผู้ใช้ใหม่" onClose={() => setShowCreate(false)}>
+        <Modal title={t('adminUsers.createUserTitle')} onClose={() => setShowCreate(false)}>
           {createdInfo ? (
             <div className="space-y-4">
               <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-xl p-4">
-                <p className="text-sm font-medium text-green-800 dark:text-green-400 mb-0.5">สร้างบัญชีสำเร็จ</p>
+                <p className="text-sm font-medium text-green-800 dark:text-green-400 mb-0.5">{t('adminUsers.accountCreated')}</p>
                 <p className="text-sm text-green-700 dark:text-green-500">{createdInfo.name}</p>
                 <p className="text-xs text-green-600 dark:text-green-600 font-mono">{createdInfo.email}</p>
               </div>
               <div>
-                <p className="text-xs text-muted mb-1.5 font-medium uppercase tracking-wide">รหัสผ่านชั่วคราว</p>
+                <p className="text-xs text-muted mb-1.5 font-medium uppercase tracking-wide">{t('adminUsers.tempPassword')}</p>
                 <div className="flex items-center gap-2 bg-canvas border border-hairline rounded-xl px-3 py-2.5">
                   <span className="flex-1 font-mono text-sm text-ink tracking-wider select-all">{createdInfo.password}</span>
                   <CopyButton text={createdInfo.password} copyKey="created" />
                 </div>
-                <p className="text-xs text-muted mt-1.5">ระบบจะบังคับให้เปลี่ยนรหัสผ่านเมื่อล็อกอินครั้งแรก</p>
+                <p className="text-xs text-muted mt-1.5">{t('adminUsers.mustChangeOnLogin')}</p>
               </div>
               <button onClick={() => setShowCreate(false)}
                 className="w-full py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">
-                ปิด
+                {t('common.close')}
               </button>
             </div>
           ) : (
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">อีเมล <span className="text-red-400 normal-case">*</span></label>
+                <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('adminUsers.emailLabel')} <span className="text-red-400 normal-case">*</span></label>
                 <input type="email" value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="user@example.com" className={inputCls} required />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">ชื่อในระบบ <span className="text-red-400 normal-case">*</span></label>
+                <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('adminUsers.nameLabel')} <span className="text-red-400 normal-case">*</span></label>
                 <input type="text" value={form.full_name}
                   onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-                  placeholder="ชื่อ" className={inputCls} required />
+                  placeholder={t('adminUsers.namePlaceholder')} className={inputCls} required />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">บทบาท</label>
+                <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('adminUsers.roleLabel')}</label>
                 <Select
                   options={[
-                    { id: 'marketing', label: 'ทีม Marketing' },
-                    { id: 'manager', label: 'ผู้จัดการ' },
-                    { id: 'admin', label: 'ผู้ดูแลระบบ' },
+                    { id: 'marketing', label: t('roles.marketing') },
+                    { id: 'manager', label: t('roles.manager') },
+                    { id: 'admin', label: t('roles.admin') },
                   ]}
                   value={form.role}
                   onChange={v => setForm(f => ({ ...f, role: v }))}
@@ -565,7 +568,7 @@ export default function AdminUsersPage() {
               </div>
               {brands.filter(b => b.active).length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">แบรนด์ที่เข้าถึงได้ <span className="text-red-400 normal-case">*</span></label>
+                  <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('adminUsers.accessibleBrands')} <span className="text-red-400 normal-case">*</span></label>
                   <div className="flex flex-wrap gap-2">
                     {brands.filter(b => b.active).map(b => (
                       <label key={b.id} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition-all ${
@@ -584,11 +587,11 @@ export default function AdminUsersPage() {
               )}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-medium text-muted tracking-wide uppercase">รหัสผ่านชั่วคราว <span className="text-red-400 normal-case">*</span></label>
+                  <label className="text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.tempPassword')} <span className="text-red-400 normal-case">*</span></label>
                   <button type="button"
                     onClick={() => setForm(f => ({ ...f, password: generatePassword() }))}
                     className="text-xs text-accent hover:text-accent-hover transition-colors">
-                    สุ่มใหม่
+                    {t('adminUsers.regenerate')}
                   </button>
                 </div>
                 <div className="relative">
@@ -613,11 +616,11 @@ export default function AdminUsersPage() {
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={createLoading}
                   className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover disabled:opacity-60 active:scale-95 transition-all">
-                  {createLoading ? 'กำลังสร้าง...' : 'สร้างบัญชี'}
+                  {createLoading ? t('adminUsers.creating') : t('adminUsers.createAccount')}
                 </button>
                 <button type="button" onClick={() => setShowCreate(false)}
                   className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">
-                  ยกเลิก
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>
@@ -627,16 +630,16 @@ export default function AdminUsersPage() {
 
       {/* Reset password modal */}
       {resetTarget && (
-        <Modal title={`รีเซ็ตรหัสผ่าน — ${resetTarget.full_name}`}
+        <Modal title={t('adminUsers.resetPasswordTitle', { name: resetTarget.full_name })}
           onClose={() => { setResetTarget(null); setResetPwd(''); }}>
           <form onSubmit={handleResetPassword} className="space-y-3">
-            <p className="text-sm text-muted">ผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเมื่อล็อกอินครั้งถัดไป</p>
+            <p className="text-sm text-muted">{t('adminUsers.mustChangeNextLogin')}</p>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-muted tracking-wide uppercase">รหัสผ่านใหม่</label>
+                <label className="text-xs font-medium text-muted tracking-wide uppercase">{t('adminUsers.newPasswordLabel')}</label>
                 <button type="button" onClick={() => setResetPwd(generatePassword())}
                   className="text-xs text-accent hover:text-accent-hover transition-colors">
-                  สุ่มใหม่
+                  {t('adminUsers.regenerate')}
                 </button>
               </div>
               <div className="flex items-center gap-2 bg-canvas border border-hairline rounded-xl px-3 py-2.5">
@@ -647,11 +650,11 @@ export default function AdminUsersPage() {
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={resetLoading}
                 className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover disabled:opacity-60 active:scale-95 transition-all">
-                {resetLoading ? 'กำลังรีเซ็ต...' : 'รีเซ็ตรหัสผ่าน'}
+                {resetLoading ? t('adminUsers.resetting') : t('adminUsers.resetPassword')}
               </button>
               <button type="button" onClick={() => { setResetTarget(null); setResetPwd(''); }}
                 className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">
-                ยกเลิก
+                {t('common.cancel')}
               </button>
             </div>
           </form>

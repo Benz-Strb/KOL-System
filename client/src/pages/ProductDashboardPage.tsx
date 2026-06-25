@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TrendingUp, ShoppingCart, ListChecks, Layers, X, Trophy, Image as ImageIcon, Download } from 'lucide-react';
 import {
   getProductDashboard, getDropdowns, exportProductDashboard,
@@ -7,9 +8,10 @@ import {
 import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
 import { getCached, setCached } from '../lib/swrCache.js';
+import { numberLocale } from '../i18n/locale.js';
 
 function formatMoney(n: number) {
-  return '฿' + Math.round(n).toLocaleString('th-TH');
+  return '฿' + Math.round(n).toLocaleString(numberLocale());
 }
 
 function ProductImage({ url }: { url: string | null }) {
@@ -81,7 +83,7 @@ function ProductRow({ p, rank, sortMode }: { p: ProductRankRow; rank: number; so
       </div>
       <span className="text-xs text-muted tabular-nums shrink-0">{p.placement_count} placement</span>
       {sortMode === 'orders' && (
-        <span className="text-xs font-semibold text-emerald-600 tabular-nums w-24 text-right shrink-0">{p.total_orders.toLocaleString('th-TH')} orders</span>
+        <span className="text-xs font-semibold text-emerald-600 tabular-nums w-24 text-right shrink-0">{p.total_orders.toLocaleString(numberLocale())} orders</span>
       )}
       <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(p.total_gmv)}</span>
     </div>
@@ -89,6 +91,7 @@ function ProductRow({ p, rank, sortMode }: { p: ProductRankRow; rank: number; so
 }
 
 export default function ProductDashboardPage() {
+  const { t } = useTranslation();
   const [data, setData] = useState<ProductDashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -108,7 +111,7 @@ export default function ProductDashboardPage() {
     try {
       await exportProductDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo });
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : 'ดาวน์โหลดไม่สำเร็จ');
+      setExportError(e instanceof Error ? e.message : t('download.failed'));
     } finally {
       setExporting(false);
     }
@@ -149,28 +152,38 @@ export default function ProductDashboardPage() {
 
   return (
     <div className="px-6 py-6 max-w-screen-xl mx-auto">
-      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold text-ink tracking-tight">Dashboard สินค้า</h1>
-          <p className="text-sm text-muted mt-0.5">Ranking สินค้าทุกรุ่นตามผลงานที่ทำได้จริง</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <div>
+            <h1 className="text-xl font-bold text-ink tracking-tight">{t('productDashboard.title')}</h1>
+            <p className="text-sm text-muted mt-0.5">{t('productDashboard.subtitle')}</p>
+          </div>
+
+          <button
+            onClick={handleExport}
+            disabled={exporting || loading || !data}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all whitespace-nowrap shadow-sm"
+          >
+            <Download size={12} /> {exporting ? t('common.loading') : 'Export Excel'}
+          </button>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <Select
             size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
+            options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
             value={brandId}
             onChange={setBrandId}
           />
           <Select
             size="sm" className="min-w-[180px]"
-            options={[{ id: '', label: 'ทุกแคมเปญ' }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
+            options={[{ id: '', label: t('placements.allCampaigns') }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
             value={campaignId}
             onChange={setCampaignId}
           />
           <Select
             size="sm" className="min-w-[160px]"
-            options={[{ id: '', label: 'ทุกหมวดหมู่' }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
+            options={[{ id: '', label: t('dashboard.allCategories') }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
             value={categoryId}
             onChange={setCategoryId}
           />
@@ -178,23 +191,13 @@ export default function ProductDashboardPage() {
           <div className="w-px h-4 bg-hairline shrink-0" />
 
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} max={dateTo || undefined} className={selectCls} />
-          <span className="text-xs text-muted">ถึง</span>
+          <span className="text-xs text-muted">{t('dashboard.to')}</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || undefined} className={selectCls} />
           {(dateFrom || dateTo) && (
             <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors">
-              <X size={11} /> ล้างวันที่
+              <X size={11} /> {t('dashboard.clearDate')}
             </button>
           )}
-
-          <div className="w-px h-4 bg-hairline shrink-0" />
-
-          <button
-            onClick={handleExport}
-            disabled={exporting || loading || !data}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-hairline text-ink hover:border-accent/40 hover:text-accent disabled:opacity-50 transition-colors"
-          >
-            <Download size={12} /> {exporting ? 'กำลังดาวน์โหลด...' : 'Export Excel'}
-          </button>
         </div>
       </div>
 
@@ -215,34 +218,34 @@ export default function ProductDashboardPage() {
       ) : (
         <div className="flex flex-col gap-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard icon={<TrendingUp size={13} />} label="GMV รวม" value={formatMoney(data.summary.total_gmv)} />
-            <KpiCard icon={<ShoppingCart size={13} />} label="Orders รวม" value={data.summary.total_orders.toLocaleString('th-TH')} />
-            <KpiCard icon={<ListChecks size={13} />} label="Placement ทั้งหมด" value={data.summary.total_placements.toLocaleString('th-TH')} />
-            <KpiCard icon={<Layers size={13} />} label="สินค้าที่มีผลงาน" value={data.summary.product_count.toLocaleString('th-TH')} />
+            <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
+            <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
+            <KpiCard icon={<ListChecks size={13} />} label={t('dashboard.totalPlacements')} value={data.summary.total_placements.toLocaleString(numberLocale())} />
+            <KpiCard icon={<Layers size={13} />} label={t('productDashboard.productsWithSales')} value={data.summary.product_count.toLocaleString(numberLocale())} />
           </div>
 
           <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-                <Trophy size={14} className="text-accent" /> Ranking สินค้า
+                <Trophy size={14} className="text-accent" /> {t('productDashboard.rankingTitle')}
               </h2>
               <div className="flex items-center gap-1 bg-canvas rounded-lg p-1">
                 <button
                   onClick={() => setSortMode('gmv')}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${sortMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                 >
-                  ตาม GMV
+                  {t('dashboard.byGmv')}
                 </button>
                 <button
                   onClick={() => setSortMode('orders')}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${sortMode === 'orders' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                 >
-                  ตาม Orders
+                  {t('productDashboard.byOrders')}
                 </button>
               </div>
             </div>
             {ranking.length === 0 ? (
-              <p className="text-sm text-muted">ยังไม่มีข้อมูล</p>
+              <p className="text-sm text-muted">{t('dashboard.noData')}</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {ranking.map((p, i) => (

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { PlacementRow, PlacementMetric } from '../api/index.js';
 import { getPlacementMetrics } from '../api/index.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
+import { numberLocale } from '../i18n/locale.js';
 
 type Props = { placement: PlacementRow; onClose: () => void; };
 
@@ -19,8 +21,8 @@ function fmt(val: string | number | null | undefined, type: 'int' | 'thb' = 'int
   if (val == null) return '—';
   const n = Number(val);
   if (isNaN(n)) return '—';
-  if (type === 'thb') return n.toLocaleString('th-TH', { maximumFractionDigits: 0 }) + ' ฿';
-  return n.toLocaleString('th-TH');
+  if (type === 'thb') return n.toLocaleString(numberLocale(), { maximumFractionDigits: 0 }) + ' ฿';
+  return n.toLocaleString(numberLocale());
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -49,7 +51,7 @@ function ChannelCard({ metric }: { metric: PlacementMetric }) {
           )}
           {metric.measured_at && (
             <span className="text-xs text-muted">
-              {new Date(metric.measured_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+              {new Date(metric.measured_at).toLocaleDateString(numberLocale(), { day: 'numeric', month: 'short' })}
             </span>
           )}
         </div>
@@ -93,6 +95,7 @@ function ChannelCard({ metric }: { metric: PlacementMetric }) {
 }
 
 export default function MetricsViewModal({ placement, onClose }: Props) {
+  const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
   const [metrics, setMetrics] = useState<PlacementMetric[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +117,7 @@ export default function MetricsViewModal({ placement, onClose }: Props) {
     >
       <div className={`bg-surface border border-hairline rounded-2xl shadow-2xl w-full max-w-lg transition-all duration-200 ${closed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
-          <h3 className="font-semibold text-ink tracking-tight">ผลลัพธ์</h3>
+          <h3 className="font-semibold text-ink tracking-tight">{t('metricsView.title')}</h3>
           <button type="button" onClick={requestClose}
             className="text-muted hover:text-ink hover:bg-canvas rounded-lg p-1 transition-colors">
             <X size={15} />
@@ -133,7 +136,7 @@ export default function MetricsViewModal({ placement, onClose }: Props) {
               <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </div>
           ) : metrics.length === 0 ? (
-            <p className="text-sm text-muted text-center py-8">ยังไม่มีข้อมูลผลลัพธ์</p>
+            <p className="text-sm text-muted text-center py-8">{t('metricsView.noData')}</p>
           ) : (
             <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-0.5">
               {metrics.map(m => <ChannelCard key={m.id} metric={m} />)}
@@ -143,7 +146,7 @@ export default function MetricsViewModal({ placement, onClose }: Props) {
           <div className="mt-4">
             <button type="button" onClick={requestClose}
               className="w-full px-4 py-2 border border-hairline rounded-full text-sm text-ink hover:bg-canvas active:scale-95 transition-all">
-              ปิด
+              {t('common.close')}
             </button>
           </div>
         </div>

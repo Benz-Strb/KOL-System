@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
@@ -14,6 +15,7 @@ import KolTrendModal from '../components/KolTrendModal.js';
 import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
 import { getCached, setCached } from '../lib/swrCache.js';
+import { numberLocale } from '../i18n/locale.js';
 
 const HOVER_EXPAND_DELAY = 400;
 
@@ -58,7 +60,7 @@ function RankAvatar({ handle, avatarUrl }: { handle: string; avatarUrl: string |
 }
 
 function formatMoney(n: number) {
-  return '฿' + Math.round(n).toLocaleString('th-TH');
+  return '฿' + Math.round(n).toLocaleString(numberLocale());
 }
 
 function formatAxisMoney(n: number) {
@@ -87,6 +89,7 @@ function MetricBenchmarkCard({
   formatValue: (v: number) => string;
   onSelectKol: (kolId: number) => void;
 }) {
+  const { t } = useTranslation();
   const [input, setInput] = useState('');
   const value = Number(input);
   const tolerancePercent = Math.round(BAND_TOLERANCE * 100);
@@ -109,7 +112,7 @@ function MetricBenchmarkCard({
       </h2>
       <p className="text-[11px] text-muted mb-3">{description(tolerancePercent)}</p>
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-muted shrink-0">ค่าที่จะเทียบ</span>
+        <span className="text-xs text-muted shrink-0">{t('dashboard.compareValueLabel')}</span>
         <div className="relative">
           <input
             type="number" min="0" step={step}
@@ -123,16 +126,16 @@ function MetricBenchmarkCard({
       </div>
 
       {value <= 0 ? (
-        <p className="text-sm text-muted">กรอกค่าด้านบนเพื่อเทียบกับ KOL ที่เคยมีค่าใกล้เคียงกัน</p>
+        <p className="text-sm text-muted">{t('dashboard.enterValueHint')}</p>
       ) : bandKols.length === 0 ? (
-        <p className="text-sm text-muted">ไม่พบ KOL ที่เคยมีค่าใกล้เคียง {formatValue(value)} (±{tolerancePercent}%)</p>
+        <p className="text-sm text-muted">{t('dashboard.noKolNear', { value: formatValue(value), pct: tolerancePercent })}</p>
       ) : (
         <>
           <div className="flex items-center justify-between gap-3 mb-2 px-1">
             <span className="text-xs text-muted">
-              พบ {bandKols.length} คน ในช่วง {formatValue(value * (1 - BAND_TOLERANCE))}–{formatValue(value * (1 + BAND_TOLERANCE))}
+              {t('dashboard.foundInRange', { count: bandKols.length, low: formatValue(value * (1 - BAND_TOLERANCE)), high: formatValue(value * (1 + BAND_TOLERANCE)) })}
             </span>
-            <span className="text-xs text-ink font-semibold shrink-0">เฉลี่ย GMV ช่วงนี้: <span className="font-mono">{formatMoney(bandAvgGmv ?? 0)}</span></span>
+            <span className="text-xs text-ink font-semibold shrink-0">{t('dashboard.avgGmvInRange')} <span className="font-mono">{formatMoney(bandAvgGmv ?? 0)}</span></span>
           </div>
           <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
             {bandKols.map((k, i) => (
@@ -159,6 +162,7 @@ function MetricBenchmarkCard({
 }
 
 function ChannelTooltip({ active, payload }: TooltipContentProps) {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload as DashboardChannelRow | undefined;
   if (!row) return null;
@@ -176,7 +180,7 @@ function ChannelTooltip({ active, payload }: TooltipContentProps) {
         <span className="ml-auto font-semibold text-ink tabular-nums">{formatMoney(row.gmv)}</span>
       </div>
       {campaigns.length === 0 ? (
-        <div className="text-muted py-0.5">ไม่มีข้อมูลแคมเปญ</div>
+        <div className="text-muted py-0.5">{t('dashboard.noCampaignData')}</div>
       ) : (
         <div className="flex flex-col gap-2">
           {visible.map(c => {
@@ -184,7 +188,7 @@ function ChannelTooltip({ active, payload }: TooltipContentProps) {
             return (
               <div key={c.campaign_id ?? 'none'} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-ink truncate">{c.code ?? 'ไม่มีแคมเปญ'}</span>
+                  <span className="text-ink truncate">{c.code ?? t('kolTrend.noCampaign')}</span>
                   <span className="text-muted tabular-nums shrink-0">{formatMoney(c.gmv)}</span>
                 </div>
                 <div className="h-1 rounded-full bg-canvas overflow-hidden">
@@ -195,7 +199,7 @@ function ChannelTooltip({ active, payload }: TooltipContentProps) {
           })}
           {rest.length > 0 && (
             <div className="flex items-center justify-between gap-3 pt-1.5 border-t border-hairline text-muted">
-              <span>อีก {rest.length} แคมเปญ</span>
+              <span>{t('dashboard.moreCampaigns', { count: rest.length })}</span>
               <span className="tabular-nums">{formatMoney(restTotal)}</span>
             </div>
           )}
@@ -206,6 +210,7 @@ function ChannelTooltip({ active, payload }: TooltipContentProps) {
 }
 
 function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: number; mode: 'gmv' | 'roi'; onSelect: (kolId: number) => void }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -222,7 +227,7 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
       onClick={() => onSelect(k.kol_id)}
-      title="คลิกเพื่อดูเทรนด์ผลงานของ KOL คนนี้"
+      title={t('dashboard.clickToViewTrend')}
       className={`rounded-lg border transition-all duration-200 cursor-pointer ${
         expanded
           ? 'relative z-20 scale-[1.05] shadow-xl bg-surface border-accent/40'
@@ -265,6 +270,7 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
 }
 
 function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<KolResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -276,7 +282,7 @@ function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!query) { setResults([]); return; }
     const seq = ++searchSeq.current;
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setLoading(true);
       try {
         const r = await searchKols(query);
@@ -286,7 +292,7 @@ function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
         if (searchSeq.current === seq) setLoading(false);
       }
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [query]);
 
   useEffect(() => {
@@ -309,7 +315,7 @@ function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
       <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
       <input
         type="text"
-        placeholder="ค้นหา KOL คนอื่น (ไม่ติด Top 10)..."
+        placeholder={t('dashboard.searchOtherKol')}
         value={query}
         onChange={e => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
@@ -317,8 +323,8 @@ function KolSearchBox({ onSelect }: { onSelect: (kolId: number) => void }) {
       />
       {open && query && (
         <div className="absolute z-30 right-0 w-72 mt-1.5 bg-surface border border-hairline rounded-xl shadow-xl max-h-64 overflow-y-auto">
-          {loading && <div className="px-3 py-3 text-sm text-muted">กำลังค้นหา...</div>}
-          {!loading && results.length === 0 && <div className="px-3 py-3 text-sm text-muted">ไม่พบ KOL</div>}
+          {loading && <div className="px-3 py-3 text-sm text-muted">{t('kolPicker.searching')}</div>}
+          {!loading && results.length === 0 && <div className="px-3 py-3 text-sm text-muted">{t('kolPicker.noResults')}</div>}
           {!loading && results.map(kol => (
             <button
               key={kol.id}
@@ -400,6 +406,7 @@ function SkeletonKolRow() {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { appUser } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -415,13 +422,14 @@ export default function DashboardPage() {
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tools'>('overview');
 
   async function handleExport() {
     setExporting(true); setExportError('');
     try {
       await exportDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo });
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : 'ดาวน์โหลดไม่สำเร็จ');
+      setExportError(e instanceof Error ? e.message : t('download.failed'));
     } finally {
       setExporting(false);
     }
@@ -458,33 +466,43 @@ export default function DashboardPage() {
 
   const rankedKols = data ? (rankMode === 'gmv' ? data.topKolsByGmv : data.topKolsByRoi) : [];
   const campaignTrendData = data
-    ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? 'ไม่มีแคมเปญ' }))
+    ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? t('kolTrend.noCampaign') }))
     : [];
 
   return (
     <div className="px-6 py-6 max-w-screen-xl mx-auto">
-      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold text-ink tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted mt-0.5">สรุปผลงาน KOL{appUser?.role === 'manager' ? ' (manager view)' : ''}</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <div>
+            <h1 className="text-xl font-bold text-ink tracking-tight">Dashboard</h1>
+            <p className="text-sm text-muted mt-0.5">{t('dashboard.subtitle')}{appUser?.role === 'manager' ? ' (manager view)' : ''}</p>
+          </div>
+
+          <button
+            onClick={handleExport}
+            disabled={exporting || loading || !data}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all whitespace-nowrap shadow-sm"
+          >
+            <Download size={12} /> {exporting ? t('common.loading') : 'Export Excel'}
+          </button>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <Select
             size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
+            options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
             value={brandId}
             onChange={setBrandId}
           />
           <Select
             size="sm" className="min-w-[180px]"
-            options={[{ id: '', label: 'ทุกแคมเปญ' }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
+            options={[{ id: '', label: t('placements.allCampaigns') }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
             value={campaignId}
             onChange={setCampaignId}
           />
           <Select
             size="sm" className="min-w-[160px]"
-            options={[{ id: '', label: 'ทุกหมวดหมู่' }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
+            options={[{ id: '', label: t('dashboard.allCategories') }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
             value={categoryId}
             onChange={setCategoryId}
           />
@@ -492,75 +510,85 @@ export default function DashboardPage() {
           <div className="w-px h-4 bg-hairline shrink-0" />
 
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} max={dateTo || undefined} className={selectCls} />
-          <span className="text-xs text-muted">ถึง</span>
+          <span className="text-xs text-muted">{t('dashboard.to')}</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || undefined} className={selectCls} />
           {(dateFrom || dateTo) && (
             <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors">
-              <X size={11} /> ล้างวันที่
+              <X size={11} /> {t('dashboard.clearDate')}
             </button>
           )}
-
-          <div className="w-px h-4 bg-hairline shrink-0" />
-
-          <button
-            onClick={handleExport}
-            disabled={exporting || loading || !data}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-hairline text-ink hover:border-accent/40 hover:text-accent disabled:opacity-50 transition-colors"
-          >
-            <Download size={12} /> {exporting ? 'กำลังดาวน์โหลด...' : 'Export Excel'}
-          </button>
         </div>
       </div>
 
       {exportError && <Toast message={exportError} onClose={() => setExportError('')} />}
 
+      <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 mb-6 w-fit">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+        >
+          {t('dashboard.tabOverview')}
+        </button>
+        <button
+          onClick={() => setActiveTab('tools')}
+          className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'tools' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+        >
+          {t('dashboard.tabTools')}
+        </button>
+      </div>
+
       {loading || !data ? (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)}
-          </div>
+        activeTab === 'overview' ? (
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)}
+            </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SkeletonChart />
-            <SkeletonChart />
-          </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <SkeletonChart />
+              <SkeletonChart />
+            </div>
 
-          <div className="bg-surface border border-hairline rounded-xl p-5">
-            <div className="h-3.5 bg-canvas rounded-md w-52 mb-4 animate-pulse" />
-            <div className="flex flex-col gap-1">
-              {Array.from({ length: 10 }).map((_, i) => <SkeletonKolRow key={i} />)}
+            <div className="bg-surface border border-hairline rounded-xl p-5">
+              <div className="h-3.5 bg-canvas rounded-md w-52 mb-4 animate-pulse" />
+              <div className="flex flex-col gap-1">
+                {Array.from({ length: 10 }).map((_, i) => <SkeletonKolRow key={i} />)}
+              </div>
             </div>
           </div>
-
-          <SkeletonChart />
-        </div>
-      ) : (
+        ) : (
+          <div className="flex flex-col gap-6">
+            <SkeletonChart />
+            <SkeletonChart />
+          </div>
+        )
+      ) : activeTab === 'overview' ? (
         <div className="flex flex-col gap-6">
           {/* KPI cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard icon={<TrendingUp size={13} />} label="GMV รวม" value={formatMoney(data.summary.total_gmv)} />
-            <KpiCard icon={<Wallet size={13} />} label="ค่าใช้จ่าย KOL" value={formatMoney(data.summary.total_spend)} />
+            <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
+            <KpiCard icon={<Wallet size={13} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
             <KpiCard icon={<Megaphone size={13} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
             <KpiCard
               icon={<Gauge size={13} />}
-              label="ROI รวม (รวม Ads Cost)"
+              label={t('dashboard.totalRoi')}
               value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
             />
             <KpiCard
               icon={<ListChecks size={13} />}
-              label="Placement ทั้งหมด"
-              value={data.summary.total_placements.toLocaleString('th-TH')}
-              sub={`โพสต์แล้ว ${data.summary.posted_count} · วางแผน ${data.summary.planned_count} · ยกเลิก ${data.summary.cancelled_count}`}
+              label={t('dashboard.totalPlacements')}
+              value={data.summary.total_placements.toLocaleString(numberLocale())}
+              sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
             />
-            <KpiCard icon={<ShoppingCart size={13} />} label="Orders รวม" value={data.summary.total_orders.toLocaleString('th-TH')} />
+            <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
           </div>
 
           {/* Channel breakdown + campaign trend */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-surface border border-hairline rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-ink mb-4">GMV แยกตามช่องทาง</h2>
+              <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvByChannel')}</h2>
               {data.channelBreakdown.length === 0 ? (
-                <p className="text-sm text-muted">ยังไม่มีข้อมูล GMV</p>
+                <p className="text-sm text-muted">{t('dashboard.noGmvData')}</p>
               ) : (
                 <div className="flex items-center gap-2">
                   <div className="w-44 h-44 shrink-0">
@@ -590,7 +618,7 @@ export default function DashboardPage() {
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
                         <span className="font-medium text-ink shrink-0 w-16 truncate">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
                         <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(c.gmv)}</span>
-                        <span className="w-20 text-right text-muted tabular-nums font-mono shrink-0">{c.orders.toLocaleString('th-TH')} orders</span>
+                        <span className="w-20 text-right text-muted tabular-nums font-mono shrink-0">{c.orders.toLocaleString(numberLocale())} orders</span>
                       </div>
                     ))}
                   </div>
@@ -599,9 +627,9 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-surface border border-hairline rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-ink mb-4">GMV vs ค่าใช้จ่าย ต่อแคมเปญ</h2>
+              <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvVsSpendByCampaign')}</h2>
               {campaignTrendData.length === 0 ? (
-                <p className="text-sm text-muted">ยังไม่มีข้อมูล</p>
+                <p className="text-sm text-muted">{t('dashboard.noData')}</p>
               ) : (
                 <ResponsiveContainer width="100%" height={224}>
                   <BarChart data={campaignTrendData} margin={{ left: -16 }}>
@@ -611,9 +639,9 @@ export default function DashboardPage() {
                     <Tooltip
                       contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
                       labelStyle={{ color: 'var(--ink)' }}
-                      formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย']}
+                      formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
                     />
-                    <Legend formatter={(v: string) => (v === 'gmv' ? 'GMV' : 'ค่าใช้จ่าย')} wrapperStyle={{ fontSize: 11 }} />
+                    <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
                     <Bar dataKey="gmv" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={500} />
                     <Bar dataKey="spend" fill="#f97316" radius={[4, 4, 0, 0]} animationDuration={500} />
                   </BarChart>
@@ -626,10 +654,10 @@ export default function DashboardPage() {
           <div className="bg-surface border border-hairline rounded-xl p-5">
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-                <Trophy size={14} className="text-accent" /> Ranking KOL (Top 10)
+                <Trophy size={14} className="text-accent" /> {t('dashboard.rankingTitle')}
                 {categoryId && (
                   <span className="text-xs font-normal text-muted">
-                    — เทียบเฉพาะหมวด {categories.find(c => String(c.id) === categoryId)?.name ?? ''}
+                    {t('dashboard.compareWithinCategory', { category: categories.find(c => String(c.id) === categoryId)?.name ?? '' })}
                   </span>
                 )}
               </h2>
@@ -640,22 +668,22 @@ export default function DashboardPage() {
                     onClick={() => setRankMode('gmv')}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                   >
-                    ตาม GMV
+                    {t('dashboard.byGmv')}
                   </button>
                   <button
                     onClick={() => setRankMode('roi')}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                   >
-                    ตาม ROI
+                    {t('dashboard.byRoi')}
                   </button>
                 </div>
               </div>
             </div>
             {rankMode === 'roi' && (
-              <p className="text-[11px] text-muted mb-3">ROI = GMV ÷ ค่าใช้จ่าย KOL (ไม่รวม Ads Cost) — เรียงเฉพาะ KOL ที่มีค่าใช้จ่ายบันทึกไว้ ใช้ดูว่าใครคุ้มจ้างต่อมากที่สุด</p>
+              <p className="text-[11px] text-muted mb-3">{t('dashboard.roiExplain')}</p>
             )}
             {rankedKols.length === 0 ? (
-              <p className="text-sm text-muted">ยังไม่มีข้อมูล{rankMode === 'roi' ? ' (ต้องมีค่าใช้จ่ายบันทึกไว้)' : 'GMV'}</p>
+              <p className="text-sm text-muted">{rankMode === 'roi' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {rankedKols.map((k, i) => (
@@ -664,12 +692,14 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
           <MetricBenchmarkCard
-            title="เทียบเรทราคากับ GMV ที่เคยทำได้"
-            description={pct => `กรอกราคาที่จะจ้าง ระบบจะหา KOL ที่เคยได้ราคาใกล้เคียงกัน (±${pct}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนต่อรอง/จ้างจริง`}
-            unitSuffix="บาท"
-            placeholder="เช่น 30000"
+            title={t('dashboard.priceBenchmarkTitle')}
+            description={pct => t('dashboard.priceBenchmarkDesc', { pct })}
+            unitSuffix={t('common.currency')}
+            placeholder={t('dashboard.priceBenchmarkPlaceholder')}
             step={1000}
             kolValueList={data.kolValueList}
             getValue={k => (k.placement_count > 0 && k.total_spend > 0) ? k.total_spend / k.placement_count : null}
@@ -678,14 +708,14 @@ export default function DashboardPage() {
           />
 
           <MetricBenchmarkCard
-            title="เทียบ Follower กับ GMV ที่เคยทำได้"
-            description={pct => `กรอกจำนวน Follower ระบบจะหา KOL ที่เคยมี Follower ใกล้เคียงกัน (±${pct}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนเลือก KOL`}
+            title={t('dashboard.followerBenchmarkTitle')}
+            description={pct => t('dashboard.followerBenchmarkDesc', { pct })}
             unitSuffix="Followers"
-            placeholder="เช่น 100000"
+            placeholder={t('dashboard.followerBenchmarkPlaceholder')}
             step={1000}
             kolValueList={data.kolValueList}
             getValue={k => k.follower_count}
-            formatValue={v => Math.round(v).toLocaleString('th-TH')}
+            formatValue={v => Math.round(v).toLocaleString(numberLocale())}
             onSelectKol={setTrendKolId}
           />
         </div>

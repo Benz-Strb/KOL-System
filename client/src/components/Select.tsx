@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Plus } from 'lucide-react';
 
 interface Option { id: string | number; label: string; iconUrl?: string | null; }
@@ -31,14 +32,14 @@ interface Props {
   className?: string;
 }
 
-export function DropdownPanel({ children }: { children: React.ReactNode }) {
+export function DropdownPanel({ children, className = 'w-full mt-1.5 origin-top' }: { children: React.ReactNode; className?: string }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(id);
   }, []);
   return (
-    <div className={`absolute z-20 w-full mt-1.5 bg-surface border border-hairline rounded-2xl shadow-xl flex flex-col max-h-64 overflow-hidden origin-top transition-all duration-150 ease-out ${
+    <div className={`absolute z-20 ${className} bg-surface border border-hairline rounded-2xl shadow-xl flex flex-col max-h-64 overflow-hidden transition-all duration-150 ease-out ${
       visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
     }`}>
       {children}
@@ -47,9 +48,12 @@ export function DropdownPanel({ children }: { children: React.ReactNode }) {
 }
 
 export default function Select({
-  options, value, onChange, placeholder = 'เลือก...', addLabel = 'เพิ่มใหม่', onAddClick, disabled,
+  options, value, onChange, placeholder, addLabel, onAddClick, disabled,
   size = 'md', className = '',
 }: Props) {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t('common.selectPlaceholder');
+  const effectiveAddLabel = addLabel ?? t('common.addNew');
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected = options.find(o => String(o.id) === value);
@@ -85,7 +89,7 @@ export default function Select({
       >
         <span className={`flex items-center gap-1.5 min-w-0 ${selected ? 'text-ink' : 'text-muted'}`}>
           {selected && selected.iconUrl !== undefined && <OptionIcon url={selected.iconUrl} label={selected.label} />}
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
+          <span className="truncate">{selected ? selected.label : effectivePlaceholder}</span>
         </span>
         <ChevronDown size={14} className={`text-muted transition-transform duration-200 flex-shrink-0 ml-1.5 ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -94,7 +98,7 @@ export default function Select({
         <DropdownPanel>
           <div className="overflow-y-auto flex-1">
             {options.length === 0 && (
-              <div className="px-3 py-3 text-sm text-muted">ไม่มีรายการ</div>
+              <div className="px-3 py-3 text-sm text-muted">{t('common.noItems')}</div>
             )}
             {options.map(o => (
               <button
@@ -120,7 +124,7 @@ export default function Select({
               onClick={() => { setOpen(false); onAddClick(); }}
             >
               <Plus size={13} />
-              {addLabel}
+              {effectiveAddLabel}
             </button>
           )}
         </DropdownPanel>

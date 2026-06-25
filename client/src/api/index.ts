@@ -1,3 +1,5 @@
+import i18n from '../i18n/index.js';
+
 export type Platform = { id: number; name: string };
 export type ContentCategory = { id: number; name: string };
 export type ProductCategory = { id: number; name: string };
@@ -480,8 +482,8 @@ async function downloadFile(path: string, filename: string) {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
   const res = await fetch(`${API_BASE_URL}${path}`, { headers: authHeader });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'ดาวน์โหลดไม่สำเร็จ' }));
-    throw new Error(err.error ?? 'ดาวน์โหลดไม่สำเร็จ');
+    const err = await res.json().catch(() => ({ error: i18n.t('download.failed') }));
+    throw new Error(err.error ?? i18n.t('download.failed'));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -593,8 +595,8 @@ export async function downloadImportTemplate(kind: ImportKind, brandId?: number)
   const qs = brandId != null ? `?brand_id=${brandId}` : '';
   const res = await fetch(`${API_BASE_URL}/api/placements/import/template/${kind}${qs}`, { headers: authHeader });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'ดาวน์โหลด template ไม่สำเร็จ' }));
-    throw new Error(err.error ?? 'ดาวน์โหลด template ไม่สำเร็จ');
+    const err = await res.json().catch(() => ({ error: i18n.t('download.templateFailed') }));
+    throw new Error(err.error ?? i18n.t('download.templateFailed'));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

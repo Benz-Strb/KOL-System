@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, X, Plus, Users } from 'lucide-react';
 import { searchKols, createKol, type KolResult, type Platform } from '../api/index.js';
 import Modal from './Modal.js';
@@ -31,6 +32,7 @@ const inputCls = [
 const labelCls = 'block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase';
 
 export default function KolPicker({ value, onChange, platforms, onAdded }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<KolResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -73,7 +75,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
   function clear() { onChange(null); setQuery(''); setShowAddForm(false); }
 
   async function handleAddKol() {
-    if (!newKol.handle.trim()) { setAddError('กรุณากรอก Handle'); return; }
+    if (!newKol.handle.trim()) { setAddError(t('kolPicker.handleRequired')); return; }
     setAddError('');
     try {
       const created = await createKol({
@@ -87,7 +89,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
       setShowAddForm(false); setAddError('');
       setNewKol({ handle: '', gen_name: '', platform_id: '', follower_count: '' });
     } catch (err: unknown) {
-      setAddError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setAddError(err instanceof Error ? err.message : t('common.error'));
     }
   }
 
@@ -118,7 +120,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
         <input
           type="text"
-          placeholder="พิมพ์ชื่อ KOL หรือ handle..."
+          placeholder={t('kolPicker.searchPlaceholder')}
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -130,11 +132,11 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
               {loading && (
                 <div className="px-3 py-3 text-sm text-muted flex items-center gap-2">
                   <div className="w-3 h-3 border border-muted border-t-accent rounded-full animate-spin" />
-                  กำลังค้นหา...
+                  {t('kolPicker.searching')}
                 </div>
               )}
               {!loading && results.length === 0 && (
-                <div className="px-3 py-3 text-sm text-muted">ไม่พบ KOL</div>
+                <div className="px-3 py-3 text-sm text-muted">{t('kolPicker.noResults')}</div>
               )}
               {!loading && results.map(kol => (
                 <button
@@ -165,7 +167,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
                 onClick={() => { setShowAddForm(true); setNewKol(k => ({ ...k, handle: query })); }}
               >
                 <Plus size={13} />
-                เพิ่ม KOL ใหม่{query ? ` "${query}"` : ''}
+                {t('kolPicker.addNewKol')}{query ? ` "${query}"` : ''}
               </button>
             )}
           </DropdownPanel>
@@ -173,7 +175,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
       </div>
 
       {showAddForm && (
-        <Modal title="เพิ่ม KOL ใหม่" onClose={() => { setShowAddForm(false); setAddError(''); setNewKol({ handle: '', gen_name: '', platform_id: '', follower_count: '' }); }}>
+        <Modal title={t('kolPicker.addNewKol')} onClose={() => { setShowAddForm(false); setAddError(''); setNewKol({ handle: '', gen_name: '', platform_id: '', follower_count: '' }); }}>
           <div className="space-y-3">
             <div>
               <label className={labelCls}>Handle / Username <span className="text-red-400 normal-case">*</span></label>
@@ -181,8 +183,8 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
                 onChange={e => setNewKol(k => ({ ...k, handle: e.target.value }))} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>ชื่อจริง / ชื่อที่รู้จัก</label>
-              <input type="text" placeholder="ชื่อ" value={newKol.gen_name}
+              <label className={labelCls}>{t('kolPicker.genName')}</label>
+              <input type="text" placeholder={t('kolPicker.genNamePlaceholder')} value={newKol.gen_name}
                 onChange={e => setNewKol(k => ({ ...k, gen_name: e.target.value }))} className={inputCls} />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -192,7 +194,6 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
                   options={platforms.map(p => ({ id: p.id, label: p.name }))}
                   value={newKol.platform_id}
                   onChange={v => setNewKol(k => ({ ...k, platform_id: v }))}
-                  placeholder="เลือก"
                 />
               </div>
               <div>
@@ -205,11 +206,11 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={handleAddKol}
                 className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">
-                บันทึก
+                {t('common.save')}
               </button>
               <button type="button" onClick={() => { setShowAddForm(false); setAddError(''); setNewKol({ handle: '', gen_name: '', platform_id: '', follower_count: '' }); }}
                 className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">
-                ยกเลิก
+                {t('common.cancel')}
               </button>
             </div>
           </div>

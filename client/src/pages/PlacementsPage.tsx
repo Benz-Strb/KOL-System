@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, Pencil, ClipboardList, BarChart2, ExternalLink, List, TrendingUp } from 'lucide-react';
 import { getPlacements, getKolGmv, getDropdowns, getProducts, type PlacementRow, type KolGmvRow, type Product, type Campaign, type UserOption, type Brand } from '../api/index.js';
 import { useAuth } from '../context/AuthContext.js';
@@ -9,26 +10,33 @@ import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
 import { getPlatformColor } from '../lib/platformColors.js';
 import { getCached, setCached } from '../lib/swrCache.js';
+import { numberLocale } from '../i18n/locale.js';
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'ทุกสถานะ' },
-  { value: 'planned', label: 'Planned' },
-  { value: 'posted', label: 'Posted' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
+function statusOptions(t: (key: string) => string) {
+  return [
+    { value: 'all', label: t('placements.allStatus') },
+    { value: 'planned', label: 'Planned' },
+    { value: 'posted', label: 'Posted' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ];
+}
 
-const TYPE_OPTIONS = [
-  { value: 'all', label: 'ทุกประเภท' },
-  { value: 'online', label: 'Online' },
-  { value: 'offline_shop', label: 'Offline' },
-];
+function typeOptions(t: (key: string) => string) {
+  return [
+    { value: 'all', label: t('placements.allType') },
+    { value: 'online', label: 'Online' },
+    { value: 'offline_shop', label: 'Offline' },
+  ];
+}
 
-const PAYMENT_OPTIONS = [
-  { value: 'all', label: 'ทุก Payment' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'free', label: 'Free' },
-  { value: 'barter', label: 'Barter' },
-];
+function paymentOptions(t: (key: string) => string) {
+  return [
+    { value: 'all', label: t('placements.allPayment') },
+    { value: 'paid', label: 'Paid' },
+    { value: 'free', label: 'Free' },
+    { value: 'barter', label: 'Barter' },
+  ];
+}
 
 const STATUS_STYLE: Record<string, string> = {
   planned: 'bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/25',
@@ -63,12 +71,12 @@ function formatFollower(n: number | null) {
 
 function formatPrice(price: string | null) {
   if (!price) return '—';
-  return Number(price).toLocaleString('th-TH') + ' ฿';
+  return Number(price).toLocaleString(numberLocale()) + ' ฿';
 }
 
 function formatGmv(n: number) {
   if (!n) return '—';
-  return n.toLocaleString('th-TH') + ' ฿';
+  return n.toLocaleString(numberLocale()) + ' ฿';
 }
 
 function SkeletonRow() {
@@ -101,6 +109,7 @@ function SkeletonRow() {
 
 
 export default function PlacementsPage() {
+  const { t } = useTranslation();
   const { appUser } = useAuth();
   const [viewMode, setViewMode] = useState<'list' | 'gmv'>('list');
   const [rows, setRows] = useState<PlacementRow[]>([]);
@@ -142,18 +151,18 @@ export default function PlacementsPage() {
   const [debouncedPriceMax, setDebouncedPriceMax] = useState('');
 
   useEffect(() => {
-    const t = setTimeout(() => { setDebouncedQ(q); setPage(1); }, 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { setDebouncedQ(q); setPage(1); }, 300);
+    return () => clearTimeout(timer);
   }, [q]);
 
   useEffect(() => {
-    const t = setTimeout(() => { setDebouncedPriceMin(priceMin); setPage(1); }, 500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { setDebouncedPriceMin(priceMin); setPage(1); }, 500);
+    return () => clearTimeout(timer);
   }, [priceMin]);
 
   useEffect(() => {
-    const t = setTimeout(() => { setDebouncedPriceMax(priceMax); setPage(1); }, 500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { setDebouncedPriceMax(priceMax); setPage(1); }, 500);
+    return () => clearTimeout(timer);
   }, [priceMax]);
 
   const loadSeq = useRef(0);
@@ -253,12 +262,12 @@ export default function PlacementsPage() {
           <h1 className="text-xl font-bold text-ink tracking-tight">Placements</h1>
           <p className="text-sm text-muted mt-0.5">
             {viewMode === 'list'
-              ? `${total.toLocaleString()} รายการ`
-              : `${kolGmv.length.toLocaleString()} KOL · รวม GMV ${formatGmv(gmvTotal)}`}
+              ? t('placements.totalCount', { count: total })
+              : t('placements.gmvSummary', { count: kolGmv.length, gmv: formatGmv(gmvTotal) })}
           </p>
         </div>
         <div className="flex items-center bg-canvas border border-hairline rounded-xl p-0.5 gap-0.5">
-          {([['list', 'รายการ', List], ['gmv', 'GMV ต่อ KOL', TrendingUp]] as const).map(([val, label, Icon]) => (
+          {([['list', t('placements.viewList'), List], ['gmv', t('placements.viewGmv'), TrendingUp]] as const).map(([val, label, Icon]) => (
             <button key={val} onClick={() => setViewMode(val)}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[9px] text-xs font-medium transition-all ${
                 viewMode === val ? 'bg-surface shadow-sm text-ink border border-hairline' : 'text-muted hover:text-ink'
@@ -277,7 +286,7 @@ export default function PlacementsPage() {
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             <input
               type="text"
-              placeholder="ค้นหา KOL"
+              placeholder={t('placements.searchKol')}
               value={q}
               onChange={e => setQ(e.target.value)}
               className="pl-8 pr-7 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent w-44 transition-colors"
@@ -294,14 +303,14 @@ export default function PlacementsPage() {
           {viewMode === 'list' && (
             <Select
               size="sm" className="min-w-[120px]"
-              options={STATUS_OPTIONS.map(o => ({ id: o.value, label: o.label }))}
+              options={statusOptions(t).map(o => ({ id: o.value, label: o.label }))}
               value={status}
               onChange={v => { setStatus(v); setPage(1); }}
             />
           )}
           <Select
             size="sm" className="min-w-[160px]"
-            options={[{ id: '', label: 'แคมเปญทั้งหมด' }, ...campaigns.map(c => ({ id: c.id, label: c.label ?? c.code }))]}
+            options={[{ id: '', label: t('placements.allCampaigns') }, ...campaigns.map(c => ({ id: c.id, label: c.label ?? c.code }))]}
             value={campaignId}
             onChange={v => { setCampaignId(v); setPage(1); }}
           />
@@ -316,11 +325,11 @@ export default function PlacementsPage() {
               }`}
             >
               <SlidersHorizontal size={12} />
-              กรอง{secondaryActiveCount > 0 ? ` (${secondaryActiveCount})` : ''}
+              {t('placements.filterButton')}{secondaryActiveCount > 0 ? ` (${secondaryActiveCount})` : ''}
             </button>
             {hasActiveFilters && (
               <button onClick={clearAll} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors whitespace-nowrap">
-                <X size={11} /> ล้างทั้งหมด
+                <X size={11} /> {t('placements.clearAll')}
               </button>
             )}
           </div>
@@ -333,13 +342,13 @@ export default function PlacementsPage() {
               <>
                 <Select
                   size="sm" className="min-w-[110px]"
-                  options={TYPE_OPTIONS.map(o => ({ id: o.value, label: o.label }))}
+                  options={typeOptions(t).map(o => ({ id: o.value, label: o.label }))}
                   value={type}
                   onChange={v => { setType(v); setPage(1); }}
                 />
                 <Select
                   size="sm" className="min-w-[110px]"
-                  options={PAYMENT_OPTIONS.map(o => ({ id: o.value, label: o.label }))}
+                  options={paymentOptions(t).map(o => ({ id: o.value, label: o.label }))}
                   value={paymentType}
                   onChange={v => { setPaymentType(v); setPage(1); }}
                 />
@@ -347,15 +356,15 @@ export default function PlacementsPage() {
             )}
             <Select
               size="sm" className="min-w-[150px]"
-              options={[{ id: '', label: 'สินค้าทั้งหมด' }, ...products.map(p => ({ id: p.id, label: p.model_code }))]}
+              options={[{ id: '', label: t('placements.allProducts') }, ...products.map(p => ({ id: p.id, label: p.model_code }))]}
               value={productId}
               onChange={v => { setProductId(v); setPage(1); }}
             />
             <Select
               size="sm" className="min-w-[170px]"
               options={[
-                { id: '', label: 'Person In Charge ทั้งหมด' },
-                ...users.map(u => ({ id: u.id, label: `${u.full_name}${u.is_active ? '' : ' (ปิดใช้งาน)'}` })),
+                { id: '', label: t('placements.allPic') },
+                ...users.map(u => ({ id: u.id, label: `${u.full_name}${u.is_active ? '' : t('placements.deactivatedSuffix')}` })),
               ]}
               value={picId}
               onChange={v => { setPicId(v); setPage(1); }}
@@ -363,7 +372,7 @@ export default function PlacementsPage() {
             {showBrandFilter && (
               <Select
                 size="sm" className="min-w-[140px]"
-                options={[{ id: '', label: 'ทุกแบรนด์' }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
+                options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
                 value={brandId}
                 onChange={v => { setBrandId(v); setPage(1); }}
               />
@@ -371,13 +380,13 @@ export default function PlacementsPage() {
             {viewMode === 'list' && (
               <div className="flex items-center gap-1.5">
                 <input
-                  type="number" min="0" placeholder="ราคาต่ำสุด" value={priceMin}
+                  type="number" min="0" placeholder={t('placements.priceMin')} value={priceMin}
                   onChange={e => setPriceMin(e.target.value)}
                   className="w-28 px-3 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                 />
                 <span className="text-muted text-xs">—</span>
                 <input
-                  type="number" min="0" placeholder="ราคาสูงสุด" value={priceMax}
+                  type="number" min="0" placeholder={t('placements.priceMax')} value={priceMax}
                   onChange={e => setPriceMax(e.target.value)}
                   className="w-28 px-3 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                 />
@@ -402,7 +411,7 @@ export default function PlacementsPage() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Lazada</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Website</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">TikTok</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">รวม GMV</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">{t('placements.totalGmv')}</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Orders</th>
                 </tr>
               </thead>
@@ -417,7 +426,7 @@ export default function PlacementsPage() {
                 {!gmvLoading && kolGmv.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-14 text-center text-muted text-sm">
-                      ไม่พบ KOL ที่มีข้อมูล GMV ตามเงื่อนไขนี้
+                      {t('placements.noGmvData')}
                     </td>
                   </tr>
                 )}
@@ -444,13 +453,13 @@ export default function PlacementsPage() {
                     <td className="px-4 py-3 text-right">
                       <span className="font-semibold text-ink tabular-nums text-sm">{formatGmv(r.total_gmv)}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-muted text-sm tabular-nums">{r.total_orders ? r.total_orders.toLocaleString('th-TH') : '—'}</td>
+                    <td className="px-4 py-3 text-right text-muted text-sm tabular-nums">{r.total_orders ? r.total_orders.toLocaleString(numberLocale()) : '—'}</td>
                   </tr>
                 ))}
                 {!gmvLoading && kolGmv.length > 0 && (
                   <tr className="border-t-2 border-hairline bg-canvas">
                     <td className="px-4 py-3" />
-                    <td className="px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">รวมทั้งหมด</td>
+                    <td className="px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">{t('placements.grandTotal')}</td>
                     <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
                       {kolGmv.reduce((s, r) => s + r.placement_count, 0)}
                     </td>
@@ -468,7 +477,7 @@ export default function PlacementsPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-ink tabular-nums">{formatGmv(gmvTotal)}</td>
                     <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
-                      {gmvOrders ? gmvOrders.toLocaleString('th-TH') : '—'}
+                      {gmvOrders ? gmvOrders.toLocaleString(numberLocale()) : '—'}
                     </td>
                   </tr>
                 )}
@@ -486,8 +495,8 @@ export default function PlacementsPage() {
               <tr className="border-b border-hairline bg-canvas">
                 <th className="w-1 p-0" />
                 <th className="px-4 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">KOL</th>
-                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">แคมเปญ / สินค้า</th>
-                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">สถานะ</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">{t('placements.colCampaignProduct')}</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider">{t('placements.colStatus')}</th>
                 <th className="px-3 py-3" />
               </tr>
             </thead>
@@ -496,8 +505,8 @@ export default function PlacementsPage() {
               {!loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="py-16 text-center">
-                    <p className="text-sm font-medium text-ink">ไม่พบรายการ</p>
-                    <p className="text-xs text-muted mt-1">ลองเปลี่ยนเงื่อนไขการกรอง</p>
+                    <p className="text-sm font-medium text-ink">{t('placements.noResults')}</p>
+                    <p className="text-xs text-muted mt-1">{t('placements.tryDifferentFilter')}</p>
                   </td>
                 </tr>
               )}
@@ -533,7 +542,7 @@ export default function PlacementsPage() {
                             )}
                             {r.kols?.follower_count && (
                               <span className="text-[11px] text-muted tabular-nums bg-canvas border border-hairline px-1.5 py-px rounded-md"
-                                title={r.kols.follower_count.toLocaleString('th-TH') + ' followers'}>
+                                title={r.kols.follower_count.toLocaleString(numberLocale()) + ' followers'}>
                                 {formatFollower(r.kols.follower_count)}
                               </span>
                             )}
@@ -582,8 +591,8 @@ export default function PlacementsPage() {
                             }`}
                           >
                             {r.status === 'posted'
-                              ? <><Pencil size={10} /> แก้ไข</>
-                              : <><ClipboardList size={10} /> บันทึกผล</>
+                              ? <><Pencil size={10} /> {t('common.edit')}</>
+                              : <><ClipboardList size={10} /> {t('performance.save')}</>
                             }
                           </button>
                           {r.status === 'posted' && (
@@ -591,7 +600,7 @@ export default function PlacementsPage() {
                               onClick={() => setMetricsPlacement(r)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-canvas border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all active:scale-95"
                             >
-                              <BarChart2 size={10} /> ดูผล
+                              <BarChart2 size={10} /> {t('placements.viewResult')}
                             </button>
                           )}
                         </div>
@@ -608,7 +617,7 @@ export default function PlacementsPage() {
         {totalPages > 1 && (
           <div className="px-5 py-3 border-t border-hairline flex items-center justify-between gap-3">
             <span className="text-xs text-muted tabular-nums shrink-0">
-              {total.toLocaleString('th-TH')} รายการ · หน้า {page}/{totalPages}
+              {t('placements.paginationLabel', { total: total.toLocaleString(numberLocale()), page, totalPages })}
             </span>
             <div className="flex items-center gap-1">
               <button

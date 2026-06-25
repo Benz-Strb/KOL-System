@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   ChevronLeft, Download, Upload, CheckCircle2, AlertTriangle, XCircle,
@@ -34,6 +35,7 @@ function rowDetail(r: ImportRowResult, kind: ImportKind) {
 }
 
 export default function ImportPlacementsPage() {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandId, setBrandId] = useState('');
@@ -51,8 +53,8 @@ export default function ImportPlacementsPage() {
       setBrands(d.brands);
       // Auto-select brand if user has exactly one — เลือกแบรนด์เองเฉพาะคนที่เข้าถึงได้หลายแบรนด์
       if (d.brands.length === 1) setBrandId(String(d.brands[0].id));
-    }).catch(() => setError('โหลดข้อมูลแบรนด์ไม่ได้ — เซิร์ฟเวอร์ทำงานอยู่หรือเปล่า?'));
-  }, []);
+    }).catch(() => setError(t('importPlacements.loadError')));
+  }, [t]);
 
   function handleReset() {
     setFileName('');
@@ -78,7 +80,7 @@ export default function ImportPlacementsPage() {
     try {
       await downloadImportTemplate(kind, brandId ? Number(brandId) : undefined);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'ดาวน์โหลด template ไม่สำเร็จ');
+      setError(err instanceof Error ? err.message : t('download.templateFailed'));
     }
   }
 
@@ -94,7 +96,7 @@ export default function ImportPlacementsPage() {
       const res = await validateImportFile(file, kind);
       setResult(res);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'ตรวจสอบไฟล์ไม่สำเร็จ');
+      setError(err instanceof Error ? err.message : t('importPlacements.validateFailed'));
     } finally {
       setValidating(false);
     }
@@ -109,9 +111,9 @@ export default function ImportPlacementsPage() {
     try {
       const res = await commitImport(kind, validRows);
       setCommitResult(res);
-      setToast(`บันทึก Placement สำเร็จ ${res.created} แถว`);
+      setToast(t('importPlacements.commitSuccess', { count: res.created }));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ');
+      setError(err instanceof Error ? err.message : t('importPlacements.commitFailed'));
     } finally {
       setCommitting(false);
     }
@@ -124,10 +126,10 @@ export default function ImportPlacementsPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
         <Link to="/placements/new" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink transition-colors mb-3">
-          <ChevronLeft size={14} /> กลับ
+          <ChevronLeft size={14} /> {t('importPlacements.back')}
         </Link>
-        <h1 className="text-xl font-semibold text-ink tracking-tight">นำเข้า Placement จาก Excel</h1>
-        <p className="text-sm text-muted mt-0.5">เหมาะสำหรับกรอกข้อมูลหลายแถวพร้อมกัน — ดาวน์โหลด template, กรอกข้อมูล, แล้วอัปโหลดกลับเข้าระบบ</p>
+        <h1 className="text-xl font-semibold text-ink tracking-tight">{t('importPlacements.title')}</h1>
+        <p className="text-sm text-muted mt-0.5">{t('importPlacements.subtitle')}</p>
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast('')} />}
@@ -145,21 +147,21 @@ export default function ImportPlacementsPage() {
         {/* Brand — แสดงเฉพาะเมื่อ user มีหลาย brand */}
         {brands.length > 1 && (
           <div className={cardCls}>
-            <SectionHeader icon={<Tag size={15} />} title="เลือกแบรนด์" />
-            <p className="text-sm text-muted mb-3">เลือกแบรนด์ก่อนดาวน์โหลด template — Model ในไฟล์จะมีให้เลือกเฉพาะของแบรนด์นี้เท่านั้น</p>
+            <SectionHeader icon={<Tag size={15} />} title={t('importPlacements.selectBrandSection')} />
+            <p className="text-sm text-muted mb-3">{t('importPlacements.selectBrandHint')}</p>
             <Select
               options={brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))}
               value={brandId}
               onChange={handleBrandChange}
-              placeholder="เลือกแบรนด์..."
+              placeholder={t('importPlacements.selectBrandPlaceholder')}
             />
           </div>
         )}
 
         {/* Step 0 — choose online/offline template */}
         <div className={cardCls}>
-          <SectionHeader icon={kind === 'online' ? <Globe size={15} /> : <Store size={15} />} title="เลือกประเภท Placement ของไฟล์นี้" />
-          <p className="text-sm text-muted mb-3">Online และ Offline ใช้ template คนละไฟล์ (คอลัมน์ต่างกัน) — เลือกก่อนดาวน์โหลด/อัปโหลด</p>
+          <SectionHeader icon={kind === 'online' ? <Globe size={15} /> : <Store size={15} />} title={t('importPlacements.selectTypeSection')} />
+          <p className="text-sm text-muted mb-3">{t('importPlacements.selectTypeHint')}</p>
           <div className="flex gap-2">
             {(['online', 'offline'] as const).map(k => (
               <button key={k} type="button" onClick={() => handleKindChange(k)}
@@ -169,7 +171,7 @@ export default function ImportPlacementsPage() {
                     : 'bg-transparent text-ink border-hairline hover:border-accent/40 hover:text-accent'
                 }`}
               >
-                {k === 'online' ? 'Online' : 'Offline (ห้าง/สาขา)'}
+                {k === 'online' ? 'Online' : t('importPlacements.offlineLabel')}
               </button>
             ))}
           </div>
@@ -177,24 +179,24 @@ export default function ImportPlacementsPage() {
 
         {/* Step 1 */}
         <div className={cardCls}>
-          <SectionHeader icon={<Download size={15} />} title="ขั้นที่ 1 — ดาวน์โหลด Template" />
-          <p className="text-sm text-muted mb-3">ไฟล์ template มี dropdown ให้เลือกในคอลัมน์ที่จำกัดค่าได้ (แบรนด์ / KOL Handle / Platform / Campaign / ประเภทจ่ายเงิน ฯลฯ) พร้อมชีต "รายชื่ออ้างอิง" — เลือก KOL แล้ว Follower/Platform จะขึ้นให้อัตโนมัติ — <strong className="text-ink">ถ้า KOL ที่ต้องการยังไม่อยู่ใน dropdown ต้องเพิ่ม KOL นั้นในเว็บก่อน</strong> (หน้า "เพิ่ม Placement" หรือ KOL Directory) แล้วค่อยดาวน์โหลด template ใหม่อีกครั้ง</p>
+          <SectionHeader icon={<Download size={15} />} title={t('importPlacements.step1Title')} />
+          <p className="text-sm text-muted mb-3">{t('importPlacements.step1HintStart')}<strong className="text-ink">{t('importPlacements.step1HintBold')}</strong>{t('importPlacements.step1HintEnd')}</p>
           <button type="button" onClick={handleDownloadTemplate} disabled={!brandId}
             className="inline-flex items-center gap-2 px-4 py-2 border border-hairline text-ink text-sm font-medium rounded-full hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all">
-            <Download size={14} /> ดาวน์โหลด Template ({kind === 'online' ? 'Online' : 'Offline'})
+            <Download size={14} /> {t('importPlacements.downloadTemplate', { kind: kind === 'online' ? 'Online' : 'Offline' })}
           </button>
-          {!brandId && brands.length > 1 && <p className="text-xs text-yellow-600 mt-2">กรุณาเลือกแบรนด์ก่อนดาวน์โหลด</p>}
+          {!brandId && brands.length > 1 && <p className="text-xs text-yellow-600 mt-2">{t('importPlacements.selectBrandFirst')}</p>}
         </div>
 
         {/* Step 2 */}
         <div className={cardCls}>
-          <SectionHeader icon={<Upload size={15} />} title="ขั้นที่ 2 — อัปโหลดไฟล์ที่กรอกแล้ว" />
+          <SectionHeader icon={<Upload size={15} />} title={t('importPlacements.step2Title')} />
           <div className="flex items-center gap-3">
             <label className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full active:scale-95 transition-all cursor-pointer ${
               brandId ? 'bg-accent text-white hover:bg-accent-hover' : 'bg-accent/40 text-white/70 cursor-not-allowed'
             }`}>
               <FileSpreadsheet size={14} />
-              เลือกไฟล์ .xlsx
+              {t('importPlacements.chooseFile')}
               <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} disabled={!brandId} />
             </label>
             {fileName && <span className="text-sm text-muted truncate max-w-xs">{fileName}</span>}
@@ -205,13 +207,13 @@ export default function ImportPlacementsPage() {
         {/* Step 3 — preview */}
         {result && !commitResult && (
           <div className={cardCls}>
-            <SectionHeader icon={<CheckCircle2 size={15} />} title="ขั้นที่ 3 — ตรวจสอบและยืนยัน" />
+            <SectionHeader icon={<CheckCircle2 size={15} />} title={t('importPlacements.step3Title')} />
 
             <div className="mb-4 p-3 bg-canvas rounded-xl text-sm text-ink flex flex-wrap gap-x-4 gap-y-1">
-              <span>พบ <strong>{result.summary.total}</strong> แถว</span>
-              <span className="text-green-600">พร้อมบันทึก <strong>{result.summary.valid}</strong> แถว</span>
+              <span>{t('importPlacements.foundRows', { count: result.summary.total })}</span>
+              <span className="text-green-600">{t('importPlacements.readyRows', { count: result.summary.valid })}</span>
               {result.summary.withErrors > 0 && (
-                <span className="text-red-500">มีปัญหา <strong>{result.summary.withErrors}</strong> แถว (จะถูกข้าม)</span>
+                <span className="text-red-500">{t('importPlacements.errorRows', { count: result.summary.withErrors })}</span>
               )}
             </div>
 
@@ -219,13 +221,13 @@ export default function ImportPlacementsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted uppercase tracking-wide border-b border-hairline">
-                    <th className="py-2 pr-3 font-medium">แถว</th>
-                    <th className="py-2 pr-3 font-medium">สถานะ</th>
-                    <th className="py-2 pr-3 font-medium">แบรนด์</th>
+                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colRow')}</th>
+                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colStatus')}</th>
+                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colBrand')}</th>
                     <th className="py-2 pr-3 font-medium">KOL Handle</th>
-                    <th className="py-2 pr-3 font-medium">รายละเอียด</th>
+                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colDetail')}</th>
                     <th className="py-2 pr-3 font-medium">Campaign</th>
-                    <th className="py-2 font-medium">หมายเหตุ</th>
+                    <th className="py-2 font-medium">{t('importPlacements.colNotes')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -237,11 +239,11 @@ export default function ImportPlacementsPage() {
                         <td className="py-2 pr-3 text-muted">{r.rowNumber}</td>
                         <td className="py-2 pr-3">
                           {hasError ? (
-                            <span className="inline-flex items-center gap-1 text-red-500"><XCircle size={13} /> ข้าม</span>
+                            <span className="inline-flex items-center gap-1 text-red-500"><XCircle size={13} /> {t('importPlacements.skip')}</span>
                           ) : hasWarning ? (
-                            <span className="inline-flex items-center gap-1 text-yellow-600"><AlertTriangle size={13} /> คำเตือน</span>
+                            <span className="inline-flex items-center gap-1 text-yellow-600"><AlertTriangle size={13} /> {t('importPlacements.warning')}</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-green-600"><CheckCircle2 size={13} /> พร้อม</span>
+                            <span className="inline-flex items-center gap-1 text-green-600"><CheckCircle2 size={13} /> {t('importPlacements.ready')}</span>
                           )}
                         </td>
                         <td className="py-2 pr-3 text-ink">{r.raw.brand || '—'}</td>
@@ -262,11 +264,11 @@ export default function ImportPlacementsPage() {
             <div className="flex gap-2 pt-4">
               <button type="button" onClick={handleCommit} disabled={committing || validRows.length === 0}
                 className="flex-1 py-3 bg-accent text-white font-medium rounded-full hover:bg-accent-hover disabled:opacity-50 active:scale-[0.99] transition-all text-sm">
-                {committing ? 'กำลังบันทึก...' : `บันทึก ${validRows.length} แถวที่ถูกต้อง`}
+                {committing ? t('common.saving') : t('importPlacements.commitButton', { count: validRows.length })}
               </button>
               <button type="button" onClick={handleReset}
                 className="px-5 py-3 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">
-                เริ่มใหม่
+                {t('importPlacements.restart')}
               </button>
             </div>
           </div>
@@ -275,28 +277,28 @@ export default function ImportPlacementsPage() {
         {/* Step 4 — commit summary */}
         {commitResult && (
           <div className={cardCls}>
-            <SectionHeader icon={<CheckCircle2 size={15} />} title="บันทึกสำเร็จ" />
+            <SectionHeader icon={<CheckCircle2 size={15} />} title={t('importPlacements.commitSuccessTitle')} />
             <div className="space-y-1 text-sm text-ink mb-4">
-              <p>สร้าง Placement ใหม่ <strong>{commitResult.created}</strong> แถว</p>
-              {commitResult.branchesCreated > 0 && <p>สร้างสาขาใหม่ <strong>{commitResult.branchesCreated}</strong> สาขา</p>}
+              <p>{t('importPlacements.createdPlacements', { count: commitResult.created })}</p>
+              {commitResult.branchesCreated > 0 && <p>{t('importPlacements.createdBranches', { count: commitResult.branchesCreated })}</p>}
               {commitResult.failed.length > 0 && (
                 <div className="text-red-500 pt-2">
-                  <p>บันทึกไม่สำเร็จ {commitResult.failed.length} แถว:</p>
-                  {commitResult.failed.map(f => <p key={f.rowNumber} className="text-xs">แถว {f.rowNumber}: {f.error}</p>)}
+                  <p>{t('importPlacements.failedRows', { count: commitResult.failed.length })}</p>
+                  {commitResult.failed.map(f => <p key={f.rowNumber} className="text-xs">{t('importPlacements.rowError', { row: f.rowNumber, error: f.error })}</p>)}
                 </div>
               )}
               {errorRows.length > 0 && (
-                <p className="text-muted pt-2">มี {errorRows.length} แถวที่ข้ามไปตั้งแต่ขั้นตรวจสอบ (มีปัญหา) — แก้ไขในไฟล์แล้วนำเข้าใหม่ได้</p>
+                <p className="text-muted pt-2">{t('importPlacements.skippedRowsNote', { count: errorRows.length })}</p>
               )}
             </div>
             <div className="flex gap-2">
               <Link to="/placements"
                 className="flex-1 text-center py-3 bg-accent text-white font-medium rounded-full hover:bg-accent-hover active:scale-[0.99] transition-all text-sm">
-                ไปที่รายการ Placement
+                {t('importPlacements.goToPlacements')}
               </Link>
               <button type="button" onClick={handleReset}
                 className="px-5 py-3 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">
-                นำเข้าไฟล์อื่น
+                {t('importPlacements.importAnother')}
               </button>
             </div>
           </div>

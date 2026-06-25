@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { KeyRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../context/AuthContext.js';
+import LanguageSwitcher from '../components/LanguageSwitcher.js';
 
 const inputCls = [
   'w-full px-3 py-2.5 rounded-xl text-sm transition-colors',
@@ -11,6 +13,7 @@ const inputCls = [
 ].join(' ');
 
 export default function ChangePasswordPage() {
+  const { t } = useTranslation();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -21,8 +24,8 @@ export default function ChangePasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (password.length < 8) { setError('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'); return; }
-    if (password !== confirm) { setError('รหัสผ่านไม่ตรงกัน'); return; }
+    if (password.length < 8) { setError(t('changePassword.tooShort')); return; }
+    if (password !== confirm) { setError(t('changePassword.mismatch')); return; }
     setLoading(true);
     try {
       const { error: updateError } = await supabase.auth.updateUser({
@@ -33,43 +36,46 @@ export default function ChangePasswordPage() {
       await supabase.auth.refreshSession();
       navigate('/placements', { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setError(err instanceof Error ? err.message : t('common.error'));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4 relative">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher variant="light" />
+      </div>
       <div className="bg-surface border border-hairline rounded-2xl w-full max-w-sm p-8 shadow-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-11 h-11 bg-amber-500/10 rounded-xl mb-4">
             <KeyRound size={20} className="text-amber-600 dark:text-amber-400" />
           </div>
-          <h1 className="text-xl font-semibold text-ink tracking-tight">ตั้งรหัสผ่านใหม่</h1>
-          <p className="text-sm text-muted mt-1">กรุณาตั้งรหัสผ่านใหม่ก่อนใช้งานระบบ</p>
+          <h1 className="text-xl font-semibold text-ink tracking-tight">{t('changePassword.title')}</h1>
+          <p className="text-sm text-muted mt-1">{t('changePassword.subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">รหัสผ่านใหม่</label>
+            <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('changePassword.newPassword')}</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="อย่างน้อย 8 ตัวอักษร"
+              placeholder={t('changePassword.newPasswordPlaceholder')}
               className={inputCls}
               autoFocus
               required
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">ยืนยันรหัสผ่าน</label>
+            <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('changePassword.confirmPassword')}</label>
             <input
               type="password"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
-              placeholder="กรอกรหัสผ่านอีกครั้ง"
+              placeholder={t('changePassword.confirmPasswordPlaceholder')}
               className={inputCls}
               required
             />
@@ -86,14 +92,14 @@ export default function ChangePasswordPage() {
             disabled={loading}
             className="w-full py-2.5 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover disabled:opacity-60 active:scale-95 transition-all mt-1"
           >
-            {loading ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่าน'}
+            {loading ? t('common.saving') : t('changePassword.save')}
           </button>
           <button
             type="button"
             onClick={signOut}
             className="w-full py-2 text-muted text-xs hover:text-ink transition-colors"
           >
-            ออกจากระบบ
+            {t('common.signOut')}
           </button>
         </form>
       </div>
