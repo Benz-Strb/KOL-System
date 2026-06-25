@@ -79,6 +79,16 @@ export const zh = {
     productsWithSales: '有成效的产品',
     rankingTitle: '产品 Ranking',
     byOrders: '按 Orders',
+    clickToViewKols: '点击查看曾经评测过此产品的 KOL',
+  },
+  productTrend: {
+    loading: '加载中...',
+    totalGmv: '总 GMV',
+    totalOrders: '总 Orders',
+    totalPlacements: '总 Placement',
+    kolCount: 'KOL 数量',
+    kolListTitle: '曾经评测过此产品的 KOL',
+    noKols: '在所选筛选条件下还没有 KOL 评测过此产品',
   },
   adminUsers: {
     copy: '复制',

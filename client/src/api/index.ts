@@ -582,6 +582,33 @@ export const exportProductDashboard = (params: { brand_id?: string; campaign_id?
   return downloadFile(`/api/dashboard/products/export?${p}`, `product_dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
+export type ProductKolRow = {
+  kol_id: number;
+  handle: string | null;
+  gen_name: string | null;
+  profile_url: string | null;
+  avatar_url: string | null;
+  follower_count: number | null;
+  platform_name: string | null;
+  placement_count: number;
+  total_gmv: number;
+  total_orders: number;
+};
+export type ProductTrendOverview = {
+  product: { id: number; model_code: string; category_name: string | null; image_url: string | null };
+  summary: { total_gmv: number; total_orders: number; total_placements: number; kol_count: number };
+  kols: ProductKolRow[];
+};
+
+export const getProductTrend = (productId: number, params: { brand_id?: string; campaign_id?: string; date_from?: string; date_to?: string } = {}) => {
+  const p = new URLSearchParams();
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.campaign_id) p.set('campaign_id', params.campaign_id);
+  if (params.date_from) p.set('date_from', params.date_from);
+  if (params.date_to) p.set('date_to', params.date_to);
+  return api<ProductTrendOverview>(`/api/dashboard/products/${productId}?${p}`);
+};
+
 // Bulk import placements from Excel
 export type ImportKind = 'online' | 'offline';
 

@@ -79,6 +79,16 @@ export const en = {
     productsWithSales: 'Products with sales',
     rankingTitle: 'Product Ranking',
     byOrders: 'By Orders',
+    clickToViewKols: 'Click to see KOLs who reviewed this product',
+  },
+  productTrend: {
+    loading: 'Loading...',
+    totalGmv: 'Total GMV',
+    totalOrders: 'Total Orders',
+    totalPlacements: 'Total Placements',
+    kolCount: 'KOL Count',
+    kolListTitle: 'KOLs who reviewed this product',
+    noKols: 'No KOLs reviewed this product in the selected filters',
   },
   adminUsers: {
     copy: 'Copy',

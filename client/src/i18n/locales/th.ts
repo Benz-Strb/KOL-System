@@ -84,6 +84,16 @@ export const th = {
     productsWithSales: 'สินค้าที่มีผลงาน',
     rankingTitle: 'Ranking สินค้า',
     byOrders: 'ตาม Orders',
+    clickToViewKols: 'คลิกเพื่อดู KOL ที่เคยรีวิวสินค้านี้',
+  },
+  productTrend: {
+    loading: 'กำลังโหลด...',
+    totalGmv: 'GMV รวม',
+    totalOrders: 'Orders รวม',
+    totalPlacements: 'Placement รวม',
+    kolCount: 'จำนวน KOL',
+    kolListTitle: 'KOL ที่เคยรีวิวสินค้านี้',
+    noKols: 'ยังไม่มี KOL ที่รีวิวสินค้านี้ในช่วงที่กรองไว้',
   },
   adminUsers: {
     copy: 'คัดลอก',

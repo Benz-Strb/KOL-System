@@ -7,6 +7,8 @@ import {
 } from '../api/index.js';
 import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
+import ProductTrendModal from '../components/ProductTrendModal.js';
+import KolTrendModal from '../components/KolTrendModal.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 
@@ -72,9 +74,32 @@ function SkeletonRow() {
   );
 }
 
-function ProductRow({ p, rank, sortMode }: { p: ProductRankRow; rank: number; sortMode: 'gmv' | 'orders' }) {
+const HOVER_EXPAND_DELAY = 400;
+
+function ProductRow({ p, rank, sortMode, onClick, hint }: { p: ProductRankRow; rank: number; sortMode: 'gmv' | 'orders'; onClick: () => void; hint: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleEnter = () => {
+    timer.current = setTimeout(() => setExpanded(true), HOVER_EXPAND_DELAY);
+  };
+  const handleLeave = () => {
+    clearTimeout(timer.current);
+    setExpanded(false);
+  };
+
   return (
-    <div className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-canvas transition-colors">
+    <div
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onClick={onClick}
+      title={hint}
+      className={`flex items-center gap-3 py-2.5 px-2 rounded-lg border transition-all duration-200 cursor-pointer ${
+        expanded
+          ? 'relative z-20 scale-[1.05] shadow-xl bg-surface border-accent/40'
+          : 'border-transparent hover:bg-canvas'
+      }`}
+    >
       <span className="w-6 text-xs font-semibold text-muted text-center shrink-0">{rank}</span>
       <ProductImage url={p.image_url} />
       <div className="min-w-0 flex-1">
@@ -105,6 +130,8 @@ export default function ProductDashboardPage() {
   const [sortMode, setSortMode] = useState<'gmv' | 'orders'>('gmv');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [trendProductId, setTrendProductId] = useState<number | null>(null);
+  const [trendKolId, setTrendKolId] = useState<number | null>(null);
 
   async function handleExport() {
     setExporting(true); setExportError('');
@@ -249,12 +276,27 @@ export default function ProductDashboardPage() {
             ) : (
               <div className="flex flex-col gap-1">
                 {ranking.map((p, i) => (
-                  <ProductRow key={p.canonical_id} p={p} rank={i + 1} sortMode={sortMode} />
+                  <ProductRow key={p.canonical_id} p={p} rank={i + 1} sortMode={sortMode} onClick={() => setTrendProductId(p.canonical_id)} hint={t('productDashboard.clickToViewKols')} />
                 ))}
               </div>
             )}
           </div>
         </div>
+      )}
+
+      {trendProductId != null && (
+        <ProductTrendModal
+          productId={trendProductId}
+          brandId={brandId || undefined}
+          campaignId={campaignId || undefined}
+          dateFrom={dateFrom || undefined}
+          dateTo={dateTo || undefined}
+          onClose={() => setTrendProductId(null)}
+          onSelectKol={setTrendKolId}
+        />
+      )}
+      {trendKolId != null && (
+        <KolTrendModal kolId={trendKolId} brandId={brandId || undefined} onClose={() => setTrendKolId(null)} />
       )}
     </div>
   );

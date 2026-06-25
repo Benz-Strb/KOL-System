@@ -93,6 +93,19 @@ type ProductRankRow = {
   total_orders: number;
 };
 
+type ProductKolRow = {
+  kol_id: number;
+  handle: string | null;
+  gen_name: string | null;
+  profile_url: string | null;
+  avatar_url: string | null;
+  follower_count: number | null;
+  platform_name: string | null;
+  placement_count: number;
+  total_gmv: number;
+  total_orders: number;
+};
+
 // Shared by GET / (JSON) and GET /export (.xlsx) — same data, two renderings.
 async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, query: {
   brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string;
@@ -748,6 +761,107 @@ app.get('/products/export', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to export product dashboard' }, 500);
+  }
+});
+
+// ─── GET /products/:id — KOLs who reviewed this product, ranked by GMV ───
+app.get('/products/:id', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const canonicalId = Number(c.req.param('id'));
+    const brand_id = c.req.query('brand_id');
+    const campaign_id = c.req.query('campaign_id');
+    const date_from = c.req.query('date_from');
+    const date_to = c.req.query('date_to');
+
+    const product = await prisma.products.findUnique({
+      where: { id: canonicalId },
+      select: { id: true, model_code: true, image_url: true, product_categories: { select: { name: true } } },
+    });
+    if (!product) return c.json({ error: 'product not found' }, 404);
+
+    const productInfo = {
+      id: product.id,
+      model_code: product.model_code,
+      category_name: product.product_categories?.name ?? null,
+      image_url: product.image_url,
+    };
+
+    // a canonical model can have raw rows that point to it via
+    // canonical_product_id (typo'd duplicates — see CLAUDE.md §4
+    // "product_resolved") — gather them all so sales aren't missed
+    const rawProducts = await prisma.products.findMany({
+      where: { OR: [{ id: canonicalId }, { canonical_product_id: canonicalId }] },
+      select: { id: true },
+    });
+    const rawProductIds = rawProducts.map(p => p.id);
+
+    const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
+    const where = {
+      ...brandFilter,
+      product_id: { in: rawProductIds },
+      ...(campaign_id === 'none' ? { campaign_id: null } : campaign_id ? { campaign_id: Number(campaign_id) } : {}),
+      ...(date_from || date_to ? {
+        publication_date: {
+          ...(date_from ? { gte: new Date(date_from) } : {}),
+          ...(date_to ? { lte: new Date(date_to) } : {}),
+        },
+      } : {}),
+    };
+    const matched = await prisma.placements.findMany({ where, select: { id: true } });
+
+    if (matched.length === 0) {
+      return c.json({
+        product: productInfo,
+        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, kol_count: 0 },
+        kols: [] as ProductKolRow[],
+      });
+    }
+
+    const ids = matched.map(p => p.id);
+    const kols = await prisma.$queryRaw<ProductKolRow[]>`
+      WITH metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        k.id::int                        AS kol_id,
+        kp.handle,
+        k.gen_name,
+        kp.profile_url,
+        kp.avatar_url,
+        kp.follower_count,
+        pf.name                          AS platform_name,
+        COUNT(DISTINCT pl.id)::int       AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float  AS total_gmv,
+        COALESCE(SUM(ma.orders), 0)::int AS total_orders
+      FROM placements pl
+      JOIN kols k ON k.id = pl.kol_id
+      LEFT JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
+      LEFT JOIN platforms pf ON pf.id = kp.platform_id
+      LEFT JOIN metric_agg ma ON ma.placement_id = pl.id
+      WHERE pl.id IN (${Prisma.join(ids)})
+      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url, kp.avatar_url, kp.follower_count, pf.name
+      ORDER BY total_gmv DESC
+    `;
+
+    const summary = kols.reduce(
+      (acc, r) => ({
+        total_gmv: acc.total_gmv + r.total_gmv,
+        total_orders: acc.total_orders + r.total_orders,
+        total_placements: acc.total_placements + r.placement_count,
+        kol_count: acc.kol_count + 1,
+      }),
+      { total_gmv: 0, total_orders: 0, total_placements: 0, kol_count: 0 },
+    );
+
+    return c.json({ product: productInfo, summary, kols });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load product kol breakdown' }, 500);
   }
 });
 
