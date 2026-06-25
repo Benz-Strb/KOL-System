@@ -65,6 +65,12 @@ export const zh = {
     followerBenchmarkTitle: '将粉丝数与过往 GMV 对比',
     followerBenchmarkDesc: '输入粉丝数,系统会找出粉丝数相近(±{{pct}}%)的 KOL,并显示其带来的 GMV,帮助您在选择 KOL 前评估。',
     followerBenchmarkPlaceholder: '例如 100000',
+    paymentCompareTitle: 'Barter 与付费对比',
+    paymentCompareDesc: '按付款方式显示每篇帖子的平均 GMV — 用于判断以货换货是否真的划算。',
+    tierCompareTitle: '按粉丝等级对比',
+    tierCompareDesc: '按粉丝等级显示每位 KOL 的平均 GMV — 用于判断哪个等级的 KOL 最值得合作。',
+    placementCountLabel: '{{count}} 篇帖子',
+    kolCountLabel: '{{count}} 位 KOL',
   },
   productDashboard: {
     title: '产品 Dashboard',

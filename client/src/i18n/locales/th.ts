@@ -70,6 +70,12 @@ export const th = {
     followerBenchmarkTitle: 'เทียบ Follower กับ GMV ที่เคยทำได้',
     followerBenchmarkDesc: 'กรอกจำนวน Follower ระบบจะหา KOL ที่เคยมี Follower ใกล้เคียงกัน (±{{pct}}%) แล้วโชว์ GMV ที่ทำได้จริง ใช้ประเมินก่อนเลือก KOL',
     followerBenchmarkPlaceholder: 'เช่น 100000',
+    paymentCompareTitle: 'เทียบ Barter กับจ่ายเงิน',
+    paymentCompareDesc: 'ค่าเฉลี่ย GMV ต่อโพสต์ แยกตามประเภทการจ่ายเงิน — ใช้ดูว่าการแลกสินค้าคุ้มกว่าจ่ายเงินจริงไหม',
+    tierCompareTitle: 'เทียบตาม Follower Tier',
+    tierCompareDesc: 'ค่าเฉลี่ย GMV ต่อ KOL 1 คน แยกตามระดับ Follower — ใช้ดูว่าจ้าง KOL ระดับไหนคุ้มที่สุด',
+    placementCountLabel: '{{count}} โพสต์',
+    kolCountLabel: '{{count}} คน',
   },
   productDashboard: {
     title: 'Dashboard สินค้า',

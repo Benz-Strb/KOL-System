@@ -42,7 +42,30 @@ const EMPTY_RESPONSE = {
     gmv: number;
     spend: number;
   }[],
+  paymentTypeBreakdown: [] as PaymentTypeRow[],
+  tierBreakdown: [] as TierRow[],
 };
+
+type PaymentTypeRow = {
+  payment_type: string;
+  placement_count: number;
+  total_gmv: number;
+  avg_gmv: number;
+};
+
+type TierRow = {
+  tier_id: number;
+  tier_name: string;
+  kol_count: number;
+  placement_count: number;
+  total_gmv: number;
+  avg_gmv_per_kol: number;
+};
+
+// barter-vs-paid is most useful in this fixed order; alphabetical (from a
+// plain GROUP BY) would read barter/free/paid which isn't how anyone thinks
+// about it
+const PAYMENT_TYPE_ORDER: Record<string, number> = { paid: 0, barter: 1, free: 2 };
 
 type KolRankRow = {
   kol_id: number;
@@ -176,6 +199,8 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       profile_url: string | null;
       avatar_url: string | null;
       follower_count: number | null;
+      kol_tier_id: number | null;
+      tier_name: string | null;
       placement_count: number;
       total_gmv: number;
       total_spend: number;
@@ -199,6 +224,8 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         kp.profile_url,
         kp.avatar_url,
         kp.follower_count,
+        kp.kol_tier_id,
+        kt.name                                  AS tier_name,
         COUNT(DISTINCT ps.id)::int                AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float           AS total_gmv,
         COALESCE(SUM(ps.spend), 0)::float         AS total_spend,
@@ -206,9 +233,58 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       FROM placement_spend ps
       JOIN kols k ON ps.kol_id = k.id
       JOIN kol_platforms kp ON kp.kol_id = k.id AND kp.is_primary = true
+      LEFT JOIN kol_tiers kt ON kt.id = kp.kol_tier_id
       LEFT JOIN metric_agg ma ON ma.placement_id = ps.id
-      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url, kp.avatar_url, kp.follower_count
+      GROUP BY k.id, kp.handle, k.gen_name, kp.profile_url, kp.avatar_url, kp.follower_count, kp.kol_tier_id, kt.name
     `;
+
+    // barter vs paid (vs free) — average GMV per post by payment type
+    const paymentTypeAgg = await prisma.$queryRaw<{ payment_type: string; placement_count: number; total_gmv: number }[]>`
+      WITH metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        p.payment_type,
+        COUNT(DISTINCT p.id)::int          AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float    AS total_gmv
+      FROM placements p
+      LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)})
+      GROUP BY p.payment_type
+    `;
+    const paymentTypeBreakdown: PaymentTypeRow[] = paymentTypeAgg
+      .map(r => ({
+        payment_type: r.payment_type,
+        placement_count: r.placement_count,
+        total_gmv: r.total_gmv,
+        avg_gmv: r.placement_count > 0 ? r.total_gmv / r.placement_count : 0,
+      }))
+      .sort((a, b) => (PAYMENT_TYPE_ORDER[a.payment_type] ?? 99) - (PAYMENT_TYPE_ORDER[b.payment_type] ?? 99));
+
+    // follower-tier comparison — average GMV per KOL, grouped by the same
+    // tier the DB trigger already assigns from follower_count (kol_tiers)
+    const tierMap = new Map<number, TierRow>();
+    for (const r of kolAgg) {
+      if (r.kol_tier_id == null) continue;
+      const entry = tierMap.get(r.kol_tier_id) ?? {
+        tier_id: r.kol_tier_id,
+        tier_name: r.tier_name ?? String(r.kol_tier_id),
+        kol_count: 0,
+        placement_count: 0,
+        total_gmv: 0,
+        avg_gmv_per_kol: 0,
+      };
+      entry.kol_count += 1;
+      entry.placement_count += r.placement_count;
+      entry.total_gmv += r.total_gmv;
+      tierMap.set(r.kol_tier_id, entry);
+    }
+    const tierBreakdown: TierRow[] = [...tierMap.values()]
+      .map(t => ({ ...t, avg_gmv_per_kol: t.kol_count > 0 ? t.total_gmv / t.kol_count : 0 }))
+      .sort((a, b) => a.tier_id - b.tier_id);
 
     // per-KOL GMV split by sales channel (shopee/lazada/website/tiktok/youtube/lamon8)
     // — same `channel` concept as the channelBreakdown donut above, just scoped per KOL
@@ -296,6 +372,8 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       topKolsByRoi,
       kolValueList: kolRows,
       campaignTrend,
+      paymentTypeBreakdown,
+      tierBreakdown,
     };
   }
 }
@@ -321,6 +399,7 @@ app.get('/', async c => {
 const EXPORT_CHANNEL_LABEL: Record<string, string> = {
   shopee: 'Shopee', lazada: 'Lazada', website: 'Website', tiktok: 'TikTok', youtube: 'YouTube', lamon8: 'Lemon8',
 };
+const EXPORT_PAYMENT_LABEL: Record<string, string> = { paid: 'จ่ายเงิน', barter: 'Barter', free: 'Free' };
 
 function styleExportHeaderRow(ws: ExcelJS.Worksheet) {
   const row = ws.getRow(1);
@@ -391,6 +470,26 @@ app.get('/export', async c => {
     campaignWs.getColumn(3).numFmt = '#,##0.00';
     campaignWs.getColumn(4).numFmt = '#,##0.00';
     styleExportHeaderRow(campaignWs);
+
+    const paymentWs = wb.addWorksheet('Barter vs จ่ายเงิน');
+    paymentWs.addRow(['ประเภทการจ่ายเงิน', 'Placement', 'GMV รวม (บาท)', 'GMV เฉลี่ยต่อโพสต์ (บาท)']);
+    for (const r of data.paymentTypeBreakdown) {
+      paymentWs.addRow([EXPORT_PAYMENT_LABEL[r.payment_type] ?? r.payment_type, r.placement_count, r.total_gmv, r.avg_gmv]);
+    }
+    paymentWs.columns = [{ width: 20 }, { width: 12 }, { width: 18 }, { width: 22 }];
+    paymentWs.getColumn(3).numFmt = '#,##0.00';
+    paymentWs.getColumn(4).numFmt = '#,##0.00';
+    styleExportHeaderRow(paymentWs);
+
+    const tierWs = wb.addWorksheet('เทียบตาม Tier');
+    tierWs.addRow(['Tier', 'จำนวน KOL', 'Placement', 'GMV รวม (บาท)', 'GMV เฉลี่ยต่อ KOL (บาท)']);
+    for (const r of data.tierBreakdown) {
+      tierWs.addRow([r.tier_name, r.kol_count, r.placement_count, r.total_gmv, r.avg_gmv_per_kol]);
+    }
+    tierWs.columns = [{ width: 16 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 22 }];
+    tierWs.getColumn(4).numFmt = '#,##0.00';
+    tierWs.getColumn(5).numFmt = '#,##0.00';
+    styleExportHeaderRow(tierWs);
 
     const buf = await wb.xlsx.writeBuffer();
     const bytes = Uint8Array.from(buf as unknown as Uint8Array);

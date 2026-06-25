@@ -161,6 +161,48 @@ function MetricBenchmarkCard({
   );
 }
 
+// Generic "compare an average value across a few fixed groups" card —
+// shared shape for barter-vs-paid and follower-tier comparisons (both are
+// "which group of GMV.metricValue is biggest" not a "type a value" lookup
+// like MetricBenchmarkCard above).
+function GroupCompareCard({
+  title, description, rows, formatValue,
+}: {
+  title: string;
+  description: string;
+  rows: { label: string; value: number; countLabel: string }[];
+  formatValue: (v: number) => string;
+}) {
+  const { t } = useTranslation();
+  const maxValue = Math.max(...rows.map(r => r.value), 1);
+  return (
+    <div className="bg-surface border border-hairline rounded-xl p-5">
+      <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5 mb-1">
+        <Scale size={14} className="text-accent" /> {title}
+      </h2>
+      <p className="text-[11px] text-muted mb-4">{description}</p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {rows.map(r => (
+            <div key={r.label} className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-ink">{r.label}</span>
+                <span className="text-sm font-semibold text-ink font-mono">{formatValue(r.value)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-canvas overflow-hidden">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${(r.value / maxValue) * 100}%` }} />
+              </div>
+              <span className="text-[11px] text-muted">{r.countLabel}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChannelTooltip({ active, payload }: TooltipContentProps) {
   const { t } = useTranslation();
   if (!active || !payload?.length) return null;
@@ -560,6 +602,8 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-6">
             <SkeletonChart />
             <SkeletonChart />
+            <SkeletonChart />
+            <SkeletonChart />
           </div>
         )
       ) : activeTab === 'overview' ? (
@@ -717,6 +761,28 @@ export default function DashboardPage() {
             getValue={k => k.follower_count}
             formatValue={v => Math.round(v).toLocaleString(numberLocale())}
             onSelectKol={setTrendKolId}
+          />
+
+          <GroupCompareCard
+            title={t('dashboard.paymentCompareTitle')}
+            description={t('dashboard.paymentCompareDesc')}
+            formatValue={formatMoney}
+            rows={data.paymentTypeBreakdown.map(r => ({
+              label: t(`payment.${r.payment_type}`, { defaultValue: r.payment_type }),
+              value: r.avg_gmv,
+              countLabel: t('dashboard.placementCountLabel', { count: r.placement_count }),
+            }))}
+          />
+
+          <GroupCompareCard
+            title={t('dashboard.tierCompareTitle')}
+            description={t('dashboard.tierCompareDesc')}
+            formatValue={formatMoney}
+            rows={data.tierBreakdown.map(r => ({
+              label: r.tier_name,
+              value: r.avg_gmv_per_kol,
+              countLabel: t('dashboard.kolCountLabel', { count: r.kol_count }),
+            }))}
           />
         </div>
       )}

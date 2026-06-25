@@ -65,6 +65,12 @@ export const en = {
     followerBenchmarkTitle: 'Compare follower count against past GMV',
     followerBenchmarkDesc: 'Enter a follower count — we\'ll find KOLs with a similar follower count (±{{pct}}%) and show the GMV they delivered, to help you evaluate before choosing a KOL.',
     followerBenchmarkPlaceholder: 'e.g. 100000',
+    paymentCompareTitle: 'Barter vs Paid comparison',
+    paymentCompareDesc: 'Average GMV per post by payment type — see whether bartering products is actually worth it vs paying cash.',
+    tierCompareTitle: 'Comparison by Follower Tier',
+    tierCompareDesc: 'Average GMV per KOL by follower tier — see which tier of KOL is most worth hiring.',
+    placementCountLabel: '{{count}} post(s)',
+    kolCountLabel: '{{count}} KOL(s)',
   },
   productDashboard: {
     title: 'Product Dashboard',

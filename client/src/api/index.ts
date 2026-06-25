@@ -455,6 +455,8 @@ export type DashboardCampaignTrendRow = {
   gmv: number;
   spend: number;
 };
+export type DashboardPaymentTypeRow = { payment_type: string; placement_count: number; total_gmv: number; avg_gmv: number };
+export type DashboardTierRow = { tier_id: number; tier_name: string; kol_count: number; placement_count: number; total_gmv: number; avg_gmv_per_kol: number };
 export type DashboardOverview = {
   summary: DashboardSummary;
   channelBreakdown: DashboardChannelRow[];
@@ -462,6 +464,8 @@ export type DashboardOverview = {
   topKolsByRoi: DashboardKolRow[];
   kolValueList: DashboardKolRow[];
   campaignTrend: DashboardCampaignTrendRow[];
+  paymentTypeBreakdown: DashboardPaymentTypeRow[];
+  tierBreakdown: DashboardTierRow[];
 };
 
 export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
