@@ -20,6 +20,7 @@ export const en = {
     noItems: 'No items',
     signOut: 'Sign out',
     toggleDarkMode: 'Toggle dark mode',
+    openMenu: 'Open menu',
     selectLanguage: 'Select language',
     selectPlaceholder: 'Select...',
     addNew: 'Add new',

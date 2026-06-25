@@ -77,7 +77,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
       {/* Contact Info */}
       <div>
         <p className={labelCls}>Contact Info</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label className="text-[11px] text-muted mb-0.5 block">Email</label>
             <input type="email" value={contact.email ?? ''} placeholder="email@example.com"
@@ -303,13 +303,13 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
                 {term.single_post_price && (
-                  <span className="text-xs text-muted">{t('kolDetail.perPost')} <span className="text-ink font-medium">{formatPrice(term.single_post_price)}</span></span>
+                  <span className="text-xs text-muted">{t('kolDetail.perPost')} <span className="text-ink font-medium font-mono">{formatPrice(term.single_post_price)}</span></span>
                 )}
                 {term.package_price && (
-                  <span className="text-xs text-muted">{t('kolDetail.packageLabel')} <span className="text-ink font-medium">{formatPrice(term.package_price)}</span></span>
+                  <span className="text-xs text-muted">{t('kolDetail.packageLabel')} <span className="text-ink font-medium font-mono">{formatPrice(term.package_price)}</span></span>
                 )}
                 {term.multi_platform_price && (
-                  <span className="text-xs text-muted">Multi-plat <span className="text-ink font-medium">{formatPrice(term.multi_platform_price)}</span></span>
+                  <span className="text-xs text-muted">Multi-plat <span className="text-ink font-medium font-mono">{formatPrice(term.multi_platform_price)}</span></span>
                 )}
               </div>
               {term.notes && <p className="text-xs text-muted mt-1">{term.notes}</p>}
@@ -325,7 +325,7 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
       {showForm && (
         <div className="bg-canvas border border-accent/30 rounded-xl px-4 py-4 space-y-3">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">{t('kolDetail.addNewTerm')}</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className={labelCls}>{t('kolDetail.pricingTypeLabel')}</label>
               <Select
@@ -455,8 +455,8 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="sm:col-span-2">
           <label className="text-[11px] text-muted mb-0.5 block">Handle</label>
           <input type="text" value={handle} onChange={e => setHandle(e.target.value)} className={inputCls} />
         </div>
@@ -464,7 +464,7 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
           <label className="text-[11px] text-muted mb-0.5 block">Followers</label>
           <input type="number" min="0" value={follower} onChange={e => setFollower(e.target.value)} className={inputCls} />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className="text-[11px] text-muted mb-0.5 block">Profile URL</label>
           <input type="text" value={profileUrl} onChange={e => setProfileUrl(e.target.value)} placeholder="https://..." className={inputCls} />
         </div>
@@ -540,7 +540,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
       {showForm && (
         <div className="bg-canvas border border-accent/30 rounded-xl px-4 py-4 space-y-3">
           <p className="text-xs font-semibold text-muted uppercase tracking-wider">{t('kolDetail.addNewPlatform')}</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className={labelCls}>Platform</label>
               <Select
@@ -554,7 +554,7 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
               <input type="number" min="0" value={form.follower_count}
                 onChange={e => setForm(f => ({ ...f, follower_count: e.target.value }))} placeholder="0" className={inputCls} />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className={labelCls}>Handle *</label>
               <input type="text" value={form.handle}
                 onChange={e => setForm(f => ({ ...f, handle: e.target.value }))} placeholder="@username" className={inputCls} />
@@ -632,7 +632,7 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
                 <span className="font-semibold text-ink">{localKol.handle}</span>
               )}
               {localKol.follower_count && (
-                <span className="text-[11px] text-muted bg-canvas border border-hairline px-1.5 py-px rounded-md tabular-nums">
+                <span className="text-[11px] text-muted bg-canvas border border-hairline px-1.5 py-px rounded-md tabular-nums font-mono">
                   {formatFollower(localKol.follower_count)}
                 </span>
               )}
@@ -652,11 +652,11 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-hairline px-4 shrink-0">
-          <button className={tabCls(tab === 'profile')} onClick={() => setTab('profile')}>{t('kolDetail.tabProfile')}</button>
-          <button className={tabCls(tab === 'platform')} onClick={() => setTab('platform')}>Platform</button>
-          <button className={tabCls(tab === 'posts')} onClick={() => setTab('posts')}>{t('kolDetail.tabPosts')}</button>
-          <button className={tabCls(tab === 'terms')} onClick={() => setTab('terms')}>{t('kolDetail.tabTerms')}</button>
+        <div className="flex border-b border-hairline px-4 shrink-0 overflow-x-auto">
+          <button className={`${tabCls(tab === 'profile')} whitespace-nowrap`} onClick={() => setTab('profile')}>{t('kolDetail.tabProfile')}</button>
+          <button className={`${tabCls(tab === 'platform')} whitespace-nowrap`} onClick={() => setTab('platform')}>Platform</button>
+          <button className={`${tabCls(tab === 'posts')} whitespace-nowrap`} onClick={() => setTab('posts')}>{t('kolDetail.tabPosts')}</button>
+          <button className={`${tabCls(tab === 'terms')} whitespace-nowrap`} onClick={() => setTab('terms')}>{t('kolDetail.tabTerms')}</button>
         </div>
 
         {/* Content */}

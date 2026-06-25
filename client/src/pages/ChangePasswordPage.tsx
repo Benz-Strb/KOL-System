@@ -47,7 +47,7 @@ export default function ChangePasswordPage() {
       <div className="absolute top-4 right-4">
         <LanguageSwitcher variant="light" />
       </div>
-      <div className="bg-surface border border-hairline rounded-2xl w-full max-w-sm p-8 shadow-sm">
+      <div className="bg-surface border border-hairline rounded-xl w-full max-w-sm p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-11 h-11 bg-amber-500/10 rounded-xl mb-4">
             <KeyRound size={20} className="text-amber-600 dark:text-amber-400" />

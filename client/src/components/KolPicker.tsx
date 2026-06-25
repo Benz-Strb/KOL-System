@@ -187,7 +187,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
               <input type="text" placeholder={t('kolPicker.genNamePlaceholder')} value={newKol.gen_name}
                 onChange={e => setNewKol(k => ({ ...k, gen_name: e.target.value }))} className={inputCls} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Platform</label>
                 <Select

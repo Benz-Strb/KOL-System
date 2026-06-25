@@ -512,7 +512,7 @@ export default function DashboardPage() {
     : [];
 
   return (
-    <div className="px-6 py-6 max-w-screen-xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
           <div>
@@ -634,7 +634,7 @@ export default function DashboardPage() {
               {data.channelBreakdown.length === 0 ? (
                 <p className="text-sm text-muted">{t('dashboard.noGmvData')}</p>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-2">
                   <div className="w-44 h-44 shrink-0">
                     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 176, height: 176 }}>
                       <PieChart>

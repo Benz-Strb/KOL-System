@@ -25,6 +25,7 @@ export const th = {
     noItems: 'ไม่มีรายการ',
     signOut: 'ออกจากระบบ',
     toggleDarkMode: 'สลับธีมมืด/สว่าง',
+    openMenu: 'เปิดเมนู',
     selectLanguage: 'เลือกภาษา',
     selectPlaceholder: 'เลือก...',
     addNew: 'เพิ่มใหม่',

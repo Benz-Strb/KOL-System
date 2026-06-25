@@ -167,7 +167,7 @@ export default function NewPlacementPage() {
         <Link to="/placements" className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink transition-colors mb-3">
           <ChevronLeft size={14} /> {t('newPlacement.back')}
         </Link>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-xl font-semibold text-ink tracking-tight">{t('newPlacement.title')}</h1>
             <p className="text-sm text-muted mt-0.5">{t('newPlacement.defaultStatus')}</p>
@@ -195,7 +195,7 @@ export default function NewPlacementPage() {
 
         {/* Brand — แสดงเฉพาะเมื่อ user มีหลาย brand */}
         {dropdowns.brands.length > 1 && (
-          <div className="bg-surface border border-hairline rounded-2xl p-5">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
             <SectionHeader icon={<Tag size={15} />} title={t('newPlacement.brandSection')} />
             <Select
               options={dropdowns.brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))}
@@ -207,7 +207,7 @@ export default function NewPlacementPage() {
         )}
 
         {/* ประเภท */}
-        <div className="bg-surface border border-hairline rounded-2xl p-5">
+        <div className="bg-surface border border-hairline rounded-xl p-5">
           <SectionHeader
             icon={form.placement_type === 'online' ? <Globe size={15} /> : <Store size={15} />}
             title={t('newPlacement.typeSection')}
@@ -229,7 +229,7 @@ export default function NewPlacementPage() {
         </div>
 
         {/* KOL */}
-        <div className="bg-surface border border-hairline rounded-2xl p-5">
+        <div className="bg-surface border border-hairline rounded-xl p-5">
           <SectionHeader icon={<User size={15} />} title={t('newPlacement.kolSection')} />
           <div className="space-y-4">
             <div>
@@ -270,7 +270,7 @@ export default function NewPlacementPage() {
                 })}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Platform</label>
                 <Select
@@ -291,7 +291,7 @@ export default function NewPlacementPage() {
         </div>
 
         {/* สินค้า / ร้านค้า */}
-        <div className="bg-surface border border-hairline rounded-2xl p-5">
+        <div className="bg-surface border border-hairline rounded-xl p-5">
           <SectionHeader
             icon={<Package size={15} />}
             title={form.placement_type === 'online' ? t('newPlacement.productSection') : t('newPlacement.storeSection')}
@@ -313,7 +313,7 @@ export default function NewPlacementPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>{t('newPlacement.shop')}</label>
                 <Select
@@ -359,10 +359,10 @@ export default function NewPlacementPage() {
         </div>
 
         {/* Campaign + PIC */}
-        <div className="bg-surface border border-hairline rounded-2xl p-5">
+        <div className="bg-surface border border-hairline rounded-xl p-5">
           <SectionHeader icon={<Tag size={15} />} title={t('newPlacement.campaignSection')} />
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Campaign</label>
                 <Select
@@ -382,7 +382,7 @@ export default function NewPlacementPage() {
         </div>
 
         {/* ค่าตอบแทน */}
-        <div className="bg-surface border border-hairline rounded-2xl p-5">
+        <div className="bg-surface border border-hairline rounded-xl p-5">
           <SectionHeader icon={<CreditCard size={15} />} title={t('newPlacement.paymentSection')} />
           <div className="space-y-4">
             <div className="flex gap-2">
@@ -398,7 +398,7 @@ export default function NewPlacementPage() {
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Final Price ({t('common.currency')})</label>
                 <input type="number" value={form.final_price}
@@ -417,7 +417,7 @@ export default function NewPlacementPage() {
         </div>
 
         {/* หมายเหตุ */}
-        <div className="bg-surface border border-hairline rounded-2xl p-5">
+        <div className="bg-surface border border-hairline rounded-xl p-5">
           <SectionHeader icon={<FileText size={15} />} title={t('newPlacement.notesSection')} />
           <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
             rows={3} placeholder={t('newPlacement.notesPlaceholder')}

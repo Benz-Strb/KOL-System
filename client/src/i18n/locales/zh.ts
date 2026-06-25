@@ -20,6 +20,7 @@ export const zh = {
     noItems: '没有数据',
     signOut: '退出登录',
     toggleDarkMode: '切换深色模式',
+    openMenu: '打开菜单',
     selectLanguage: '选择语言',
     selectPlaceholder: '请选择...',
     addNew: '添加新项',

@@ -255,9 +255,9 @@ export default function PlacementsPage() {
 
   return (
     <>
-    <div className="px-6 py-6 max-w-screen-xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
         <div>
           <h1 className="text-xl font-bold text-ink tracking-tight">Placements</h1>
           <p className="text-sm text-muted mt-0.5">
@@ -279,17 +279,17 @@ export default function PlacementsPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-surface border border-hairline rounded-2xl mb-4">
+      <div className="bg-surface border border-hairline rounded-xl mb-4">
         {/* Main row */}
-        <div className="flex items-center gap-2 px-3 py-2.5">
-          <div className="relative">
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2.5">
+          <div className="relative w-full sm:w-auto">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             <input
               type="text"
               placeholder={t('placements.searchKol')}
               value={q}
               onChange={e => setQ(e.target.value)}
-              className="pl-8 pr-7 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent w-44 transition-colors"
+              className="pl-8 pr-7 py-1.5 rounded-lg text-sm bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent w-full sm:w-44 transition-colors"
             />
             {q && (
               <button onClick={() => setQ('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-ink">
@@ -298,7 +298,7 @@ export default function PlacementsPage() {
             )}
           </div>
 
-          <div className="w-px h-4 bg-hairline shrink-0" />
+          <div className="hidden sm:block w-px h-4 bg-hairline shrink-0" />
 
           {viewMode === 'list' && (
             <Select
@@ -399,7 +399,7 @@ export default function PlacementsPage() {
 
       {/* GMV Table */}
       {viewMode === 'gmv' && (
-        <div className="bg-surface border border-hairline rounded-2xl overflow-hidden">
+        <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -432,7 +432,7 @@ export default function PlacementsPage() {
                 )}
                 {!gmvLoading && kolGmv.map((r, i) => (
                   <tr key={r.kol_id} className="hover:bg-canvas transition-colors">
-                    <td className="px-4 py-3 text-xs text-muted tabular-nums">{i + 1}</td>
+                    <td className="px-4 py-3 text-xs text-muted tabular-nums font-mono">{i + 1}</td>
                     <td className="px-4 py-3">
                       {r.profile_url ? (
                         <a href={r.profile_url} target="_blank" rel="noopener noreferrer"
@@ -445,38 +445,38 @@ export default function PlacementsPage() {
                       )}
                       {r.gen_name && <div className="text-xs text-muted mt-0.5">{r.gen_name}</div>}
                     </td>
-                    <td className="px-4 py-3 text-right text-muted text-sm tabular-nums">{r.placement_count}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums text-muted">{formatGmv(r.shopee_gmv)}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums text-muted">{formatGmv(r.lazada_gmv)}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums text-muted">{formatGmv(r.website_gmv)}</td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums text-muted">{formatGmv(r.tiktok_gmv)}</td>
+                    <td className="px-4 py-3 text-right text-muted text-sm tabular-nums font-mono">{r.placement_count}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-mono text-muted">{formatGmv(r.shopee_gmv)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-mono text-muted">{formatGmv(r.lazada_gmv)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-mono text-muted">{formatGmv(r.website_gmv)}</td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums font-mono text-muted">{formatGmv(r.tiktok_gmv)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-semibold text-ink tabular-nums text-sm">{formatGmv(r.total_gmv)}</span>
+                      <span className="font-semibold text-ink tabular-nums font-mono text-sm">{formatGmv(r.total_gmv)}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-muted text-sm tabular-nums">{r.total_orders ? r.total_orders.toLocaleString(numberLocale()) : '—'}</td>
+                    <td className="px-4 py-3 text-right text-muted text-sm tabular-nums font-mono">{r.total_orders ? r.total_orders.toLocaleString(numberLocale()) : '—'}</td>
                   </tr>
                 ))}
                 {!gmvLoading && kolGmv.length > 0 && (
                   <tr className="border-t-2 border-hairline bg-canvas">
                     <td className="px-4 py-3" />
                     <td className="px-4 py-3 text-xs font-semibold text-muted uppercase tracking-wider">{t('placements.grandTotal')}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums font-mono">
                       {kolGmv.reduce((s, r) => s + r.placement_count, 0)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums font-mono">
                       {formatGmv(kolGmv.reduce((s, r) => s + r.shopee_gmv, 0))}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums font-mono">
                       {formatGmv(kolGmv.reduce((s, r) => s + r.lazada_gmv, 0))}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums font-mono">
                       {formatGmv(kolGmv.reduce((s, r) => s + r.website_gmv, 0))}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums font-mono">
                       {formatGmv(kolGmv.reduce((s, r) => s + r.tiktok_gmv, 0))}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-ink tabular-nums">{formatGmv(gmvTotal)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums">
+                    <td className="px-4 py-3 text-right text-sm font-bold text-ink tabular-nums font-mono">{formatGmv(gmvTotal)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold text-ink tabular-nums font-mono">
                       {gmvOrders ? gmvOrders.toLocaleString(numberLocale()) : '—'}
                     </td>
                   </tr>
@@ -488,7 +488,7 @@ export default function PlacementsPage() {
       )}
 
       {/* List Table */}
-      <div className={viewMode === 'gmv' ? 'hidden' : 'bg-surface border border-hairline rounded-2xl overflow-hidden'}>
+      <div className={viewMode === 'gmv' ? 'hidden' : 'bg-surface border border-hairline rounded-xl overflow-hidden'}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -541,7 +541,7 @@ export default function PlacementsPage() {
                               <span className="font-semibold text-ink">{handle || '—'}</span>
                             )}
                             {r.kols?.follower_count && (
-                              <span className="text-[11px] text-muted tabular-nums bg-canvas border border-hairline px-1.5 py-px rounded-md"
+                              <span className="text-[11px] text-muted tabular-nums font-mono bg-canvas border border-hairline px-1.5 py-px rounded-md"
                                 title={r.kols.follower_count.toLocaleString(numberLocale()) + ' followers'}>
                                 {formatFollower(r.kols.follower_count)}
                               </span>
@@ -573,7 +573,7 @@ export default function PlacementsPage() {
                           {r.payment_type}
                         </span>
                         {r.payment_type === 'paid' && r.final_price && (
-                          <span className="text-[11px] text-muted tabular-nums font-medium">{formatPrice(r.final_price)}</span>
+                          <span className="text-[11px] text-muted tabular-nums font-mono font-medium">{formatPrice(r.final_price)}</span>
                         )}
                         {pic && <span className="text-[11px] text-muted">· {pic}</span>}
                       </div>

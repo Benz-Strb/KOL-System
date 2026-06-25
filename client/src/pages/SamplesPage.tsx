@@ -168,7 +168,7 @@ function CreateSampleModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Brand — auto หรือ dropdown */}
             <div>
               <label className={labelCls}>Brand</label>
@@ -324,7 +324,7 @@ export default function SamplesPage() {
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
-    <div className="px-6 py-6 max-w-screen-xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
       {/* Header + Filters */}
       <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -361,7 +361,7 @@ export default function SamplesPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-surface border border-hairline rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

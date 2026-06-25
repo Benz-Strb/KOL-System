@@ -105,7 +105,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Publication Date</label>
                 <input type="date" value={form.publication_date}
@@ -133,7 +133,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
                 <p className="text-xs font-medium text-muted uppercase tracking-wider mb-2">
                   {isYoutube ? 'YouTube Stats' : 'Lemon8 Stats'} {t('performance.optional')}
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {isYoutube && (
                     <>
                       <div>

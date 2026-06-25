@@ -12,7 +12,7 @@ import {
 import Toast from '../components/Toast.js';
 import Select from '../components/Select.js';
 
-const cardCls = 'bg-surface border border-hairline rounded-2xl p-5';
+const cardCls = 'bg-surface border border-hairline rounded-xl p-5';
 
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (

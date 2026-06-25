@@ -174,10 +174,10 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
       onClick={onClick}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
-      className={`bg-surface border rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 flex flex-col ${
+      className={`bg-surface border rounded-xl overflow-hidden cursor-pointer transition-all duration-200 flex flex-col ${
         expanded
           ? 'relative z-20 scale-[1.12] -translate-y-1 shadow-2xl border-accent/40'
-          : 'border-hairline hover:shadow-md hover:border-accent/30 hover:-translate-y-0.5'
+          : 'border-hairline hover:border-accent/30'
       }`}
     >
       <div className="p-4 flex flex-col gap-3 flex-1">
@@ -196,7 +196,7 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
           <div className="flex items-center gap-1 shrink-0">
             {r.follower_count && (
               <span
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted tabular-nums bg-canvas border border-hairline px-1.5 py-0.5 rounded-md"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted tabular-nums font-mono bg-canvas border border-hairline px-1.5 py-0.5 rounded-md"
                 title={r.follower_count.toLocaleString(numberLocale()) + ' followers'}>
                 <Users size={9} className="shrink-0" />
                 {formatFollower(r.follower_count)}
@@ -234,7 +234,7 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
 // ─── Skeleton card ────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="bg-surface border border-hairline rounded-2xl overflow-hidden animate-pulse">
+    <div className="bg-surface border border-hairline rounded-xl overflow-hidden animate-pulse">
       <div className="p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-xl bg-canvas shrink-0" />
@@ -317,7 +317,7 @@ export default function KolsPage() {
   function clearAll() { setQ(''); setPlatformId(''); setCategoryId(''); setPage(1); }
 
   return (
-    <div className="px-6 py-6 max-w-screen-xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
       {/* Header + filters in one row */}
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div>

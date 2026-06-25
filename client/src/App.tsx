@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut } from 'lucide-react';
+import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut, Menu } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
@@ -100,6 +100,17 @@ function Layout({ children }: { children: React.ReactNode }) {
     if (dashboardSectionActive) setDashboardOpen(true);
   }, [dashboardSectionActive]);
 
+  // Mobile off-canvas drawer — closed by default, closes itself on every navigation
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileNavOpen]);
+
   function toggleDark() {
     const next = !dark;
     setDark(next);
@@ -131,8 +142,39 @@ function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+      {/* Mobile top bar — hidden on lg+ where the sidebar is always visible */}
+      <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between gap-2 bg-black h-12 px-3">
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          className="text-white/70 hover:text-white p-2 -ml-1 rounded-lg hover:bg-white/5 transition-colors"
+          aria-label={t('common.openMenu')}
+        >
+          <Menu size={20} />
+        </button>
+        <Link to="/" className="text-white text-sm font-semibold tracking-tight">KOL System</Link>
+        <Link
+          to="/placements/new"
+          className="text-white/70 hover:text-white p-2 -mr-1 rounded-lg hover:bg-white/5 transition-colors"
+          aria-label={t('nav.addPlacement')}
+        >
+          <Plus size={20} />
+        </Link>
+      </div>
+
+      {/* Backdrop behind the mobile drawer */}
+      {mobileNavOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
       <div className="flex">
-        <aside className="w-56 shrink-0 bg-black sticky top-0 h-screen flex flex-col">
+        <aside
+          className={`bg-black flex flex-col shrink-0 z-50 fixed left-0 top-0 h-screen w-64 transition-transform duration-200 lg:sticky lg:top-0 lg:w-56 lg:translate-x-0 ${
+            mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
           <Link to="/" className="text-white text-sm font-semibold tracking-tight px-4 h-11 flex items-center shrink-0">
             KOL System
           </Link>

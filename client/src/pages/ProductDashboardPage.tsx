@@ -34,14 +34,14 @@ const selectCls = [
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-surface border border-hairline rounded-2xl p-4 flex flex-col gap-2 shadow-sm hover:shadow-lg hover:border-accent/30 hover:-translate-y-0.5 transition-all duration-200">
+    <div className="bg-surface border border-hairline rounded-xl p-4 flex flex-col gap-2 hover:border-accent/30 transition-colors duration-200">
       <div className="flex items-center gap-1.5">
         <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-accent/10 text-accent shrink-0">
           {icon}
         </span>
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</span>
       </div>
-      <div className="text-xl font-bold text-ink tabular-nums leading-tight">{value}</div>
+      <div className="text-xl font-bold text-ink tabular-nums font-mono leading-tight">{value}</div>
       {sub && <div className="text-[11px] text-muted">{sub}</div>}
     </div>
   );
@@ -49,7 +49,7 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
 
 function SkeletonKpiCard() {
   return (
-    <div className="bg-surface border border-hairline rounded-2xl p-4 flex flex-col gap-2 animate-pulse">
+    <div className="bg-surface border border-hairline rounded-xl p-4 flex flex-col gap-2 animate-pulse">
       <div className="h-2.5 bg-canvas rounded-md w-2/3" />
       <div className="h-5 bg-canvas rounded-md w-1/2" />
       <div className="h-2 bg-canvas rounded-md w-3/4" />
@@ -81,11 +81,11 @@ function ProductRow({ p, rank, sortMode }: { p: ProductRankRow; rank: number; so
         <div className="text-sm font-medium text-ink truncate">{p.model_code}</div>
         {p.category_name && <div className="text-[11px] text-muted truncate">{p.category_name}</div>}
       </div>
-      <span className="text-xs text-muted tabular-nums shrink-0">{p.placement_count} placement</span>
+      <span className="text-xs text-muted tabular-nums font-mono shrink-0">{p.placement_count} placement</span>
       {sortMode === 'orders' && (
-        <span className="text-xs font-semibold text-emerald-600 tabular-nums w-24 text-right shrink-0">{p.total_orders.toLocaleString(numberLocale())} orders</span>
+        <span className="text-xs font-semibold text-emerald-600 tabular-nums font-mono w-24 text-right shrink-0">{p.total_orders.toLocaleString(numberLocale())} orders</span>
       )}
-      <span className="text-sm font-semibold text-ink tabular-nums w-28 text-right shrink-0">{formatMoney(p.total_gmv)}</span>
+      <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(p.total_gmv)}</span>
     </div>
   );
 }
@@ -151,7 +151,7 @@ export default function ProductDashboardPage() {
     : [];
 
   return (
-    <div className="px-6 py-6 max-w-screen-xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
           <div>
@@ -208,7 +208,7 @@ export default function ProductDashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)}
           </div>
-          <div className="bg-surface border border-hairline rounded-2xl p-5">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
             <div className="h-3.5 bg-canvas rounded-md w-52 mb-4 animate-pulse" />
             <div className="flex flex-col gap-1">
               {Array.from({ length: 12 }).map((_, i) => <SkeletonRow key={i} />)}
@@ -224,7 +224,7 @@ export default function ProductDashboardPage() {
             <KpiCard icon={<Layers size={13} />} label={t('productDashboard.productsWithSales')} value={data.summary.product_count.toLocaleString(numberLocale())} />
           </div>
 
-          <div className="bg-surface border border-hairline rounded-2xl p-5 shadow-sm">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
                 <Trophy size={14} className="text-accent" /> {t('productDashboard.rankingTitle')}

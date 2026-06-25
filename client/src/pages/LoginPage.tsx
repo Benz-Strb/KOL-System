@@ -45,7 +45,7 @@ export default function LoginPage() {
       <div className="absolute top-4 right-4">
         <LanguageSwitcher variant="light" />
       </div>
-      <div className={`bg-surface border border-hairline rounded-2xl w-full max-w-sm p-8 shadow-sm ${shake ? 'shake' : ''}`}>
+      <div className={`bg-surface border border-hairline rounded-xl w-full max-w-sm p-8 ${shake ? 'shake' : ''}`}>
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-11 h-11 bg-accent/10 rounded-xl mb-4">
             <LayoutList size={20} className="text-accent" />
