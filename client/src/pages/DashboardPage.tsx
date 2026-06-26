@@ -211,6 +211,7 @@ function PlatformBreakdownCard({
 }) {
   const { t } = useTranslation();
   const total = rows.reduce((s, r) => s + r.placement_count, 0);
+  const maxCount = Math.max(...rows.map(r => r.placement_count), 1);
   return (
     <div className="bg-surface border border-hairline rounded-xl p-5">
       <h2 className="text-sm font-semibold text-ink mb-1">{t('dashboard.platformBreakdownTitle')}</h2>
@@ -228,16 +229,16 @@ function PlatformBreakdownCard({
                     <PlatformLogo name={r.platform_name} size={20} />
                     <span className="text-sm font-medium text-ink truncate">{r.platform_name}</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-muted tabular-nums font-mono">{pct.toFixed(1)}%</span>
-                    <span className="text-sm font-semibold text-ink tabular-nums font-mono">{r.placement_count.toLocaleString()}</span>
-                  </div>
+                  <span className="text-sm font-semibold text-ink tabular-nums font-mono shrink-0">
+                    {formatMoney(r.total_gmv)}
+                  </span>
                 </div>
                 <div className="h-2 rounded-full bg-canvas overflow-hidden">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${(r.placement_count / maxCount) * 100}%` }} />
                 </div>
                 <span className="text-[11px] text-muted">
                   {t('dashboard.kolAndPlacements', { kols: r.kol_count, placements: r.placement_count })}
+                  {' · '}{pct.toFixed(1)}%
                 </span>
               </div>
             );
