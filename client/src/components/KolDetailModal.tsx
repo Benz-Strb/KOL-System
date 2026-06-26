@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Plus, Trash2, ExternalLink, Tag } from 'lucide-react';
-import type { KolDirectoryRow, CommercialTerm, ContactInfo, KolPlatformAccount, KolPlatformsBundle, Platform, KolPost } from '../api/index.js';
-import { updateKol, getKolTerms, createKolTerm, deleteKolTerm, getDropdowns, addKolPlatform, updateKolPlatform, deleteKolPlatform, getKolPosts } from '../api/index.js';
+import type { KolDirectoryRow, CommercialTerm, ContactInfo, KolPlatformAccount, KolPlatformsBundle, Platform, KolPost, KolHireHistoryItem } from '../api/index.js';
+import { updateKol, getKolTerms, createKolTerm, deleteKolTerm, getDropdowns, addKolPlatform, updateKolPlatform, deleteKolPlatform, getKolPosts, getKolHireHistory } from '../api/index.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
 import Select from './Select.js';
 import PlatformLogo from './PlatformLogo.js';
@@ -585,11 +585,85 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
   );
 }
 
+// ─── Hire History Tab ────────────────────────────────────────
+// Shows brand-scoped placement cost timeline (planned + posted, no cancelled)
+function HireHistoryTab({ kol }: { kol: KolDirectoryRow }) {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<KolHireHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getKolHireHistory(kol.id).then(setItems).finally(() => setLoading(false));
+  }, [kol.id]);
+
+  if (loading) return (
+    <div className="py-10 flex justify-center">
+      <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (items.length === 0) {
+    return <p className="text-sm text-muted text-center py-6">{t('kolDetail.noHireHistory')}</p>;
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {items.map(item => {
+        const subtitle = item.products?.model_code
+          ?? (item.stores ? [item.stores.name, item.stores.branch].filter(Boolean).join(' · ') : null);
+        const isPosted = item.status === 'posted';
+        const price = item.final_price ? Number(item.final_price) : null;
+        const paid = item.pay_amount ? Number(item.pay_amount) : null;
+        const hasPay = isPosted && item.payment_type === 'paid' && paid != null;
+        const payDiffers = hasPay && price != null && paid !== price;
+        return (
+          <div key={item.id}
+            className="flex items-start gap-3 bg-canvas border border-hairline rounded-xl px-3.5 py-2.5">
+            <div className="mt-0.5 shrink-0"><BrandLogo name={item.brands.name} logoUrl={item.brands.logo_url} size={28} /></div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-sm font-medium text-ink">{item.brands.name}</span>
+                {item.platforms && <PlatformLogo name={item.platforms.name} size={14} />}
+                {item.campaigns && (
+                  <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full">{item.campaigns.code}</span>
+                )}
+              </div>
+              {subtitle && <p className="text-xs text-muted mt-0.5 truncate">{subtitle}</p>}
+              {isPosted && item.publication_date && (
+                <p className="text-xs text-muted">
+                  {new Date(item.publication_date).toLocaleDateString(numberLocale(), { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+            <div className="text-right shrink-0 space-y-0.5">
+              <span className={`inline-block text-[10px] font-medium px-2 py-px rounded-full ${
+                isPosted ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                         : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+              }`}>
+                {isPosted ? 'Posted' : 'Planned'}
+              </span>
+              <p className="text-[11px] text-muted">
+                {item.payment_type === 'barter' ? 'Barter' : item.payment_type === 'free' ? 'Free' : 'Paid'}
+              </p>
+              {price != null && (
+                <p className="text-xs font-mono font-semibold text-ink">{price.toLocaleString(numberLocale())} ฿</p>
+              )}
+              {payDiffers && (
+                <p className="text-[10px] font-mono text-muted">{t('kolDetail.paidAmount')}: {paid!.toLocaleString(numberLocale())} ฿</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main Modal ──────────────────────────────────────────────
 export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
   const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
-  const [tab, setTab] = useState<'profile' | 'platform' | 'posts' | 'terms'>('profile');
+  const [tab, setTab] = useState<'profile' | 'platform' | 'hire-history' | 'posts' | 'terms'>('profile');
   const [localKol, setLocalKol] = useState(kol);
 
   function handleUpdated(partial: Partial<KolDirectoryRow>) {
@@ -655,6 +729,7 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
         <div className="flex border-b border-hairline px-4 shrink-0 overflow-x-auto">
           <button className={`${tabCls(tab === 'profile')} whitespace-nowrap`} onClick={() => setTab('profile')}>{t('kolDetail.tabProfile')}</button>
           <button className={`${tabCls(tab === 'platform')} whitespace-nowrap`} onClick={() => setTab('platform')}>Platform</button>
+          <button className={`${tabCls(tab === 'hire-history')} whitespace-nowrap`} onClick={() => setTab('hire-history')}>{t('kolDetail.tabHireHistory')}</button>
           <button className={`${tabCls(tab === 'posts')} whitespace-nowrap`} onClick={() => setTab('posts')}>{t('kolDetail.tabPosts')}</button>
           <button className={`${tabCls(tab === 'terms')} whitespace-nowrap`} onClick={() => setTab('terms')}>{t('kolDetail.tabTerms')}</button>
         </div>
@@ -663,6 +738,7 @@ export default function KolDetailModal({ kol, onClose, onUpdated }: Props) {
         <div className="overflow-y-auto flex-1 px-6 py-5">
           {tab === 'profile' && <ProfileTab kol={localKol} onUpdated={handleUpdated} />}
           {tab === 'platform' && <PlatformTab kol={localKol} onUpdated={handleUpdated} />}
+          {tab === 'hire-history' && <HireHistoryTab kol={localKol} />}
           {tab === 'posts' && <PostsTab kol={localKol} />}
           {tab === 'terms' && <TermsTab kol={localKol} />}
         </div>

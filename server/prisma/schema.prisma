@@ -75,36 +75,39 @@ model kols {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model placement_metrics {
-  id               Int        @id @default(autoincrement())
-  placement_id     Int
-  channel          String
-  period_days      Int        @default(30)
-  measured_at      DateTime?  @db.Date
-  visits           Int?
-  atc              Int?
-  atc_value        Decimal?   @db.Decimal(14, 2)
-  gmv              Decimal?   @db.Decimal(14, 2)
-  orders           Int?
-  vdo_view         Int?
-  clicks           Int?
-  ads_spend        Decimal?   @db.Decimal(14, 2)
-  is_automated     Boolean    @default(false)
-  created_at       DateTime   @default(now()) @db.Timestamptz(6)
-  likes            Int?
-  comments         Int?
-  saves            Int?
-  impressions      Int?
-  shares           Int?
-  engagement_rate  Decimal?   @db.Decimal(10, 6)
-  tracking_period  String?    @default("recent_30_days")
-  promotion_status String?
-  placements       placements @relation(fields: [placement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                Int                @id @default(autoincrement())
+  placement_id      Int
+  channel           String
+  period_days       Int                @default(30)
+  measured_at       DateTime?          @db.Date
+  visits            Int?
+  atc               Int?
+  atc_value         Decimal?           @db.Decimal(14, 2)
+  gmv               Decimal?           @db.Decimal(14, 2)
+  orders            Int?
+  vdo_view          Int?
+  clicks            Int?
+  ads_spend         Decimal?           @db.Decimal(14, 2)
+  is_automated      Boolean            @default(false)
+  created_at        DateTime           @default(now()) @db.Timestamptz(6)
+  likes             Int?
+  comments          Int?
+  saves             Int?
+  impressions       Int?
+  shares            Int?
+  engagement_rate   Decimal?           @db.Decimal(10, 6)
+  tracking_period   String?            @default("recent_30_days")
+  promotion_status  String?
+  repost_id         Int?
+  placements        placements         @relation(fields: [placement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  placement_reposts placement_reposts? @relation(fields: [repost_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([placement_id, channel, period_days, measured_at])
   @@index([channel], map: "idx_metrics_channel")
   @@index([placement_id], map: "idx_metrics_placement")
   @@index([promotion_status], map: "idx_metrics_promotion_status")
   @@index([tracking_period], map: "idx_metrics_tracking_period")
+  @@index([repost_id], map: "idx_metrics_repost_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -140,6 +143,7 @@ model placements {
   created_by_id                               Int?
   kol_samples                                 kol_samples[]
   placement_metrics                           placement_metrics[]
+  placement_reposts                           placement_reposts[]
   brands                                      brands              @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   campaigns                                   campaigns?          @relation(fields: [campaign_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users_placements_created_by_idTousers       users?              @relation("placements_created_by_idTousers", fields: [created_by_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -298,4 +302,45 @@ model kol_platforms {
   @@index([kol_id], map: "idx_kol_platforms_kol_id")
   @@index([platform_id], map: "idx_kol_platforms_platform_id")
   @@index([kol_tier_id], map: "idx_kol_platforms_tier")
+}
+
+model offplatform_traffic_daily {
+  id                BigInt   @id @default(autoincrement())
+  platform          String   @db.VarChar(20)
+  brand_id          String   @db.VarChar(50)
+  brand_name        String?  @db.VarChar(100)
+  report_date       DateTime @db.Date
+  channel           String?  @db.VarChar(150)
+  campaign_name     String?  @db.VarChar(255)
+  ad_content        String?  @db.VarChar(255)
+  visits            BigInt?
+  unique_visitors   BigInt?
+  add_to_cart_units BigInt?
+  revenue_local     Decimal? @db.Decimal(18, 2)
+  revenue_usd       Decimal? @db.Decimal(18, 2)
+  orders            BigInt?
+  units_sold        BigInt?
+  buyers            BigInt?
+  new_buyers        BigInt?
+  conversion_rate   Float?
+  synced_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([brand_id, report_date], map: "idx_optd_brand_date")
+  @@index([platform, report_date], map: "idx_optd_platform_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model placement_reposts {
+  id                Int                 @id @default(autoincrement())
+  placement_id      Int
+  round_number      Int
+  posted_by         String              @db.VarChar(10)
+  post_url          String?
+  posted_at         DateTime?           @db.Date
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  placement_metrics placement_metrics[]
+  placements        placements          @relation(fields: [placement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([placement_id, round_number])
+  @@index([placement_id], map: "idx_placement_reposts_placement_id")
 }

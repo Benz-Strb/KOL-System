@@ -321,4 +321,145 @@ app.post('/', async c => {
   }
 });
 
+// ─── Reposts ─────────────────────────────────────────────────────────────
+
+app.get('/:id/reposts', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const placementId = Number(c.req.param('id'));
+
+    if (user.role !== 'admin') {
+      const p = await prisma.placements.findUnique({ where: { id: placementId }, select: { brand_id: true } });
+      if (!p || !user.brandIds.includes(p.brand_id)) return c.json({ error: 'Not found' }, 404);
+    }
+
+    const reposts = await prisma.placement_reposts.findMany({
+      where: { placement_id: placementId },
+      orderBy: { round_number: 'asc' },
+      include: { placement_metrics: { orderBy: { measured_at: 'desc' } } },
+    });
+
+    return c.json(reposts);
+  } catch (err) { console.error(err); return c.json({ error: 'failed' }, 500); }
+});
+
+app.post('/:id/reposts', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const placementId = Number(c.req.param('id'));
+
+    if (user.role !== 'admin') {
+      const p = await prisma.placements.findUnique({ where: { id: placementId }, select: { brand_id: true } });
+      if (!p || !user.brandIds.includes(p.brand_id)) return c.json({ error: 'Not found' }, 404);
+    }
+
+    const { posted_by, post_url, posted_at } = await c.req.json() as {
+      posted_by: 'brand' | 'kol'; post_url?: string; posted_at?: string;
+    };
+    if (!posted_by || !['brand', 'kol'].includes(posted_by))
+      return c.json({ error: 'posted_by must be brand or kol' }, 400);
+
+    const last = await prisma.placement_reposts.findFirst({
+      where: { placement_id: placementId }, orderBy: { round_number: 'desc' }, select: { round_number: true },
+    });
+    const round_number = (last?.round_number ?? 0) + 1;
+
+    const repost = await prisma.placement_reposts.create({
+      data: {
+        placement_id: placementId, round_number, posted_by,
+        post_url: post_url?.trim() || null,
+        posted_at: posted_at ? new Date(posted_at) : null,
+      },
+    });
+    return c.json(repost, 201);
+  } catch (err) { console.error(err); return c.json({ error: 'failed' }, 500); }
+});
+
+app.patch('/:id/reposts/:repostId', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const placementId = Number(c.req.param('id'));
+    const repostId = Number(c.req.param('repostId'));
+
+    if (user.role !== 'admin') {
+      const p = await prisma.placements.findUnique({ where: { id: placementId }, select: { brand_id: true } });
+      if (!p || !user.brandIds.includes(p.brand_id)) return c.json({ error: 'Not found' }, 404);
+    }
+
+    const { posted_by, post_url, posted_at } = await c.req.json() as {
+      posted_by?: 'brand' | 'kol'; post_url?: string; posted_at?: string | null;
+    };
+
+    const updated = await prisma.placement_reposts.update({
+      where: { id: repostId, placement_id: placementId },
+      data: {
+        ...(posted_by ? { posted_by } : {}),
+        ...(post_url !== undefined ? { post_url: post_url?.trim() || null } : {}),
+        ...(posted_at !== undefined ? { posted_at: posted_at ? new Date(posted_at) : null } : {}),
+      },
+    });
+    return c.json(updated);
+  } catch (err) { console.error(err); return c.json({ error: 'failed' }, 500); }
+});
+
+app.delete('/:id/reposts/:repostId', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const placementId = Number(c.req.param('id'));
+    const repostId = Number(c.req.param('repostId'));
+
+    if (user.role !== 'admin') {
+      const p = await prisma.placements.findUnique({ where: { id: placementId }, select: { brand_id: true } });
+      if (!p || !user.brandIds.includes(p.brand_id)) return c.json({ error: 'Not found' }, 404);
+    }
+
+    await prisma.placement_reposts.delete({ where: { id: repostId, placement_id: placementId } });
+    return c.json({ ok: true });
+  } catch (err) { console.error(err); return c.json({ error: 'failed' }, 500); }
+});
+
+app.post('/:id/reposts/:repostId/metrics', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const placementId = Number(c.req.param('id'));
+    const repostId = Number(c.req.param('repostId'));
+
+    if (user.role !== 'admin') {
+      const p = await prisma.placements.findUnique({ where: { id: placementId }, select: { brand_id: true } });
+      if (!p || !user.brandIds.includes(p.brand_id)) return c.json({ error: 'Not found' }, 404);
+    }
+
+    const repost = await prisma.placement_reposts.findUnique({ where: { id: repostId, placement_id: placementId } });
+    if (!repost) return c.json({ error: 'Repost not found' }, 404);
+
+    const { channel, measured_at, vdo_view, likes, comments, saves, shares } = await c.req.json() as {
+      channel: string; measured_at?: string;
+      vdo_view?: number | null; likes?: number | null;
+      comments?: number | null; saves?: number | null; shares?: number | null;
+    };
+    if (!channel) return c.json({ error: 'channel is required' }, 400);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const measuredDate = new Date(measured_at ?? today);
+
+    // replace existing metric for this repost+channel (no unique index on repost_id yet so use deleteMany+create)
+    await prisma.placement_metrics.deleteMany({ where: { repost_id: repostId, channel } });
+    const metric = await prisma.placement_metrics.create({
+      data: {
+        placement_id: placementId, repost_id: repostId,
+        channel, period_days: 0, measured_at: measuredDate,
+        is_automated: false,
+        vdo_view: vdo_view ?? null, likes: likes ?? null,
+        comments: comments ?? null, saves: saves ?? null, shares: shares ?? null,
+      },
+    });
+    return c.json(metric, 201);
+  } catch (err) { console.error(err); return c.json({ error: 'failed' }, 500); }
+});
+
 export default app;

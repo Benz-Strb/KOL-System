@@ -45,6 +45,7 @@ const EMPTY_RESPONSE = {
   paymentTypeBreakdown: [] as PaymentTypeRow[],
   tierBreakdown: [] as TierRow[],
   platformBreakdown: [] as PlatformRow[],
+  kolPaymentBreakdown: [] as { kol_id: number; payment_type: string; placement_count: number; total_gmv: number; total_spend: number }[],
 };
 
 type PaymentTypeRow = {
@@ -83,6 +84,8 @@ type KolRankRow = {
   profile_url: string | null;
   avatar_url: string | null;
   follower_count: number | null;
+  kol_tier_id: number | null;
+  tier_name: string | null;
   placement_count: number;
   total_gmv: number;
   total_spend: number;
@@ -364,6 +367,33 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       byChannel: byChannelMap.get(r.kol_id) ?? [],
     }));
 
+    // per-KOL per-payment-type GMV — used by the comparison tool tab
+    const kolPaymentBreakdown = await prisma.$queryRaw<{
+      kol_id: number;
+      payment_type: string;
+      placement_count: number;
+      total_gmv: number;
+      total_spend: number;
+    }[]>`
+      WITH metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        p.kol_id::int                                                    AS kol_id,
+        p.payment_type,
+        COUNT(DISTINCT p.id)::int                                        AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float                                  AS total_gmv,
+        COALESCE(SUM(COALESCE(p.pay_amount, p.final_price, 0)), 0)::float AS total_spend
+      FROM placements p
+      LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)}) AND p.kol_id IS NOT NULL
+      GROUP BY p.kol_id, p.payment_type
+      ORDER BY total_gmv DESC
+    `;
+
     const topKolsByGmv = [...kolRows].sort((a, b) => b.total_gmv - a.total_gmv).slice(0, 10);
     const topKolsByRoi = kolRows
       .filter(k => k.roi != null)
@@ -422,6 +452,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       paymentTypeBreakdown,
       tierBreakdown,
       platformBreakdown,
+      kolPaymentBreakdown,
     };
   }
 }
@@ -908,6 +939,109 @@ app.get('/products/:id', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load product kol breakdown' }, 500);
+  }
+});
+
+// brand_id (integer in our system) → brand_id strings in offplatform_traffic_daily
+const OFFPLATFORM_BRAND_MAP: Record<number, string[]> = {
+  1: ['dreame'],
+  2: ['xiaomi_mg', 'youpin'],
+};
+
+function buildOffplatformBrandStrings(role: string, brandIds: number[], brand_id?: string): string[] | null {
+  const bid = brand_id ? Number(brand_id) : null;
+  if (role === 'admin') {
+    if (!bid) return null; // null = no filter, show all brands
+    return OFFPLATFORM_BRAND_MAP[bid] ?? [];
+  }
+  // manager: filter to their accessible brands
+  const targetIds = bid && brandIds.includes(bid) ? [bid] : brandIds;
+  return targetIds.flatMap(id => OFFPLATFORM_BRAND_MAP[id] ?? []);
+}
+
+// ─── GET /offplatform — off-platform traffic summary (Shopee Ads) ─────────────
+app.get('/offplatform', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const brand_id = c.req.query('brand_id');
+    const date_from = c.req.query('date_from');
+    const date_to = c.req.query('date_to');
+
+    const dateEnd = date_to ? new Date(date_to) : new Date();
+    const dateStart = date_from
+      ? new Date(date_from)
+      : new Date(new Date(dateEnd).setDate(dateEnd.getDate() - 29));
+
+    const dateStartStr = dateStart.toISOString().slice(0, 10);
+    const dateEndStr = dateEnd.toISOString().slice(0, 10);
+
+    const brandStrings = buildOffplatformBrandStrings(user.role, user.brandIds, brand_id);
+    const brandSql = brandStrings === null
+      ? Prisma.empty
+      : brandStrings.length === 0
+        ? Prisma.sql`AND 1 = 0`
+        : Prisma.sql`AND brand_id IN (${Prisma.join(brandStrings)})`;
+
+    const [summaryRow] = await prisma.$queryRaw<{ total_revenue: number; total_orders: number; total_visits: number }[]>(
+      Prisma.sql`
+        SELECT
+          COALESCE(SUM(revenue_local), 0)::float AS total_revenue,
+          COALESCE(SUM(orders), 0)::int          AS total_orders,
+          COALESCE(SUM(visits), 0)::int          AS total_visits
+        FROM offplatform_traffic_daily
+        WHERE report_date BETWEEN ${dateStartStr}::date AND ${dateEndStr}::date
+        ${brandSql}
+      `
+    );
+
+    // normalize long channel names (e.g. "Facebook Collaborative Ads - Sales" → "Facebook")
+    // so multiple sub-channels are grouped into one readable label
+    const channelNorm = Prisma.sql`
+      CASE
+        WHEN channel ILIKE 'facebook%' THEN 'Facebook'
+        WHEN channel ILIKE 'google%'   THEN 'Google'
+        WHEN channel = 'N/a' OR channel IS NULL THEN 'Others'
+        ELSE channel
+      END
+    `;
+
+    const dailyTrend = await prisma.$queryRaw<{ date: string; channel: string; revenue: number; orders: number; visits: number }[]>(
+      Prisma.sql`
+        SELECT
+          report_date::text                       AS date,
+          ${channelNorm}                          AS channel,
+          COALESCE(SUM(revenue_local), 0)::float  AS revenue,
+          COALESCE(SUM(orders), 0)::int           AS orders,
+          COALESCE(SUM(visits), 0)::int           AS visits
+        FROM offplatform_traffic_daily
+        WHERE report_date BETWEEN ${dateStartStr}::date AND ${dateEndStr}::date
+        ${brandSql}
+        GROUP BY report_date, ${channelNorm}
+        ORDER BY report_date, revenue DESC
+      `
+    );
+
+    const channelBreakdown = await prisma.$queryRaw<{ channel: string; revenue: number; orders: number; visits: number }[]>(
+      Prisma.sql`
+        SELECT
+          ${channelNorm}                          AS channel,
+          COALESCE(SUM(revenue_local), 0)::float  AS revenue,
+          COALESCE(SUM(orders), 0)::int           AS orders,
+          COALESCE(SUM(visits), 0)::int           AS visits
+        FROM offplatform_traffic_daily
+        WHERE report_date BETWEEN ${dateStartStr}::date AND ${dateEndStr}::date
+        ${brandSql}
+        GROUP BY ${channelNorm}
+        HAVING SUM(revenue_local) > 0
+        ORDER BY revenue DESC
+      `
+    );
+
+    return c.json({ summary: summaryRow, dailyTrend, channelBreakdown });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load offplatform traffic' }, 500);
   }
 });
 

@@ -203,6 +203,34 @@ export type MetricEntry = {
 export const getPlacementMetrics = (id: number) =>
   api<PlacementMetric[]>(`/api/placements/${id}/metrics`);
 
+export type PlacementRepost = {
+  id: number;
+  placement_id: number;
+  round_number: number;
+  posted_by: 'brand' | 'kol';
+  post_url: string | null;
+  posted_at: string | null;
+  created_at: string;
+  placement_metrics: PlacementMetric[];
+};
+
+export const getReposts = (placementId: number) =>
+  api<PlacementRepost[]>(`/api/placements/${placementId}/reposts`);
+
+export const createRepost = (placementId: number, body: { posted_by: 'brand' | 'kol'; post_url?: string; posted_at?: string }) =>
+  api<PlacementRepost>(`/api/placements/${placementId}/reposts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+export const updateRepost = (placementId: number, repostId: number, body: { posted_by?: 'brand' | 'kol'; post_url?: string | null; posted_at?: string | null }) =>
+  api<PlacementRepost>(`/api/placements/${placementId}/reposts/${repostId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+export const deleteRepost = (placementId: number, repostId: number) =>
+  api<{ ok: boolean }>(`/api/placements/${placementId}/reposts/${repostId}`, { method: 'DELETE' });
+
+export const saveRepostMetrics = (
+  placementId: number, repostId: number,
+  body: { channel: string; measured_at?: string; vdo_view?: number | null; likes?: number | null; comments?: number | null; saves?: number | null; shares?: number | null },
+) => api<PlacementMetric>(`/api/placements/${placementId}/reposts/${repostId}/metrics`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
 export type KolGmvRow = {
   kol_id: number;
   handle: string;
@@ -457,6 +485,8 @@ export type DashboardKolRow = {
   profile_url: string | null;
   avatar_url: string | null;
   follower_count: number | null;
+  kol_tier_id: number | null;
+  tier_name: string | null;
   placement_count: number;
   total_gmv: number;
   total_spend: number;
@@ -464,6 +494,7 @@ export type DashboardKolRow = {
   roi: number | null;
   byChannel: DashboardKolChannelRow[];
 };
+export type DashboardKolPaymentRow = { kol_id: number; payment_type: string; placement_count: number; total_gmv: number; total_spend: number };
 export type DashboardCampaignTrendRow = {
   campaign_id: number | null;
   code: string | null;
@@ -486,6 +517,7 @@ export type DashboardOverview = {
   paymentTypeBreakdown: DashboardPaymentTypeRow[];
   tierBreakdown: DashboardTierRow[];
   platformBreakdown: DashboardPlatformRow[];
+  kolPaymentBreakdown: DashboardKolPaymentRow[];
 };
 
 export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
@@ -627,6 +659,23 @@ export const getProductTrend = (productId: number, params: { brand_id?: string; 
   if (params.date_from) p.set('date_from', params.date_from);
   if (params.date_to) p.set('date_to', params.date_to);
   return api<ProductTrendOverview>(`/api/dashboard/products/${productId}?${p}`);
+};
+
+export type OffplatformSummary = { total_revenue: number; total_orders: number; total_visits: number };
+export type OffplatformDailyRow = { date: string; channel: string; revenue: number; orders: number; visits: number };
+export type OffplatformChannelRow = { channel: string; revenue: number; orders: number; visits: number };
+export type OffplatformTraffic = {
+  summary: OffplatformSummary;
+  dailyTrend: OffplatformDailyRow[];
+  channelBreakdown: OffplatformChannelRow[];
+};
+
+export const getOffplatformTraffic = (params: { brand_id?: string; date_from?: string; date_to?: string }) => {
+  const p = new URLSearchParams();
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.date_from) p.set('date_from', params.date_from);
+  if (params.date_to) p.set('date_to', params.date_to);
+  return api<OffplatformTraffic>(`/api/dashboard/offplatform?${p}`);
 };
 
 // Bulk import placements from Excel

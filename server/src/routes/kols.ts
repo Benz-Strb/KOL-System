@@ -174,6 +174,7 @@ app.get('/', async c => {
             avatar_url: p.avatar_url,
             is_primary: p.is_primary,
           })),
+        placement_count: k.placements.length,
         category: k.content_categories?.name ?? null,
         brands: [...brandMap.values()]
           .map(b => ({
@@ -427,6 +428,54 @@ app.delete('/platforms/:platformId', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to delete platform' }, 500);
+  }
+});
+
+// ─── GET /:id/hire-history — brand-scoped placement cost timeline ────────────
+// Returns planned + posted placements (no cancelled) for this KOL with pricing
+// details. Non-admin users only see their own brands' data — matching the rule
+// "ไม่เห็น placement detail (ราคา/PIC) ของ brand อื่น" in §8.
+app.get('/:id/hire-history', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const isAdmin = user.role === 'admin';
+    const kolId = Number(c.req.param('id'));
+
+    const items = await prisma.placements.findMany({
+      where: {
+        kol_id: kolId,
+        status: { not: 'cancelled' },
+        ...(!isAdmin && { brand_id: { in: user.brandIds } }),
+      },
+      select: {
+        id: true,
+        status: true,
+        payment_type: true,
+        final_price: true,
+        pay_amount: true,
+        publication_date: true,
+        placement_type: true,
+        platforms: { select: { id: true, name: true } },
+        brands: { select: { id: true, name: true, logo_url: true } },
+        campaigns: { select: { code: true, label: true, start_date: true } },
+        products: { select: { model_code: true } },
+        stores: { select: { name: true, branch: true } },
+      },
+      orderBy: [
+        { campaigns: { start_date: 'desc' } },
+        { publication_date: 'desc' },
+        { created_at: 'desc' },
+      ],
+    });
+    return c.json(items.map(item => ({
+      ...item,
+      final_price: item.final_price?.toString() ?? null,
+      pay_amount: item.pay_amount?.toString() ?? null,
+    })));
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load hire history' }, 500);
   }
 });
 

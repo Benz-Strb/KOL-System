@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, Pencil, ClipboardList, BarChart2, ExternalLink, List, TrendingUp } from 'lucide-react';
+import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, Pencil, ClipboardList, BarChart2, ExternalLink, List, TrendingUp, Repeat2 } from 'lucide-react';
 import { getPlacements, getKolGmv, getDropdowns, getProducts, type PlacementRow, type KolGmvRow, type Product, type Campaign, type UserOption, type Brand } from '../api/index.js';
 import { useAuth } from '../context/AuthContext.js';
 import PerformanceModal from '../components/PerformanceModal.js';
 import MetricsViewModal from '../components/MetricsViewModal.js';
+import RepostModal from '../components/RepostModal.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
@@ -134,6 +135,7 @@ export default function PlacementsPage() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [perfPlacement, setPerfPlacement] = useState<PlacementRow | null>(null);
   const [metricsPlacement, setMetricsPlacement] = useState<PlacementRow | null>(null);
+  const [repostPlacement, setRepostPlacement] = useState<PlacementRow | null>(null);
 
   const LIMIT = 20;
 
@@ -603,6 +605,14 @@ export default function PlacementsPage() {
                               <BarChart2 size={10} /> {t('placements.viewResult')}
                             </button>
                           )}
+                          {r.status === 'posted' && (
+                            <button
+                              onClick={() => setRepostPlacement(r)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-canvas border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all active:scale-95"
+                            >
+                              <Repeat2 size={10} /> Repost
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -680,6 +690,12 @@ export default function PlacementsPage() {
       <MetricsViewModal
         placement={metricsPlacement}
         onClose={() => setMetricsPlacement(null)}
+      />
+    )}
+    {repostPlacement && (
+      <RepostModal
+        placement={repostPlacement}
+        onClose={() => setRepostPlacement(null)}
       />
     )}
     </>

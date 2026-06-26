@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -8,8 +8,9 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext.js';
 import {
-  getDashboardOverview, getDropdowns, searchKols, exportDashboard,
+  getDashboardOverview, getDropdowns, searchKols, exportDashboard, getOffplatformTraffic,
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
+  type OffplatformTraffic,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import PlatformLogo from '../components/PlatformLogo.js';
@@ -38,6 +39,8 @@ const CHANNEL_COLOR: Record<string, string> = {
   lamon8: '#10b981',
 };
 const FALLBACK_COLORS = ['#f97316', '#3b82f6', '#8b5cf6', '#111827', '#ef4444', '#10b981', '#eab308', '#ec4899'];
+
+const OFFPLATFORM_COLORS = ['#3b82f6', '#f97316', '#8b5cf6', '#10b981', '#eab308', '#ef4444'];
 
 const AVATAR_COLORS = [
   ['bg-rose-500', 'text-white'], ['bg-orange-500', 'text-white'], ['bg-amber-500', 'text-white'],
@@ -166,39 +169,77 @@ function MetricBenchmarkCard({
 // shared shape for barter-vs-paid and follower-tier comparisons (both are
 // "which group of GMV.metricValue is biggest" not a "type a value" lookup
 // like MetricBenchmarkCard above).
-function GroupCompareCard({
-  title, description, rows, formatValue,
+function KolsByGroupCard({
+  title, description, groups, kolMap, onSelectKol,
 }: {
   title: string;
   description: string;
-  rows: { label: string; value: number; countLabel: string }[];
-  formatValue: (v: number) => string;
+  groups: { key: string; label: string; kols: { kol_id: number; placement_count: number; total_gmv: number; total_spend: number }[] }[];
+  kolMap: Map<number, DashboardKolRow>;
+  onSelectKol: (kolId: number) => void;
 }) {
   const { t } = useTranslation();
-  const maxValue = Math.max(...rows.map(r => r.value), 1);
+  const [activeGroup, setActiveGroup] = useState(() => groups[0]?.key ?? '');
+  const currentGroup = groups.find(g => g.key === activeGroup);
+  const sorted = currentGroup
+    ? [...currentGroup.kols].sort((a, b) => b.total_gmv - a.total_gmv)
+    : [];
+
   return (
     <div className="bg-surface border border-hairline rounded-xl p-5">
-      <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5 mb-1">
-        <Scale size={14} className="text-accent" /> {title}
-      </h2>
-      <p className="text-[11px] text-muted mb-4">{description}</p>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {rows.map(r => (
-            <div key={r.label} className="flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-ink">{r.label}</span>
-                <span className="text-sm font-semibold text-ink font-mono">{formatValue(r.value)}</span>
-              </div>
-              <div className="h-2 rounded-full bg-canvas overflow-hidden">
-                <div className="h-full rounded-full bg-accent" style={{ width: `${(r.value / maxValue) * 100}%` }} />
-              </div>
-              <span className="text-[11px] text-muted">{r.countLabel}</span>
-            </div>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
+          <Scale size={14} className="text-accent" /> {title}
+        </h2>
+        <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+          {groups.map(g => (
+            <button
+              key={g.key}
+              onClick={() => setActiveGroup(g.key)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${activeGroup === g.key ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+            >
+              {g.label}
+              <span className="ml-1 text-[10px] tabular-nums text-muted">({g.kols.length})</span>
+            </button>
           ))}
         </div>
+      </div>
+      <p className="text-[11px] text-muted mb-3">{description}</p>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 px-2 mb-1">
+            <span className="w-5 shrink-0" />
+            <span className="w-8 shrink-0" />
+            <span className="flex-1" />
+            <span className="text-[10px] font-medium text-muted uppercase tracking-wide w-20 text-right shrink-0">{t('dashboard.kolSpend')}</span>
+            <span className="text-[10px] font-medium text-muted uppercase tracking-wide w-28 text-right shrink-0">GMV</span>
+            <span className="w-6 shrink-0" />
+          </div>
+          <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
+            {sorted.map((entry, i) => {
+              const kol = kolMap.get(entry.kol_id);
+              return (
+                <div
+                  key={entry.kol_id}
+                  onClick={() => onSelectKol(entry.kol_id)}
+                  className="flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-canvas transition-colors"
+                >
+                  <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                  <RankAvatar handle={kol?.handle ?? String(entry.kol_id)} avatarUrl={kol?.avatar_url ?? null} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-ink truncate">{kol?.handle ?? `KOL #${entry.kol_id}`}</div>
+                    {kol?.gen_name && <div className="text-[11px] text-muted truncate">{kol.gen_name}</div>}
+                  </div>
+                  <span className="text-sm tabular-nums font-mono text-muted w-20 text-right shrink-0">{formatMoney(entry.total_spend)}</span>
+                  <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(entry.total_gmv)}</span>
+                  <span className="w-6 shrink-0" />
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -214,32 +255,27 @@ function PlatformBreakdownCard({
   const maxCount = Math.max(...rows.map(r => r.placement_count), 1);
   return (
     <div className="bg-surface border border-hairline rounded-xl p-5">
-      <h2 className="text-sm font-semibold text-ink mb-1">{t('dashboard.platformBreakdownTitle')}</h2>
-      <p className="text-[11px] text-muted mb-4">{t('dashboard.platformBreakdownDesc')}</p>
+      <div className="flex items-baseline gap-3 mb-4">
+        <h2 className="text-sm font-semibold text-ink">{t('dashboard.platformBreakdownTitle')}</h2>
+        <p className="text-[11px] text-muted">{t('dashboard.platformBreakdownDesc')}</p>
+      </div>
       {rows.length === 0 ? (
         <p className="text-sm text-muted">{t('dashboard.noData')}</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
           {rows.map(r => {
             const pct = total > 0 ? (r.placement_count / total) * 100 : 0;
             return (
-              <div key={r.platform_id} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <PlatformLogo name={r.platform_name} size={20} />
-                    <span className="text-sm font-medium text-ink truncate">{r.platform_name}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-ink tabular-nums font-mono shrink-0">
-                    {formatMoney(r.total_gmv)}
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-canvas overflow-hidden">
+              <div key={r.platform_id} className="flex items-center gap-2.5">
+                <PlatformLogo name={r.platform_name} size={18} />
+                <span className="text-sm font-medium text-ink w-24 shrink-0">{r.platform_name}</span>
+                <div className="flex-1 h-1.5 rounded-full bg-canvas overflow-hidden">
                   <div className="h-full rounded-full bg-accent" style={{ width: `${(r.placement_count / maxCount) * 100}%` }} />
                 </div>
-                <span className="text-[11px] text-muted">
-                  {t('dashboard.kolAndPlacements', { kols: r.kol_count, placements: r.placement_count })}
-                  {' · '}{pct.toFixed(1)}%
+                <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">
+                  {formatMoney(r.total_gmv)}
                 </span>
+                <span className="text-[11px] text-muted tabular-nums w-9 text-right shrink-0">{pct.toFixed(0)}%</span>
               </div>
             );
           })}
@@ -450,9 +486,9 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
         <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-accent/10 text-accent shrink-0">
           {icon}
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</span>
+        <span className="text-[11px] font-medium text-muted leading-tight">{label}</span>
       </div>
-      <div className="text-xl font-bold text-ink tabular-nums font-mono leading-tight">{value}</div>
+      <div className="text-2xl font-bold text-ink tabular-nums font-mono leading-tight">{value}</div>
       {sub && <div className="text-[11px] text-muted">{sub}</div>}
     </div>
   );
@@ -511,6 +547,9 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'tools'>('overview');
+  const [offplatformDays, setOffplatformDays] = useState(30);
+  const [offplatformData, setOffplatformData] = useState<OffplatformTraffic | null>(null);
+  const [offplatformLoading, setOffplatformLoading] = useState(true);
 
   async function handleExport() {
     setExporting(true); setExportError('');
@@ -552,59 +591,158 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
+  const offplatformSeq = useRef(0);
+  const loadOffplatform = useCallback(async () => {
+    const seq = ++offplatformSeq.current;
+    setOffplatformLoading(true);
+    const end = new Date();
+    const start = new Date(new Date().setDate(end.getDate() - (offplatformDays - 1)));
+    try {
+      const res = await getOffplatformTraffic({
+        brand_id: brandId,
+        date_from: start.toISOString().slice(0, 10),
+        date_to: end.toISOString().slice(0, 10),
+      });
+      if (offplatformSeq.current !== seq) return;
+      setOffplatformData(res);
+    } finally {
+      if (offplatformSeq.current === seq) setOffplatformLoading(false);
+    }
+  }, [brandId, offplatformDays]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadOffplatform(); }, [loadOffplatform]);
+
+  const offplatformBarData = useMemo(() => {
+    if (!offplatformData) return [];
+    const dateMap = new Map<string, number>();
+    for (const r of offplatformData.dailyTrend) {
+      dateMap.set(r.date, (dateMap.get(r.date) ?? 0) + r.revenue);
+    }
+    return [...dateMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, revenue]) => ({ date: date.slice(5), revenue }));
+  }, [offplatformData]);
+
   const rankedKols = data ? (rankMode === 'gmv' ? data.topKolsByGmv : data.topKolsByRoi) : [];
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? t('kolTrend.noCampaign') }))
     : [];
 
+  const kolMap = useMemo(() => {
+    const m = new Map<number, DashboardKolRow>();
+    for (const k of data?.kolValueList ?? []) m.set(k.kol_id, k);
+    return m;
+  }, [data?.kolValueList]);
+
+  const PAYMENT_ORDER = ['paid', 'barter', 'free'];
+  const paymentGroups = useMemo(() => {
+    const map = new Map<string, { kol_id: number; placement_count: number; total_gmv: number; total_spend: number }[]>();
+    for (const r of data?.kolPaymentBreakdown ?? []) {
+      const arr = map.get(r.payment_type) ?? [];
+      arr.push({ kol_id: r.kol_id, placement_count: r.placement_count, total_gmv: r.total_gmv, total_spend: r.total_spend });
+      map.set(r.payment_type, arr);
+    }
+    return PAYMENT_ORDER
+      .filter(pt => map.has(pt))
+      .map(pt => ({ key: pt, label: t(`payment.${pt}`, { defaultValue: pt }), kols: map.get(pt)! }));
+  }, [data?.kolPaymentBreakdown, t]);
+
+  const tierGroups = useMemo(() => {
+    const map = new Map<string, { kol_id: number; placement_count: number; total_gmv: number; total_spend: number }[]>();
+    const tierOrder = new Map<string, number>();
+    for (const k of data?.kolValueList ?? []) {
+      const tier = k.tier_name ?? 'ไม่ระบุ';
+      if (k.kol_tier_id != null && !tierOrder.has(tier)) tierOrder.set(tier, k.kol_tier_id);
+      const arr = map.get(tier) ?? [];
+      arr.push({ kol_id: k.kol_id, placement_count: k.placement_count, total_gmv: k.total_gmv, total_spend: k.total_spend });
+      map.set(tier, arr);
+    }
+    return [...map.entries()]
+      .sort(([ta], [tb]) => (tierOrder.get(ta) ?? 99) - (tierOrder.get(tb) ?? 99))
+      .map(([tier, kols]) => ({ key: tier, label: tier, kols }));
+  }, [data?.kolValueList]);
+
+  const hasAnyFilter = !!(brandId || campaignId || categoryId || dateFrom || dateTo);
+  function clearAllFilters() { setBrandId(''); setCampaignId(''); setCategoryId(''); setDateFrom(''); setDateTo(''); }
+
   return (
     <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-ink tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted mt-0.5">{t('dashboard.subtitle')}{appUser?.role === 'manager' ? ' (manager view)' : ''}</p>
-          </div>
-
-          <button
-            onClick={handleExport}
-            disabled={exporting || loading || !data}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all whitespace-nowrap shadow-sm"
-          >
-            <Download size={12} /> {exporting ? t('common.loading') : 'Export Excel'}
-          </button>
+      {/* Page header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <h1 className="text-xl font-bold text-ink tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted mt-0.5">{t('dashboard.subtitle')}{appUser?.role === 'manager' ? ' (manager view)' : ''}</p>
         </div>
+        <button
+          onClick={handleExport}
+          disabled={exporting || loading || !data}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all whitespace-nowrap shadow-sm"
+        >
+          <Download size={12} /> {exporting ? t('common.loading') : 'Export Excel'}
+        </button>
+      </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select
-            size="sm" className="min-w-[140px]"
-            options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
-            value={brandId}
-            onChange={setBrandId}
-          />
-          <Select
-            size="sm" className="min-w-[180px]"
-            options={[{ id: '', label: t('placements.allCampaigns') }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
-            value={campaignId}
-            onChange={setCampaignId}
-          />
-          <Select
-            size="sm" className="min-w-[160px]"
-            options={[{ id: '', label: t('dashboard.allCategories') }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
-            value={categoryId}
-            onChange={setCategoryId}
-          />
-
-          <div className="w-px h-4 bg-hairline shrink-0" />
-
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} max={dateTo || undefined} className={selectCls} />
-          <span className="text-xs text-muted">{t('dashboard.to')}</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || undefined} className={selectCls} />
-          {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors">
-              <X size={11} /> {t('dashboard.clearDate')}
+      {/* Filter panel */}
+      <div className="bg-surface border border-hairline rounded-xl p-4 mb-6">
+        <div className="flex items-center gap-1.5 mb-3">
+          <SlidersHorizontal size={13} className="text-muted" />
+          <span className="text-xs font-medium text-muted">Filters</span>
+          {hasAnyFilter && (
+            <button
+              onClick={clearAllFilters}
+              className="ml-auto flex items-center gap-1 text-xs text-muted hover:text-ink transition-colors"
+            >
+              <X size={11} /> {t('common.clearAll')}
             </button>
           )}
+        </div>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted">Brand</span>
+            <Select
+              size="sm" className="min-w-[140px]"
+              options={[{ id: '', label: t('common.allBrands') }, ...brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))]}
+              value={brandId}
+              onChange={setBrandId}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted">Campaign</span>
+            <Select
+              size="sm" className="min-w-[180px]"
+              options={[{ id: '', label: t('placements.allCampaigns') }, ...campaigns.map(c => ({ id: c.id, label: `${c.code}${c.label ? ` — ${c.label}` : ''}` }))]}
+              value={campaignId}
+              onChange={setCampaignId}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted">{t('dashboard.categoryLabel')}</span>
+            <Select
+              size="sm" className="min-w-[160px]"
+              options={[{ id: '', label: t('dashboard.allCategories') }, ...categories.map(cat => ({ id: cat.id, label: cat.name }))]}
+              value={categoryId}
+              onChange={setCategoryId}
+            />
+          </div>
+          <div className="h-8 w-px bg-hairline self-end mb-[3px] shrink-0" />
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted">{t('dashboard.dateRange')}</span>
+            <div className="flex items-center gap-2">
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} max={dateTo || undefined} className={selectCls} />
+              <span className="text-xs text-muted">–</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom || undefined} className={selectCls} />
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="flex items-center justify-center w-6 h-6 rounded-md text-muted hover:text-ink hover:bg-canvas transition-colors"
+                  title={t('dashboard.clearDate')}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -627,13 +765,26 @@ export default function DashboardPage() {
 
       {loading || !data ? (
         activeTab === 'overview' ? (
-          <div className="flex flex-col gap-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)}
+          <div className="flex flex-col gap-8">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-2.5 bg-canvas rounded-md w-24 animate-pulse shrink-0" />
+                <div className="flex-1 h-px bg-hairline" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <SkeletonChart />
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-2.5 bg-canvas rounded-md w-28 animate-pulse shrink-0" />
+                <div className="flex-1 h-px bg-hairline" />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <SkeletonChart />
+                <SkeletonChart />
+              </div>
               <SkeletonChart />
             </div>
 
@@ -653,130 +804,154 @@ export default function DashboardPage() {
           </div>
         )
       ) : activeTab === 'overview' ? (
-        <div className="flex flex-col gap-6">
-          {/* KPI cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
-            <KpiCard icon={<Wallet size={13} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
-            <KpiCard icon={<Megaphone size={13} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
-            <KpiCard
-              icon={<Gauge size={13} />}
-              label={t('dashboard.totalRoi')}
-              value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
-            />
-            <KpiCard
-              icon={<ListChecks size={13} />}
-              label={t('dashboard.totalPlacements')}
-              value={data.summary.total_placements.toLocaleString(numberLocale())}
-              sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
-            />
-            <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
+        <div className="flex flex-col gap-8">
+          {/* KPI section */}
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted shrink-0">{t('dashboard.sectionMetrics')}</span>
+              <div className="flex-1 h-px bg-hairline" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
+              <KpiCard
+                icon={<Gauge size={13} />}
+                label={t('dashboard.totalRoi')}
+                value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
+              />
+              <KpiCard icon={<Wallet size={13} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
+              <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
+              <KpiCard
+                icon={<ListChecks size={13} />}
+                label={t('dashboard.totalPlacements')}
+                value={data.summary.total_placements.toLocaleString(numberLocale())}
+                sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
+              />
+              <KpiCard icon={<Megaphone size={13} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
+            </div>
           </div>
 
-          {/* Channel breakdown + campaign trend */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-surface border border-hairline rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvByChannel')}</h2>
-              {data.channelBreakdown.length === 0 ? (
-                <p className="text-sm text-muted">{t('dashboard.noGmvData')}</p>
-              ) : (
-                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-2">
-                  <div className="w-44 h-44 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 176, height: 176 }}>
-                      <PieChart>
-                        <Pie
-                          data={data.channelBreakdown}
-                          dataKey="gmv"
-                          nameKey="channel"
-                          innerRadius="60%"
-                          outerRadius="95%"
-                          paddingAngle={2}
-                          stroke="none"
-                          animationDuration={500}
-                        >
-                          {data.channelBreakdown.map((c, i) => (
-                            <Cell key={c.channel} fill={CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={ChannelTooltip} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex-1 flex flex-col gap-2 min-w-0">
-                    {data.channelBreakdown.map((c, i) => (
-                      <div key={c.channel} className="flex items-center gap-2 text-xs">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
-                        <span className="font-medium text-ink shrink-0 w-16 truncate">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
-                        <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(c.gmv)}</span>
-                        <span className="w-20 text-right text-muted tabular-nums font-mono shrink-0">{c.orders.toLocaleString(numberLocale())} orders</span>
+          {/* Analysis section: row 1 = donut + bar chart, row 2 = platform breakdown full width */}
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted shrink-0">{t('dashboard.sectionAnalysis')}</span>
+              <div className="flex-1 h-px bg-hairline" />
+            </div>
+
+            {/* Row 1: Donut + Bar chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-surface border border-hairline rounded-xl p-5">
+                <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvByChannel')}</h2>
+                {data.channelBreakdown.length === 0 ? (
+                  <p className="text-sm text-muted">{t('dashboard.noGmvData')}</p>
+                ) : (() => {
+                  const totalGmv = data.channelBreakdown.reduce((s, r) => s + r.gmv, 0);
+                  return (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                      <div className="w-44 h-44 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 176, height: 176 }}>
+                          <PieChart>
+                            <Pie
+                              data={data.channelBreakdown}
+                              dataKey="gmv"
+                              nameKey="channel"
+                              innerRadius="60%"
+                              outerRadius="95%"
+                              paddingAngle={2}
+                              stroke="none"
+                              animationDuration={500}
+                            >
+                              {data.channelBreakdown.map((c, i) => (
+                                <Cell key={c.channel} fill={CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip content={ChannelTooltip} />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      <div className="flex-1 flex flex-col gap-2.5 min-w-0">
+                        {data.channelBreakdown.map((c, i) => {
+                          const pct = totalGmv > 0 ? ((c.gmv / totalGmv) * 100).toFixed(1) : '0.0';
+                          return (
+                            <div key={c.channel} className="flex items-center gap-2.5 text-sm">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
+                              <span className="font-medium text-ink w-16 shrink-0">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
+                              <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(c.gmv)}</span>
+                              <span className="w-12 text-right text-muted tabular-nums shrink-0">{pct}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="bg-surface border border-hairline rounded-xl p-5">
+                <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvVsSpendByCampaign')}</h2>
+                {campaignTrendData.length === 0 ? (
+                  <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={224}>
+                    <BarChart data={campaignTrendData} margin={{ left: -16 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                        labelStyle={{ color: 'var(--ink)' }}
+                        formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
+                      />
+                      <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+                      <Bar dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             </div>
 
-            <div className="bg-surface border border-hairline rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvVsSpendByCampaign')}</h2>
-              {campaignTrendData.length === 0 ? (
-                <p className="text-sm text-muted">{t('dashboard.noData')}</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={224}>
-                  <BarChart data={campaignTrendData} margin={{ left: -16 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
-                      labelStyle={{ color: 'var(--ink)' }}
-                      formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
-                    />
-                    <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="gmv" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={500} />
-                    <Bar dataKey="spend" fill="#f97316" radius={[4, 4, 0, 0]} animationDuration={500} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
+            {/* Row 2: Platform breakdown full width */}
+            {data.platformBreakdown.length > 0 && (
+              <PlatformBreakdownCard rows={data.platformBreakdown} />
+            )}
           </div>
-
-          {/* Platform hiring breakdown */}
-          {data.platformBreakdown.length > 0 && (
-            <PlatformBreakdownCard rows={data.platformBreakdown} />
-          )}
 
           {/* Top KOL ranking */}
           <div className="bg-surface border border-hairline rounded-xl p-5">
-            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-              <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-                <Trophy size={14} className="text-accent" /> {t('dashboard.rankingTitle')}
+            {/* Title row */}
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
+                  <Trophy size={14} className="text-accent" /> {t('dashboard.rankingTitle')}
+                </h2>
                 {categoryId && (
-                  <span className="text-xs font-normal text-muted">
+                  <p className="text-[11px] text-muted mt-0.5">
                     {t('dashboard.compareWithinCategory', { category: categories.find(c => String(c.id) === categoryId)?.name ?? '' })}
-                  </span>
+                  </p>
                 )}
-              </h2>
-              <div className="flex items-center gap-2 flex-wrap">
-                <KolSearchBox onSelect={setTrendKolId} />
-                <div className="flex items-center gap-1 bg-canvas rounded-lg p-1">
-                  <button
-                    onClick={() => setRankMode('gmv')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                  >
-                    {t('dashboard.byGmv')}
-                  </button>
-                  <button
-                    onClick={() => setRankMode('roi')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                  >
-                    {t('dashboard.byRoi')}
-                  </button>
-                </div>
+              </div>
+              <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+                <button
+                  onClick={() => setRankMode('gmv')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                >
+                  {t('dashboard.byGmv')}
+                </button>
+                <button
+                  onClick={() => setRankMode('roi')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                >
+                  {t('dashboard.byRoi')}
+                </button>
               </div>
             </div>
             {rankMode === 'roi' && (
               <p className="text-[11px] text-muted mb-3">{t('dashboard.roiExplain')}</p>
             )}
+            {/* Search row */}
+            <div className="mb-4">
+              <KolSearchBox onSelect={setTrendKolId} />
+            </div>
             {rankedKols.length === 0 ? (
               <p className="text-sm text-muted">{rankMode === 'roi' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
             ) : (
@@ -785,6 +960,113 @@ export default function DashboardPage() {
                   <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} onSelect={setTrendKolId} />
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Off-Platform Traffic widget */}
+          <div className="bg-surface border border-hairline rounded-xl p-5">
+            <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">{t('dashboard.offplatformTitle')}</h2>
+                <p className="text-[11px] text-muted mt-0.5">{t('dashboard.offplatformSubtitle')}</p>
+              </div>
+              <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+                {([7, 30, 90] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setOffplatformDays(d)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${offplatformDays === d ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {offplatformLoading ? (
+              <div className="h-32 flex items-center justify-center">
+                <p className="text-sm text-muted">{t('common.loading')}</p>
+              </div>
+            ) : !offplatformData || offplatformData.dailyTrend.length === 0 ? (
+              <p className="text-sm text-muted">{t('dashboard.offplatformNoData')}</p>
+            ) : (
+              <>
+                {/* KPI row */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className="bg-canvas rounded-lg p-3">
+                    <p className="text-[11px] text-muted mb-1">{t('dashboard.offplatformRevenue')}</p>
+                    <p className="text-base font-semibold text-ink font-mono">{formatMoney(offplatformData.summary.total_revenue)}</p>
+                  </div>
+                  <div className="bg-canvas rounded-lg p-3">
+                    <p className="text-[11px] text-muted mb-1">{t('dashboard.offplatformOrders')}</p>
+                    <p className="text-base font-semibold text-ink font-mono">{offplatformData.summary.total_orders.toLocaleString(numberLocale())}</p>
+                  </div>
+                  <div className="bg-canvas rounded-lg p-3">
+                    <p className="text-[11px] text-muted mb-1">{t('dashboard.offplatformVisits')}</p>
+                    <p className="text-base font-semibold text-ink font-mono">{offplatformData.summary.total_visits.toLocaleString(numberLocale())}</p>
+                  </div>
+                </div>
+
+                {/* Chart + breakdown */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div>
+                    <h3 className="text-xs font-medium text-muted mb-3">{t('dashboard.offplatformDailyTrend')}</h3>
+                    <ResponsiveContainer width="100%" height={180} initialDimension={{ width: 400, height: 180 }}>
+                      <BarChart data={offplatformBarData} margin={{ left: -16 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={formatAxisMoney} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                          labelStyle={{ color: 'var(--ink)', fontSize: 11 }}
+                          formatter={(v) => [formatMoney(Number(v ?? 0)), t('dashboard.offplatformRevenue')]}
+                        />
+                        <Bar dataKey="revenue" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-medium text-muted mb-3">{t('dashboard.offplatformChannelBreakdown')}</h3>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-2">
+                      <div className="w-36 h-36 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 144, height: 144 }}>
+                          <PieChart>
+                            <Pie
+                              data={offplatformData.channelBreakdown}
+                              dataKey="revenue"
+                              nameKey="channel"
+                              innerRadius="60%"
+                              outerRadius="95%"
+                              paddingAngle={2}
+                              stroke="none"
+                              animationDuration={500}
+                            >
+                              {offplatformData.channelBreakdown.map((ch, i) => (
+                                <Cell key={ch.channel} fill={OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                              formatter={(v, name) => [formatMoney(Number(v ?? 0)), String(name)]}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex-1 flex flex-col gap-2 min-w-0">
+                        {offplatformData.channelBreakdown.map((ch, i) => (
+                          <div key={ch.channel} className="flex items-center gap-2 text-xs">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length] }} />
+                            <span className="font-medium text-ink shrink-0 w-16 truncate">{ch.channel}</span>
+                            <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(ch.revenue)}</span>
+                            <span className="w-20 text-right text-muted tabular-nums font-mono shrink-0">{ch.orders.toLocaleString(numberLocale())} orders</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -814,26 +1096,20 @@ export default function DashboardPage() {
             onSelectKol={setTrendKolId}
           />
 
-          <GroupCompareCard
+          <KolsByGroupCard
             title={t('dashboard.paymentCompareTitle')}
             description={t('dashboard.paymentCompareDesc')}
-            formatValue={formatMoney}
-            rows={data.paymentTypeBreakdown.map(r => ({
-              label: t(`payment.${r.payment_type}`, { defaultValue: r.payment_type }),
-              value: r.avg_gmv,
-              countLabel: t('dashboard.placementCountLabel', { count: r.placement_count }),
-            }))}
+            groups={paymentGroups}
+            kolMap={kolMap}
+            onSelectKol={setTrendKolId}
           />
 
-          <GroupCompareCard
+          <KolsByGroupCard
             title={t('dashboard.tierCompareTitle')}
             description={t('dashboard.tierCompareDesc')}
-            formatValue={formatMoney}
-            rows={data.tierBreakdown.map(r => ({
-              label: r.tier_name,
-              value: r.avg_gmv_per_kol,
-              countLabel: t('dashboard.kolCountLabel', { count: r.kol_count }),
-            }))}
+            groups={tierGroups}
+            kolMap={kolMap}
+            onSelectKol={setTrendKolId}
           />
         </div>
       )}

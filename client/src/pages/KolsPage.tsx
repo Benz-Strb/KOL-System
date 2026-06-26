@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, ChevronLeft, ChevronRight, X, Users } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, X, Users, Briefcase } from 'lucide-react';
 import { getKolDirectory, getDropdowns, type KolDirectoryRow, type KolBrandRow, type KolPlatformAccount, type Platform, type ContentCategory } from '../api/index.js';
 import KolDetailModal from '../components/KolDetailModal.js';
 import { getCached, setCached } from '../lib/swrCache.js';
@@ -200,6 +200,14 @@ function KolCard({ r, onClick }: { r: KolDirectoryRow; onClick: () => void }) {
                 title={r.follower_count.toLocaleString(numberLocale()) + ' followers'}>
                 <Users size={9} className="shrink-0" />
                 {formatFollower(r.follower_count)}
+              </span>
+            )}
+            {r.placement_count > 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted tabular-nums font-mono bg-canvas border border-hairline px-1.5 py-0.5 rounded-md"
+                title={t('kols.hireCountTooltip', { count: r.placement_count })}>
+                <Briefcase size={9} className="shrink-0" />
+                {r.placement_count}
               </span>
             )}
           </div>
