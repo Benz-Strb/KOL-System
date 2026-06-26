@@ -12,6 +12,7 @@ import {
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
+import PlatformLogo from '../components/PlatformLogo.js';
 import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
 import { getCached, setCached } from '../lib/swrCache.js';
@@ -197,6 +198,50 @@ function GroupCompareCard({
               <span className="text-[11px] text-muted">{r.countLabel}</span>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlatformBreakdownCard({
+  rows,
+}: {
+  rows: { platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number }[];
+}) {
+  const { t } = useTranslation();
+  const total = rows.reduce((s, r) => s + r.placement_count, 0);
+  return (
+    <div className="bg-surface border border-hairline rounded-xl p-5">
+      <h2 className="text-sm font-semibold text-ink mb-1">{t('dashboard.platformBreakdownTitle')}</h2>
+      <p className="text-[11px] text-muted mb-4">{t('dashboard.platformBreakdownDesc')}</p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {rows.map(r => {
+            const pct = total > 0 ? (r.placement_count / total) * 100 : 0;
+            return (
+              <div key={r.platform_id} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <PlatformLogo name={r.platform_name} size={20} />
+                    <span className="text-sm font-medium text-ink truncate">{r.platform_name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted tabular-nums font-mono">{pct.toFixed(1)}%</span>
+                    <span className="text-sm font-semibold text-ink tabular-nums font-mono">{r.placement_count.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-canvas overflow-hidden">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[11px] text-muted">
+                  {t('dashboard.kolAndPlacements', { kols: r.kol_count, placements: r.placement_count })}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -693,6 +738,11 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {/* Platform hiring breakdown */}
+          {data.platformBreakdown.length > 0 && (
+            <PlatformBreakdownCard rows={data.platformBreakdown} />
+          )}
 
           {/* Top KOL ranking */}
           <div className="bg-surface border border-hairline rounded-xl p-5">

@@ -44,6 +44,7 @@ const EMPTY_RESPONSE = {
   }[],
   paymentTypeBreakdown: [] as PaymentTypeRow[],
   tierBreakdown: [] as TierRow[],
+  platformBreakdown: [] as PlatformRow[],
 };
 
 type PaymentTypeRow = {
@@ -60,6 +61,14 @@ type TierRow = {
   placement_count: number;
   total_gmv: number;
   avg_gmv_per_kol: number;
+};
+
+type PlatformRow = {
+  platform_id: number;
+  platform_name: string;
+  placement_count: number;
+  kol_count: number;
+  total_gmv: number;
 };
 
 // barter-vs-paid is most useful in this fixed order; alphabetical (from a
@@ -299,6 +308,31 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       .map(t => ({ ...t, avg_gmv_per_kol: t.kol_count > 0 ? t.total_gmv / t.kol_count : 0 }))
       .sort((a, b) => a.tier_id - b.tier_id);
 
+    // hiring distribution by KOL platform (Facebook/Instagram/TikTok/YouTube etc.)
+    // — groups by placements.platform_id (the channel the KOL posts on), not
+    // placement_metrics.channel (the sales channel that tracks actual GMV)
+    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number }[]>`
+      WITH metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        pt.id::int                                  AS platform_id,
+        pt.name                                     AS platform_name,
+        COUNT(DISTINCT p.id)::int                   AS placement_count,
+        COUNT(DISTINCT p.kol_id)::int               AS kol_count,
+        COALESCE(SUM(ma.gmv), 0)::float             AS total_gmv
+      FROM placements p
+      JOIN platforms pt ON pt.id = p.platform_id
+      LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)})
+      GROUP BY pt.id, pt.name
+      ORDER BY placement_count DESC
+    `;
+    const platformBreakdown: PlatformRow[] = platformAgg;
+
     // per-KOL GMV split by sales channel (shopee/lazada/website/tiktok/youtube/lamon8)
     // — same `channel` concept as the channelBreakdown donut above, just scoped per KOL
     const kolChannelBreakdown = await prisma.$queryRaw<{
@@ -387,6 +421,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       campaignTrend,
       paymentTypeBreakdown,
       tierBreakdown,
+      platformBreakdown,
     };
   }
 }
@@ -503,6 +538,17 @@ app.get('/export', async c => {
     tierWs.getColumn(4).numFmt = '#,##0.00';
     tierWs.getColumn(5).numFmt = '#,##0.00';
     styleExportHeaderRow(tierWs);
+
+    const platformWs = wb.addWorksheet('แยกตาม Platform');
+    platformWs.addRow(['Platform', 'Placement', 'จำนวน KOL', 'GMV รวม (บาท)']);
+    const totalPlatformPlacements = data.platformBreakdown.reduce((s, r) => s + r.placement_count, 0);
+    for (const r of data.platformBreakdown) {
+      const pct = totalPlatformPlacements > 0 ? ((r.placement_count / totalPlatformPlacements) * 100).toFixed(1) + '%' : '0%';
+      platformWs.addRow([r.platform_name, r.placement_count, r.kol_count, r.total_gmv, pct]);
+    }
+    platformWs.columns = [{ width: 18 }, { width: 12 }, { width: 14 }, { width: 18 }, { width: 10 }];
+    platformWs.getColumn(4).numFmt = '#,##0.00';
+    styleExportHeaderRow(platformWs);
 
     const buf = await wb.xlsx.writeBuffer();
     const bytes = Uint8Array.from(buf as unknown as Uint8Array);

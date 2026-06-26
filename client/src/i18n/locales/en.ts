@@ -72,6 +72,9 @@ export const en = {
     tierCompareDesc: 'Average GMV per KOL by follower tier — see which tier of KOL is most worth hiring.',
     placementCountLabel: '{{count}} post(s)',
     kolCountLabel: '{{count}} KOL(s)',
+    platformBreakdownTitle: 'Hiring by Platform',
+    platformBreakdownDesc: 'Number of placements per platform used by KOLs',
+    kolAndPlacements: '{{kols}} KOL(s) · {{placements}} post(s)',
   },
   productDashboard: {
     title: 'Product Dashboard',
@@ -170,8 +173,11 @@ export const en = {
     addNewPlatform: 'Add new platform',
     confirmDeletePlatform: 'Remove {{platform}} ({{handle}}) from this KOL?',
     tabProfile: 'Profile',
+    tabHireHistory: 'Hire History',
     tabPosts: 'Posts',
     tabTerms: 'Pricing / Terms',
+    noHireHistory: 'No hire history yet',
+    paidAmount: 'Paid',
   },
   sampleStatus: {
     to_be_shipped: 'To be shipped',
@@ -225,6 +231,7 @@ export const en = {
     tryDifferentSearch: 'Try changing your search',
     clearFilters: 'Clear filters',
     paginationLabel: '{{total}} KOL · page {{page}}/{{totalPages}}',
+    hireCountTooltip: 'Hired {{count}} time(s)',
   },
   placements: {
     allStatus: 'All statuses',

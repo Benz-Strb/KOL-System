@@ -272,6 +272,7 @@ export type KolDirectoryRow = {
   platform: { id: number; name: string } | null;
   platforms: KolPlatformAccount[];
   category: string | null;
+  placement_count: number;
   brands: KolBrandRow[];
 };
 
@@ -359,6 +360,23 @@ export type KolPost = {
   stores: { name: string; branch: string | null } | null;
 };
 export const getKolPosts = (kolId: number) => api<KolPost[]>(`/api/kols/${kolId}/posts`);
+
+// Hire History — brand-scoped placement cost timeline (planned + posted, no cancelled)
+export type KolHireHistoryItem = {
+  id: number;
+  status: string;
+  payment_type: string;
+  final_price: string | null;
+  pay_amount: string | null;
+  publication_date: string | null;
+  placement_type: string;
+  platforms: { id: number; name: string } | null;
+  brands: { id: number; name: string; logo_url: string | null };
+  campaigns: { code: string; label: string | null; start_date: string | null } | null;
+  products: { model_code: string } | null;
+  stores: { name: string; branch: string | null } | null;
+};
+export const getKolHireHistory = (kolId: number) => api<KolHireHistoryItem[]>(`/api/kols/${kolId}/hire-history`);
 
 // Commercial Terms
 export const getKolTerms = (kolId: number) => api<CommercialTerm[]>(`/api/kols/${kolId}/terms`);
@@ -457,6 +475,7 @@ export type DashboardCampaignTrendRow = {
 };
 export type DashboardPaymentTypeRow = { payment_type: string; placement_count: number; total_gmv: number; avg_gmv: number };
 export type DashboardTierRow = { tier_id: number; tier_name: string; kol_count: number; placement_count: number; total_gmv: number; avg_gmv_per_kol: number };
+export type DashboardPlatformRow = { platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number };
 export type DashboardOverview = {
   summary: DashboardSummary;
   channelBreakdown: DashboardChannelRow[];
@@ -466,6 +485,7 @@ export type DashboardOverview = {
   campaignTrend: DashboardCampaignTrendRow[];
   paymentTypeBreakdown: DashboardPaymentTypeRow[];
   tierBreakdown: DashboardTierRow[];
+  platformBreakdown: DashboardPlatformRow[];
 };
 
 export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {

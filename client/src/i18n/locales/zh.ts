@@ -72,6 +72,9 @@ export const zh = {
     tierCompareDesc: '按粉丝等级显示每位 KOL 的平均 GMV — 用于判断哪个等级的 KOL 最值得合作。',
     placementCountLabel: '{{count}} 篇帖子',
     kolCountLabel: '{{count}} 位 KOL',
+    platformBreakdownTitle: '按平台划分的合作比例',
+    platformBreakdownDesc: '各平台的 KOL 发帖数量',
+    kolAndPlacements: '{{kols}} 位 KOL · {{placements}} 篇',
   },
   productDashboard: {
     title: '产品 Dashboard',
@@ -170,8 +173,11 @@ export const zh = {
     addNewPlatform: '添加新 platform',
     confirmDeletePlatform: '从此 KOL 中移除 {{platform}}({{handle}})?',
     tabProfile: '资料',
+    tabHireHistory: '合作记录',
     tabPosts: '帖子',
     tabTerms: '价格 / 条件',
+    noHireHistory: '暂无合作记录',
+    paidAmount: '已付',
   },
   sampleStatus: {
     to_be_shipped: '待寄出',
@@ -225,6 +231,7 @@ export const zh = {
     tryDifferentSearch: '请尝试更改搜索条件',
     clearFilters: '清除筛选',
     paginationLabel: '共 {{total}} 位 KOL · 第 {{page}}/{{totalPages}} 页',
+    hireCountTooltip: '已合作 {{count}} 次',
   },
   placements: {
     allStatus: '所有状态',

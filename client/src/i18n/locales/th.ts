@@ -77,6 +77,9 @@ export const th = {
     tierCompareDesc: 'ค่าเฉลี่ย GMV ต่อ KOL 1 คน แยกตามระดับ Follower — ใช้ดูว่าจ้าง KOL ระดับไหนคุ้มที่สุด',
     placementCountLabel: '{{count}} โพสต์',
     kolCountLabel: '{{count}} คน',
+    platformBreakdownTitle: 'สัดส่วนการจ้างงานตาม Platform',
+    platformBreakdownDesc: 'จำนวน Placement แยกตาม Platform ที่ KOL ใช้โพสต์',
+    kolAndPlacements: '{{kols}} คน · {{placements}} โพสต์',
   },
   productDashboard: {
     title: 'Dashboard สินค้า',
@@ -175,8 +178,11 @@ export const th = {
     addNewPlatform: 'เพิ่ม platform ใหม่',
     confirmDeletePlatform: 'ลบ {{platform}} ({{handle}}) ออกจาก KOL นี้?',
     tabProfile: 'โปรไฟล์',
+    tabHireHistory: 'ประวัติค่าตัว',
     tabPosts: 'โพสต์',
     tabTerms: 'ราคา / เงื่อนไข',
+    noHireHistory: 'ยังไม่มีประวัติการจ้างงาน',
+    paidAmount: 'จ่ายแล้ว',
   },
   sampleStatus: {
     to_be_shipped: 'รอส่ง',
@@ -230,6 +236,7 @@ export const th = {
     tryDifferentSearch: 'ลองเปลี่ยนเงื่อนไขการค้นหา',
     clearFilters: 'ล้างตัวกรอง',
     paginationLabel: '{{total}} KOL · หน้า {{page}}/{{totalPages}}',
+    hireCountTooltip: 'จ้างมาแล้ว {{count}} ครั้ง',
   },
   placements: {
     allStatus: 'ทุกสถานะ',
