@@ -106,6 +106,18 @@ export const zh = {
     funnelConversionRate: '转化率',
     categoryTitle: '按内容分类的 GMV',
     categoryDesc: '按 KOL 内容类型划分的表现',
+    visitsShopee: 'Visits Shopee',
+    visitsLazada: 'Visits Lazada',
+    othersLabel: '其他',
+  },
+  marketing: {
+    title: '营销仪表板',
+    subtitle: '面向营销团队的销售概览与 GMV 占比',
+    totalCost: '总成本',
+    gmvByPlatform: '各 Platform 的 GMV 占比',
+    gmvByProductCategory: '各产品类别的 GMV 占比',
+    gmvByProductSku: '各产品 SKU 的 GMV 占比',
+    gmvByContentCategory: '各内容分类的 GMV 占比',
   },
   productDashboard: {
     title: '产品 Dashboard',
@@ -317,6 +329,7 @@ export const zh = {
     placements: '列表',
     addPlacement: '添加 Placement',
     dashboardProducts: '产品',
+    marketingDashboard: '营销仪表板',
     users: '用户',
   },
   roles: {

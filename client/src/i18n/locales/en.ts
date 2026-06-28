@@ -106,6 +106,18 @@ export const en = {
     funnelConversionRate: 'Conversion rate',
     categoryTitle: 'GMV by content category',
     categoryDesc: 'Performance by the KOL\'s content niche',
+    visitsShopee: 'Visits Shopee',
+    visitsLazada: 'Visits Lazada',
+    othersLabel: 'Others',
+  },
+  marketing: {
+    title: 'Marketing Dashboard',
+    subtitle: 'Sales overview and GMV contribution for the marketing team',
+    totalCost: 'Total Cost',
+    gmvByPlatform: 'GMV Contribution by Platform',
+    gmvByProductCategory: 'GMV Contribution by Product Category',
+    gmvByProductSku: 'GMV Contribution by Product SKU',
+    gmvByContentCategory: 'GMV Contribution by Content Category',
   },
   productDashboard: {
     title: 'Product Dashboard',
@@ -317,6 +329,7 @@ export const en = {
     placements: 'List',
     addPlacement: 'Add Placement',
     dashboardProducts: 'Products',
+    marketingDashboard: 'Marketing Dashboard',
     users: 'Users',
   },
   roles: {
