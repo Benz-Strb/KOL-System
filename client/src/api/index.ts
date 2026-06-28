@@ -473,10 +473,14 @@ export type DashboardSummary = {
   total_ads_cost: number;
   total_gmv: number;
   total_orders: number;
+  total_visits: number;
+  total_atc: number;
   roi: number | null;
 };
 export type DashboardChannelCampaignRow = { campaign_id: number | null; code: string | null; label: string | null; gmv: number };
-export type DashboardChannelRow = { channel: string; gmv: number; orders: number; visits: number; byCampaign: DashboardChannelCampaignRow[] };
+export type DashboardChannelRow = { channel: string; gmv: number; orders: number; visits: number; atc: number; byCampaign: DashboardChannelCampaignRow[] };
+export type DashboardMonthlyRow = { month: string; placement_count: number; gmv: number; orders: number };
+export type DashboardCategoryRow = { category_id: number; category_name: string; kol_count: number; placement_count: number; gmv: number; orders: number };
 export type DashboardKolChannelRow = { channel: string; gmv: number };
 export type DashboardKolRow = {
   kol_id: number;
@@ -510,6 +514,8 @@ export type DashboardPlatformRow = { platform_id: number; platform_name: string;
 export type DashboardOverview = {
   summary: DashboardSummary;
   channelBreakdown: DashboardChannelRow[];
+  monthlyTrend: DashboardMonthlyRow[];
+  categoryBreakdown: DashboardCategoryRow[];
   topKolsByGmv: DashboardKolRow[];
   topKolsByRoi: DashboardKolRow[];
   kolValueList: DashboardKolRow[];
@@ -738,7 +744,7 @@ export const updateAdminBrand = (id: number, body: { name?: string; active?: boo
   api<Brand>(`/api/admin/brands/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 export const createAdminUser = (body: { email: string; full_name: string; role: string; password: string; brand_ids?: number[] }) =>
   api<AdminUser>('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-export const updateAdminUser = (id: number, body: { role?: string; is_active?: boolean; brand_ids?: number[] }) =>
+export const updateAdminUser = (id: number, body: { role?: string; is_active?: boolean; brand_ids?: number[]; email?: string; full_name?: string }) =>
   api<AdminUser>(`/api/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 export const resetUserPassword = (id: number, password: string) =>
   api<{ ok: boolean }>(`/api/admin/users/${id}/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });

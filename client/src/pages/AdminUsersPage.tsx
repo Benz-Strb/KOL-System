@@ -65,6 +65,11 @@ export default function AdminUsersPage() {
   const [editingUserBrandIds, setEditingUserBrandIds] = useState<number[]>([]);
   const [savingUserBrands, setSavingUserBrands] = useState(false);
 
+  // Edit email state
+  const [editingEmailId, setEditingEmailId] = useState<number | null>(null);
+  const [editingEmail, setEditingEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+
   // Brand panel state
   const [showBrandsPanel, setShowBrandsPanel] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
@@ -210,6 +215,22 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function handleSaveEmail(userId: number) {
+    const trimmed = editingEmail.trim().toLowerCase();
+    if (!trimmed) return;
+    setSavingEmail(true);
+    try {
+      await updateAdminUser(userId, { email: trimmed });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, email: trimmed } : u));
+      setToast(t('adminUsers.emailUpdated'));
+      setEditingEmailId(null);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setSavingEmail(false);
+    }
+  }
+
   // --- Brand handlers ---
   async function handleCreateBrand(e: React.FormEvent) {
     e.preventDefault();
@@ -317,7 +338,40 @@ export default function AdminUsersPage() {
                       <span className="font-medium text-ink">{user.full_name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-muted font-mono text-xs">{user.email ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    {editingEmailId === user.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          autoFocus
+                          type="email"
+                          value={editingEmail}
+                          onChange={e => setEditingEmail(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); handleSaveEmail(user.id); }
+                            if (e.key === 'Escape') setEditingEmailId(null);
+                          }}
+                          placeholder="email@example.com"
+                          className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink font-mono focus:outline-none focus:ring-2 focus:ring-accent w-48"
+                        />
+                        <button onClick={() => handleSaveEmail(user.id)} disabled={savingEmail}
+                          className="text-accent hover:text-accent-hover disabled:opacity-50 transition-colors">
+                          <CheckIcon size={13} />
+                        </button>
+                        <button onClick={() => setEditingEmailId(null)} className="text-muted hover:text-ink transition-colors">
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 group">
+                        <span className="text-muted font-mono text-xs">{user.email ?? <span className="italic">—</span>}</span>
+                        <button
+                          onClick={() => { setEditingEmailId(user.id); setEditingEmail(user.email ?? ''); }}
+                          className="opacity-0 group-hover:opacity-100 text-muted hover:text-accent transition-all">
+                          <Pencil size={11} />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${ROLE_STYLE[user.role] ?? 'bg-canvas text-muted'}`}>
                       {roleLabel(t, user.role)}

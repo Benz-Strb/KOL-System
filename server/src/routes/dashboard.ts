@@ -24,12 +24,16 @@ const EMPTY_RESPONSE = {
     total_ads_cost: 0,
     total_gmv: 0,
     total_orders: 0,
+    total_visits: 0,
+    total_atc: 0,
     roi: null as number | null,
   },
   channelBreakdown: [] as {
-    channel: string; gmv: number; orders: number; visits: number;
+    channel: string; gmv: number; orders: number; visits: number; atc: number;
     byCampaign: { campaign_id: number | null; code: string | null; label: string | null; gmv: number }[];
   }[],
+  monthlyTrend: [] as MonthlyTrendRow[],
+  categoryBreakdown: [] as CategoryRow[],
   topKolsByGmv: [] as KolRankRow[],
   topKolsByRoi: [] as KolRankRow[],
   kolValueList: [] as KolRankRow[],
@@ -70,6 +74,25 @@ type PlatformRow = {
   placement_count: number;
   kol_count: number;
   total_gmv: number;
+};
+
+// monthly GMV/orders/placement trend (A) — the only "over time" view; campaign
+// bars are a noisy proxy with 36 campaigns
+type MonthlyTrendRow = {
+  month: string;        // 'YYYY-MM'
+  placement_count: number;
+  gmv: number;
+  orders: number;
+};
+
+// GMV grouped by the KOL's content category (C) — category was filter-only before
+type CategoryRow = {
+  category_id: number;
+  category_name: string;
+  kol_count: number;
+  placement_count: number;
+  gmv: number;
+  orders: number;
 };
 
 // barter-vs-paid is most useful in this fixed order; alphabetical (from a
@@ -163,20 +186,23 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       else if (p.status === 'cancelled') cancelledCount++;
     }
 
-    const [gmvRow] = await prisma.$queryRaw<{ total_gmv: number; total_orders: number }[]>`
+    const [gmvRow] = await prisma.$queryRaw<{ total_gmv: number; total_orders: number; total_visits: number; total_atc: number }[]>`
       SELECT
         COALESCE(SUM(gmv::numeric), 0)::float AS total_gmv,
-        COALESCE(SUM(orders), 0)::int          AS total_orders
+        COALESCE(SUM(orders), 0)::int          AS total_orders,
+        COALESCE(SUM(visits), 0)::int          AS total_visits,
+        COALESCE(SUM(atc), 0)::int             AS total_atc
       FROM placement_metrics
       WHERE placement_id IN (${Prisma.join(ids)})
     `;
 
-    const channelBreakdown = await prisma.$queryRaw<{ channel: string; gmv: number; orders: number; visits: number }[]>`
+    const channelBreakdown = await prisma.$queryRaw<{ channel: string; gmv: number; orders: number; visits: number; atc: number }[]>`
       SELECT
         channel,
         COALESCE(SUM(gmv::numeric), 0)::float AS gmv,
         COALESCE(SUM(orders), 0)::int          AS orders,
-        COALESCE(SUM(visits), 0)::int          AS visits
+        COALESCE(SUM(visits), 0)::int          AS visits,
+        COALESCE(SUM(atc), 0)::int             AS atc
       FROM placement_metrics
       WHERE placement_id IN (${Prisma.join(ids)})
       GROUP BY channel
@@ -430,6 +456,51 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       ORDER BY c.start_date ASC NULLS LAST
     `;
 
+    // monthly trend (A) — group by publication_date month; placements without a
+    // publication_date are dropped (no time bucket to put them in)
+    const monthlyTrend = await prisma.$queryRaw<MonthlyTrendRow[]>`
+      WITH metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        to_char(p.publication_date, 'YYYY-MM')  AS month,
+        COUNT(DISTINCT p.id)::int               AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float         AS gmv,
+        COALESCE(SUM(ma.orders), 0)::int        AS orders
+      FROM placements p
+      LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)}) AND p.publication_date IS NOT NULL
+      GROUP BY month
+      ORDER BY month ASC
+    `;
+
+    // GMV by content category (C) — categories live on the KOL, not the placement
+    const categoryBreakdown = await prisma.$queryRaw<CategoryRow[]>`
+      WITH metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        cc.id::int                              AS category_id,
+        cc.name                                 AS category_name,
+        COUNT(DISTINCT p.kol_id)::int           AS kol_count,
+        COUNT(DISTINCT p.id)::int               AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float         AS gmv,
+        COALESCE(SUM(ma.orders), 0)::int        AS orders
+      FROM placements p
+      JOIN kols k ON k.id = p.kol_id
+      JOIN content_categories cc ON cc.id = k.content_category_id
+      LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)})
+      GROUP BY cc.id, cc.name
+      ORDER BY gmv DESC
+    `;
+
     const totalSpendWithAds = totalSpend + totalAdsCost;
 
     return {
@@ -442,9 +513,13 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         total_ads_cost: totalAdsCost,
         total_gmv: gmvRow.total_gmv,
         total_orders: gmvRow.total_orders,
+        total_visits: gmvRow.total_visits,
+        total_atc: gmvRow.total_atc,
         roi: totalSpendWithAds > 0 ? gmvRow.total_gmv / totalSpendWithAds : null,
       },
       channelBreakdown: channelBreakdownWithCampaigns,
+      monthlyTrend,
+      categoryBreakdown,
       topKolsByGmv,
       topKolsByRoi,
       kolValueList: kolRows,
@@ -521,13 +596,31 @@ app.get('/export', async c => {
     styleExportHeaderRow(summaryWs);
 
     const channelWs = wb.addWorksheet('แยกตามช่องทาง');
-    channelWs.addRow(['ช่องทาง', 'GMV (บาท)', 'Orders', 'Visits']);
+    channelWs.addRow(['ช่องทาง', 'GMV (บาท)', 'Orders', 'Visits', 'ATC']);
     for (const ch of data.channelBreakdown) {
-      channelWs.addRow([EXPORT_CHANNEL_LABEL[ch.channel] ?? ch.channel, ch.gmv, ch.orders, ch.visits]);
+      channelWs.addRow([EXPORT_CHANNEL_LABEL[ch.channel] ?? ch.channel, ch.gmv, ch.orders, ch.visits, ch.atc]);
     }
-    channelWs.columns = [{ width: 18 }, { width: 16 }, { width: 12 }, { width: 12 }];
+    channelWs.columns = [{ width: 18 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 }];
     channelWs.getColumn(2).numFmt = '#,##0.00';
     styleExportHeaderRow(channelWs);
+
+    const monthlyWs = wb.addWorksheet('Trend รายเดือน');
+    monthlyWs.addRow(['เดือน', 'Placement', 'GMV (บาท)', 'Orders']);
+    for (const m of data.monthlyTrend) {
+      monthlyWs.addRow([m.month, m.placement_count, m.gmv, m.orders]);
+    }
+    monthlyWs.columns = [{ width: 12 }, { width: 12 }, { width: 16 }, { width: 12 }];
+    monthlyWs.getColumn(3).numFmt = '#,##0.00';
+    styleExportHeaderRow(monthlyWs);
+
+    const categoryWs = wb.addWorksheet('แยกตามหมวดคอนเทนต์');
+    categoryWs.addRow(['หมวดคอนเทนต์', 'จำนวน KOL', 'Placement', 'GMV (บาท)', 'Orders']);
+    for (const cat of data.categoryBreakdown) {
+      categoryWs.addRow([cat.category_name, cat.kol_count, cat.placement_count, cat.gmv, cat.orders]);
+    }
+    categoryWs.columns = [{ width: 18 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 12 }];
+    categoryWs.getColumn(4).numFmt = '#,##0.00';
+    styleExportHeaderRow(categoryWs);
 
     const kolWs = wb.addWorksheet('Ranking KOL (GMV)');
     kolWs.addRow(['อันดับ', 'Handle', 'ชื่อ', 'Follower', 'Placement', 'GMV (บาท)', 'ค่าใช้จ่าย (บาท)', 'Orders', 'ROI']);

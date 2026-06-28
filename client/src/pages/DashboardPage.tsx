@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal, Coins, Percent, CheckCircle2 } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid,
   type TooltipContentProps,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext.js';
@@ -279,6 +279,261 @@ function PlatformBreakdownCard({
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A — GMV (bars) + Orders (line) per month; the only true "over time" view
+function MonthlyTrendCard({
+  rows,
+}: {
+  rows: { month: string; placement_count: number; gmv: number; orders: number }[];
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="bg-surface border border-hairline rounded-xl p-5">
+      <div className="flex items-baseline gap-3 mb-4">
+        <h2 className="text-sm font-semibold text-ink">{t('dashboard.monthlyTrendTitle')}</h2>
+        <p className="text-[11px] text-muted">{t('dashboard.monthlyTrendDesc')}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+      ) : (
+        <ResponsiveContainer width="100%" height={260} initialDimension={{ width: 600, height: 260 }}>
+          <ComposedChart data={rows} margin={{ left: -16, right: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+            <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={v => String(Math.round(Number(v)))} />
+            <Tooltip
+              contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+              labelStyle={{ color: 'var(--ink)' }}
+              formatter={(v, n) => n === 'gmv'
+                ? [formatMoney(Number(v ?? 0)), t('kolTrend.gmv')]
+                : [Number(v ?? 0).toLocaleString(numberLocale()), t('dashboard.totalOrders')]}
+            />
+            <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('dashboard.totalOrders'))} wrapperStyle={{ fontSize: 11 }} />
+            <Bar yAxisId="left" dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+            <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} animationDuration={500} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+// B — Visits → Add to Cart → Orders funnel with conversion rates;
+// togglable per sales channel (channelBreakdown already carries visits/atc/orders)
+const FUNNEL_COLORS = ['#3b82f6', '#8b5cf6', '#10b981'];
+function FunnelCard({
+  total, channels,
+}: {
+  total: { visits: number; atc: number; orders: number };
+  channels: { channel: string; visits: number; atc: number; orders: number }[];
+}) {
+  const { t } = useTranslation();
+  const channelOptions = channels.filter(c => c.visits > 0 || c.atc > 0 || c.orders > 0);
+  const canCompare = channelOptions.length >= 2;
+  const selectable = [
+    { key: 'all', label: t('dashboard.funnelAllChannels'), visits: total.visits, atc: total.atc, orders: total.orders },
+    ...channelOptions.map(c => ({ key: c.channel, label: CHANNEL_LABEL[c.channel] ?? c.channel, visits: c.visits, atc: c.atc, orders: c.orders })),
+  ];
+  const [active, setActive] = useState('all');
+
+  const current = selectable.find(o => o.key === active) ?? selectable[0];
+  const { visits, atc, orders } = current;
+  const stages = [
+    { key: 'visits', label: 'Visits', value: visits, color: FUNNEL_COLORS[0] },
+    { key: 'atc', label: 'Add to Cart', value: atc, color: FUNNEL_COLORS[1] },
+    { key: 'orders', label: 'Orders', value: orders, color: FUNNEL_COLORS[2] },
+  ];
+  const atcRate = visits > 0 ? (atc / visits) * 100 : null;
+  const conversionRate = visits > 0 ? (orders / visits) * 100 : null;
+  const hasData = visits > 0 || atc > 0 || orders > 0;
+
+  // compare mode: per-channel rates, with the leader in each column highlighted
+  const rows = channelOptions.map(c => ({
+    channel: c.channel,
+    label: CHANNEL_LABEL[c.channel] ?? c.channel,
+    visits: c.visits,
+    orders: c.orders,
+    atcRate: c.visits > 0 ? (c.atc / c.visits) * 100 : null,
+    convRate: c.visits > 0 ? (c.orders / c.visits) * 100 : null,
+  }));
+  const best = {
+    visits: Math.max(...rows.map(r => r.visits), 0),
+    orders: Math.max(...rows.map(r => r.orders), 0),
+    atcRate: Math.max(...rows.map(r => r.atcRate ?? -1), -1),
+    convRate: Math.max(...rows.map(r => r.convRate ?? -1), -1),
+  };
+  const leadCls = (isLead: boolean) => `tabular-nums font-mono ${isLead ? 'text-accent font-semibold' : 'text-ink'}`;
+
+  // card-flip between the funnel face and the compare table; only the body
+  // flips (header + toggle stay put so you can always flip back). The 3D
+  // container needs an explicit height — measure the visible face so it
+  // animates between the two (different) face heights without a jump.
+  const flipped = active === 'compare';
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
+  const [bodyHeight, setBodyHeight] = useState<number>();
+  useLayoutEffect(() => {
+    const measure = () => {
+      const h = (flipped ? backRef.current : frontRef.current)?.offsetHeight;
+      if (h) setBodyHeight(h);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (frontRef.current) ro.observe(frontRef.current);
+    if (backRef.current) ro.observe(backRef.current);
+    return () => ro.disconnect();
+  }, [flipped]);
+
+  return (
+    <div className="bg-surface border border-hairline rounded-xl p-5">
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h2 className="text-sm font-semibold text-ink shrink-0">{t('dashboard.funnelTitle')}</h2>
+        {(selectable.length > 1 || canCompare) && (
+          <div className="flex flex-wrap items-center justify-end gap-1 bg-canvas rounded-lg p-1">
+            {canCompare && (
+              <button
+                onClick={() => setActive('compare')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${active === 'compare' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+              >
+                {t('dashboard.funnelCompare')}
+              </button>
+            )}
+            {selectable.map(o => (
+              <button
+                key={o.key}
+                onClick={() => setActive(o.key)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${active === o.key ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="text-[11px] text-muted mb-4">
+        {active === 'compare' ? t('dashboard.funnelCompareHint') : t('dashboard.funnelDesc')}
+      </p>
+
+      <div className="[perspective:1400px]">
+        <div
+          className="relative [transform-style:preserve-3d] transition-[transform,height] duration-500 ease-out"
+          style={{ transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)', height: bodyHeight }}
+        >
+          {/* Front face — funnel bars */}
+          <div
+            ref={frontRef}
+            aria-hidden={flipped}
+            className={`absolute top-0 left-0 w-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] ${flipped ? 'pointer-events-none' : ''}`}
+          >
+            {!hasData ? (
+              <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {stages.map(s => {
+                  const pct = visits > 0 ? (s.value / visits) * 100 : (s.value > 0 ? 100 : 0);
+                  return (
+                    <div key={s.key}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-ink">{s.label}</span>
+                        <span className="text-sm font-semibold text-ink tabular-nums font-mono">{s.value.toLocaleString(numberLocale())}</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-canvas overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, 2)}%`, background: s.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="bg-canvas rounded-lg p-3">
+                    <p className="text-[11px] text-muted mb-1">{t('dashboard.funnelAtcRate')}</p>
+                    <p className="text-base font-semibold text-ink font-mono">{atcRate != null ? `${atcRate.toFixed(1)}%` : '—'}</p>
+                  </div>
+                  <div className="bg-canvas rounded-lg p-3">
+                    <p className="text-[11px] text-muted mb-1">{t('dashboard.funnelConversionRate')}</p>
+                    <p className="text-base font-semibold text-ink font-mono">{conversionRate != null ? `${conversionRate.toFixed(2)}%` : '—'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Back face — channel comparison table */}
+          <div
+            ref={backRef}
+            aria-hidden={!flipped}
+            className={`absolute top-0 left-0 w-full [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(180deg)] ${flipped ? '' : 'pointer-events-none'}`}
+          >
+            <div className="overflow-x-auto -mx-1 px-1">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-muted border-b border-hairline">
+                    <th className="text-left font-medium py-2 pr-2">{t('dashboard.funnelChannelCol')}</th>
+                    <th className="text-right font-medium py-2 px-2">Visits</th>
+                    <th className="text-right font-medium py-2 px-2">Orders</th>
+                    <th className="text-right font-medium py-2 px-2">ATC %</th>
+                    <th className="text-right font-medium py-2 pl-2">Conv %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.channel} className="border-b border-hairline last:border-0">
+                      <td className="py-2.5 pr-2">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[r.channel] ?? '#94a3b8' }} />
+                          <span className="font-medium text-ink">{r.label}</span>
+                        </span>
+                      </td>
+                      <td className={`py-2.5 px-2 text-right ${leadCls(r.visits === best.visits && r.visits > 0)}`}>{r.visits.toLocaleString(numberLocale())}</td>
+                      <td className={`py-2.5 px-2 text-right ${leadCls(r.orders === best.orders && r.orders > 0)}`}>{r.orders.toLocaleString(numberLocale())}</td>
+                      <td className={`py-2.5 px-2 text-right ${leadCls(r.atcRate != null && r.atcRate === best.atcRate)}`}>{r.atcRate != null ? `${r.atcRate.toFixed(1)}%` : '—'}</td>
+                      <td className={`py-2.5 pl-2 text-right ${leadCls(r.convRate != null && r.convRate === best.convRate)}`}>{r.convRate != null ? `${r.convRate.toFixed(2)}%` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// C — GMV by the KOL's content category (was filter-only before)
+function CategoryBreakdownCard({
+  rows,
+}: {
+  rows: { category_id: number; category_name: string; kol_count: number; placement_count: number; gmv: number; orders: number }[];
+}) {
+  const { t } = useTranslation();
+  const maxGmv = Math.max(...rows.map(r => r.gmv), 1);
+  return (
+    <div className="bg-surface border border-hairline rounded-xl p-5">
+      <div className="flex items-baseline gap-3 mb-4">
+        <h2 className="text-sm font-semibold text-ink">{t('dashboard.categoryTitle')}</h2>
+        <p className="text-[11px] text-muted">{t('dashboard.categoryDesc')}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {rows.map((r, i) => (
+            <div key={r.category_id} className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
+              <span className="text-sm font-medium text-ink w-24 shrink-0 truncate">{r.category_name}</span>
+              <div className="flex-1 h-1.5 rounded-full bg-canvas overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${(r.gmv / maxGmv) * 100}%`, background: FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
+              </div>
+              <span className="text-[11px] text-muted tabular-nums w-14 text-right shrink-0">{t('dashboard.kolCountLabel', { count: r.kol_count })}</span>
+              <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">{formatMoney(r.gmv)}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -771,8 +1026,12 @@ export default function DashboardPage() {
                 <div className="h-2.5 bg-canvas rounded-md w-24 animate-pulse shrink-0" />
                 <div className="flex-1 h-px bg-hairline" />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => <SkeletonKpiCard key={i} />)}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {Array.from({ length: 5 }).map((_, i) => <SkeletonKpiCard key={i} />)}
+              </div>
+              <div className="h-2 bg-canvas rounded-md w-16 mt-5 mb-3 animate-pulse" />
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)}
               </div>
             </div>
 
@@ -811,13 +1070,9 @@ export default function DashboardPage() {
               <span className="text-xs font-semibold uppercase tracking-wider text-muted shrink-0">{t('dashboard.sectionMetrics')}</span>
               <div className="flex-1 h-px bg-hairline" />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Totals — absolute numbers; Ads Cost last (sparse data, lowest priority) */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
-              <KpiCard
-                icon={<Gauge size={13} />}
-                label={t('dashboard.totalRoi')}
-                value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
-              />
               <KpiCard icon={<Wallet size={13} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
               <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
               <KpiCard
@@ -828,6 +1083,34 @@ export default function DashboardPage() {
               />
               <KpiCard icon={<Megaphone size={13} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
             </div>
+
+            {/* Efficiency — derived ratios (ROI lives here, not with the totals) */}
+            <p className="text-[11px] font-medium text-muted mt-5 mb-3">{t('dashboard.sectionEfficiency')}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
+              <KpiCard
+                icon={<Gauge size={13} />}
+                label={t('dashboard.totalRoi')}
+                value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
+              />
+              <KpiCard
+                icon={<Coins size={13} />}
+                label={t('dashboard.avgGmvPerPlacement')}
+                value={data.summary.posted_count > 0 ? formatMoney(data.summary.total_gmv / data.summary.posted_count) : '—'}
+                sub={t('dashboard.perPostedPlacement')}
+              />
+              <KpiCard
+                icon={<Percent size={13} />}
+                label={t('dashboard.conversionRate')}
+                value={data.summary.total_visits > 0 ? `${((data.summary.total_orders / data.summary.total_visits) * 100).toFixed(2)}%` : '—'}
+                sub={t('dashboard.ordersPerVisits')}
+              />
+              <KpiCard
+                icon={<CheckCircle2 size={13} />}
+                label={t('dashboard.postedRate')}
+                value={data.summary.total_placements > 0 ? `${((data.summary.posted_count / data.summary.total_placements) * 100).toFixed(0)}%` : '—'}
+                sub={t('dashboard.postedOfTotal', { posted: data.summary.posted_count, total: data.summary.total_placements })}
+              />
+            </div>
           </div>
 
           {/* Analysis section: row 1 = donut + bar chart, row 2 = platform breakdown full width */}
@@ -835,6 +1118,11 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 mb-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted shrink-0">{t('dashboard.sectionAnalysis')}</span>
               <div className="flex-1 h-px bg-hairline" />
+            </div>
+
+            {/* Monthly trend (A) — full width, the only over-time view */}
+            <div className="mb-6">
+              <MonthlyTrendCard rows={data.monthlyTrend} />
             </div>
 
             {/* Row 1: Donut + Bar chart */}
@@ -910,7 +1198,16 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Row 2: Platform breakdown full width */}
+            {/* Row 2: Funnel (B) + Category (C) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <FunnelCard
+                total={{ visits: data.summary.total_visits, atc: data.summary.total_atc, orders: data.summary.total_orders }}
+                channels={data.channelBreakdown}
+              />
+              <CategoryBreakdownCard rows={data.categoryBreakdown} />
+            </div>
+
+            {/* Row 3: Platform breakdown full width */}
             {data.platformBreakdown.length > 0 && (
               <PlatformBreakdownCard rows={data.platformBreakdown} />
             )}

@@ -127,14 +127,40 @@ app.post('/users', async c => {
 app.patch('/users/:id', async c => {
   const prisma = c.get('prisma');
   const id = Number(c.req.param('id'));
-  const { role, is_active, brand_ids } = await c.req.json() as { role?: string; is_active?: boolean; brand_ids?: number[] };
+  const { role, is_active, brand_ids, email, full_name } = await c.req.json() as {
+    role?: string; is_active?: boolean; brand_ids?: number[]; email?: string; full_name?: string;
+  };
 
   try {
+    // Email update: sync to Supabase auth first
+    if (email !== undefined) {
+      const newEmail = email.trim().toLowerCase();
+      if (!newEmail) return c.json({ error: 'email ห้ามว่าง' }, 400);
+
+      const dbUser = await prisma.users.findUnique({ where: { id }, select: { email: true } });
+      if (!dbUser) return c.json({ error: 'ไม่พบผู้ใช้' }, 404);
+
+      const supabaseAdmin = getSupabaseAdmin(c.env);
+      if (dbUser.email) {
+        // find existing supabase user and update
+        const { data, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        if (listErr) return c.json({ error: listErr.message }, 500);
+        const supaUser = data.users.find(u => u.email === dbUser.email);
+        if (supaUser) {
+          const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(supaUser.id, { email: newEmail });
+          if (updateErr) return c.json({ error: updateErr.message }, 400);
+        }
+      }
+      // update DB email
+      await prisma.users.update({ where: { id }, data: { email: newEmail } });
+    }
+
     const user = await prisma.users.update({
       where: { id },
       data: {
         ...(role !== undefined ? { role } : {}),
         ...(is_active !== undefined ? { is_active } : {}),
+        ...(full_name !== undefined && full_name.trim() ? { full_name: full_name.trim() } : {}),
       },
       select: {
         id: true, full_name: true, email: true, role: true, is_active: true, created_at: true,
