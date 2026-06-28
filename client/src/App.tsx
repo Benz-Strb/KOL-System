@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut, Menu } from 'lucide-react';
+import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut, Menu, PieChart } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
@@ -19,6 +19,7 @@ const KolsPage = lazy(() => import('./pages/KolsPage.js'));
 const SamplesPage = lazy(() => import('./pages/SamplesPage.js'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage.js'));
 const ProductDashboardPage = lazy(() => import('./pages/ProductDashboardPage.js'));
+const MarketingDashboardPage = lazy(() => import('./pages/MarketingDashboardPage.js'));
 
 const Spinner = (
   <div className="flex items-center justify-center min-h-screen bg-canvas">
@@ -29,7 +30,9 @@ const Spinner = (
 // No standalone "home" page — landing destination depends on role: admin/manager
 // go straight to the analytics Dashboard, everyone else goes to the Placements list.
 function homePathFor(role?: string) {
-  return role === 'admin' || role === 'manager' ? '/dashboard' : '/placements';
+  if (role === 'admin' || role === 'manager') return '/dashboard';
+  if (role === 'marketing') return '/marketing';
+  return '/placements';
 }
 
 // Redirects to the role-appropriate home (or /change-password) when already logged in
@@ -229,6 +232,10 @@ function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             )}
+            <NavLink to="/marketing" className={navLinkCls}>
+              <PieChart size={15} />
+              {t('nav.marketingDashboard')}
+            </NavLink>
             {appUser?.role === 'admin' && (
               <NavLink to="/admin/users" className={navLinkCls}>
                 <Users size={15} />
@@ -323,6 +330,11 @@ export default function App() {
               <RequireManagerOrAdmin>
                 <Layout><ProductDashboardPage /></Layout>
               </RequireManagerOrAdmin>
+            </ProtectedRoute>
+          } />
+          <Route path="/marketing" element={
+            <ProtectedRoute>
+              <Layout><MarketingDashboardPage /></Layout>
             </ProtectedRoute>
           } />
           <Route path="/admin/users" element={
