@@ -111,6 +111,18 @@ export const th = {
     funnelConversionRate: 'อัตราการซื้อ',
     categoryTitle: 'GMV แยกตามหมวดคอนเทนต์',
     categoryDesc: 'ผลงานแยกตามสายคอนเทนต์ของ KOL',
+    visitsShopee: 'Visits Shopee',
+    visitsLazada: 'Visits Lazada',
+    othersLabel: 'อื่นๆ',
+  },
+  marketing: {
+    title: 'Dashboard การตลาด',
+    subtitle: 'ภาพรวมยอดขายและสัดส่วน GMV สำหรับฝ่ายการตลาด',
+    totalCost: 'ค่าใช้จ่ายรวม',
+    gmvByPlatform: 'สัดส่วน GMV ตาม Platform',
+    gmvByProductCategory: 'สัดส่วน GMV ตามหมวดสินค้า',
+    gmvByProductSku: 'สัดส่วน GMV ตามรุ่นสินค้า (SKU)',
+    gmvByContentCategory: 'สัดส่วน GMV ตามหมวดคอนเทนต์',
   },
   productDashboard: {
     title: 'Dashboard สินค้า',
@@ -322,6 +334,7 @@ export const th = {
     placements: 'รายการ',
     addPlacement: 'เพิ่ม Placement',
     dashboardProducts: 'สินค้า',
+    marketingDashboard: 'Dashboard การตลาด',
     users: 'ผู้ใช้',
   },
   roles: {

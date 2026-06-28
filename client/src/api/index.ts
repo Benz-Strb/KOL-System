@@ -536,6 +536,26 @@ export const getDashboardOverview = (params: { brand_id?: string; campaign_id?: 
   return api<DashboardOverview>(`/api/dashboard?${p}`);
 };
 
+export type MarketingSummary = {
+  total_gmv: number; kol_cost: number; ads_cost: number; total_cost: number;
+  visits_shopee: number; visits_lazada: number; total_visits: number;
+};
+export type MarketingDashboard = {
+  summary: MarketingSummary;
+  byPlatform: { platform_id: number; platform_name: string; gmv: number }[];
+  byProductCategory: { category_id: number | null; category_name: string | null; gmv: number }[];
+  byProductSku: { canonical_id: number; model_code: string | null; gmv: number }[];
+  byContentCategory: { category_id: number; category_name: string; gmv: number }[];
+};
+
+export const getMarketingDashboard = (params: { brand_id?: string; date_from?: string; date_to?: string }) => {
+  const p = new URLSearchParams();
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.date_from) p.set('date_from', params.date_from);
+  if (params.date_to) p.set('date_to', params.date_to);
+  return api<MarketingDashboard>(`/api/dashboard/marketing?${p}`);
+};
+
 // Shared by both dashboard export buttons — fetch with auth header (these
 // are file downloads, not JSON, so they bypass the api() wrapper) then
 // trigger a browser download via a synthetic <a download>, same pattern as

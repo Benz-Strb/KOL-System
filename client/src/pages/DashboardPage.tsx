@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal, Coins, Percent, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal, Coins, Percent, CheckCircle2, MousePointerClick } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid,
@@ -890,6 +890,9 @@ export default function DashboardPage() {
     return m;
   }, [data?.kolValueList]);
 
+  const visitsShopee = useMemo(() => data?.channelBreakdown.find(c => c.channel === 'shopee')?.visits ?? 0, [data]);
+  const visitsLazada = useMemo(() => data?.channelBreakdown.find(c => c.channel === 'lazada')?.visits ?? 0, [data]);
+
   const PAYMENT_ORDER = ['paid', 'barter', 'free'];
   const paymentGroups = useMemo(() => {
     const map = new Map<string, { kol_id: number; placement_count: number; total_gmv: number; total_spend: number }[]>();
@@ -1026,8 +1029,8 @@ export default function DashboardPage() {
                 <div className="h-2.5 bg-canvas rounded-md w-24 animate-pulse shrink-0" />
                 <div className="flex-1 h-px bg-hairline" />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {Array.from({ length: 5 }).map((_, i) => <SkeletonKpiCard key={i} />)}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                {Array.from({ length: 7 }).map((_, i) => <SkeletonKpiCard key={i} />)}
               </div>
               <div className="h-2 bg-canvas rounded-md w-16 mt-5 mb-3 animate-pulse" />
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
@@ -1071,7 +1074,7 @@ export default function DashboardPage() {
               <div className="flex-1 h-px bg-hairline" />
             </div>
             {/* Totals — absolute numbers; Ads Cost last (sparse data, lowest priority) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
               <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
               <KpiCard icon={<Wallet size={13} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
               <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
@@ -1082,6 +1085,8 @@ export default function DashboardPage() {
                 sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
               />
               <KpiCard icon={<Megaphone size={13} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
+              <KpiCard icon={<MousePointerClick size={13} />} label={t('dashboard.visitsShopee')} value={visitsShopee.toLocaleString(numberLocale())} />
+              <KpiCard icon={<MousePointerClick size={13} />} label={t('dashboard.visitsLazada')} value={visitsLazada.toLocaleString(numberLocale())} />
             </div>
 
             {/* Efficiency — derived ratios (ROI lives here, not with the totals) */}
