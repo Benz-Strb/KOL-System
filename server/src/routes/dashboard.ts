@@ -5,7 +5,7 @@ import { requireAuth, requireRole, type AuthUser } from '../middleware/auth.js';
 import type { AppEnv } from '../types.js';
 
 const app = new Hono<AppEnv>();
-app.use('*', requireAuth, requireRole('admin', 'manager'));
+app.use('*', requireAuth);
 
 function buildDashboardBrandFilter(role: string, brandIds: number[], brand_id?: string) {
   const bid = brand_id ? Number(brand_id) : null;
@@ -93,6 +93,24 @@ type CategoryRow = {
   placement_count: number;
   gmv: number;
   orders: number;
+};
+
+// Marketing dashboard (privacy-scoped: no per-KOL data) — KPI summary +
+// GMV-contribution donuts. Shares query patterns with buildDashboardOverview /
+// buildProductDashboard but exposes only aggregates.
+type MarketingSummary = {
+  total_gmv: number; kol_cost: number; ads_cost: number; total_cost: number;
+  visits_shopee: number; visits_lazada: number; total_visits: number;
+};
+type GmvSlice = { platform_id?: number; category_id?: number | null; canonical_id?: number;
+  platform_name?: string; category_name?: string | null; model_code?: string | null; gmv: number };
+
+const EMPTY_MARKETING = {
+  summary: { total_gmv: 0, kol_cost: 0, ads_cost: 0, total_cost: 0, visits_shopee: 0, visits_lazada: 0, total_visits: 0 },
+  byPlatform: [] as { platform_id: number; platform_name: string; gmv: number }[],
+  byProductCategory: [] as { category_id: number | null; category_name: string | null; gmv: number }[],
+  byProductSku: [] as { canonical_id: number; model_code: string | null; gmv: number }[],
+  byContentCategory: [] as { category_id: number; category_name: string; gmv: number }[],
 };
 
 // barter-vs-paid is most useful in this fixed order; alphabetical (from a
@@ -532,7 +550,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
   }
 }
 
-app.get('/', async c => {
+app.get('/', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -565,7 +583,7 @@ function styleExportHeaderRow(ws: ExcelJS.Worksheet) {
 
 // ─── GET /export — same data as GET /, rendered as a multi-sheet .xlsx ──
 // so the download always matches whatever filters are currently on screen.
-app.get('/export', async c => {
+app.get('/export', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -689,7 +707,7 @@ app.get('/export', async c => {
 });
 
 // ─── GET /kol/:id — per-KOL campaign trend + delivery reliability ───
-app.get('/kol/:id', async c => {
+app.get('/kol/:id', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -879,7 +897,7 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
   }
 }
 
-app.get('/products', async c => {
+app.get('/products', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -898,7 +916,7 @@ app.get('/products', async c => {
 });
 
 // ─── GET /products/export — same data as GET /products, as a .xlsx ──────
-app.get('/products/export', async c => {
+app.get('/products/export', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -935,7 +953,7 @@ app.get('/products/export', async c => {
 });
 
 // ─── GET /products/:id — KOLs who reviewed this product, ranked by GMV ───
-app.get('/products/:id', async c => {
+app.get('/products/:id', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -1053,7 +1071,7 @@ function buildOffplatformBrandStrings(role: string, brandIds: number[], brand_id
 }
 
 // ─── GET /offplatform — off-platform traffic summary (Shopee Ads) ─────────────
-app.get('/offplatform', async c => {
+app.get('/offplatform', requireRole('admin', 'manager'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -1135,6 +1153,157 @@ app.get('/offplatform', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load offplatform traffic' }, 500);
+  }
+});
+
+const SKU_TOP_N = 8;
+
+// Marketing dashboard aggregates — same brand-scoping as the manager dashboard
+// but returns only KPI totals + GMV-contribution slices (no per-KOL rows).
+async function buildMarketingDashboard(prisma: PrismaClient, user: AuthUser, query: {
+  brand_id?: string; date_from?: string; date_to?: string;
+}) {
+  const { brand_id, date_from, date_to } = query;
+  const brandFilter = buildDashboardBrandFilter(user.role, user.brandIds, brand_id);
+  const where = {
+    ...brandFilter,
+    ...(date_from || date_to ? {
+      publication_date: {
+        ...(date_from ? { gte: new Date(date_from) } : {}),
+        ...(date_to ? { lte: new Date(date_to) } : {}),
+      },
+    } : {}),
+  };
+
+  const matched = await prisma.placements.findMany({
+    where, select: { id: true, pay_amount: true, final_price: true, ads_cost: true },
+  });
+  if (matched.length === 0) return EMPTY_MARKETING;
+
+  const ids = matched.map(p => p.id);
+  let kolCost = 0, adsCost = 0;
+  for (const p of matched) {
+    kolCost += Number(p.pay_amount ?? p.final_price ?? 0);
+    adsCost += Number(p.ads_cost ?? 0);
+  }
+
+  // GMV total + visits per sales channel
+  const channelRows = await prisma.$queryRaw<{ channel: string; gmv: number; visits: number }[]>`
+    SELECT channel,
+           COALESCE(SUM(gmv::numeric), 0)::float AS gmv,
+           COALESCE(SUM(visits), 0)::int          AS visits
+    FROM placement_metrics
+    WHERE placement_id IN (${Prisma.join(ids)})
+    GROUP BY channel
+  `;
+  let totalGmv = 0, totalVisits = 0, visitsShopee = 0, visitsLazada = 0;
+  for (const r of channelRows) {
+    totalGmv += r.gmv; totalVisits += r.visits;
+    if (r.channel === 'shopee') visitsShopee = r.visits;
+    if (r.channel === 'lazada') visitsLazada = r.visits;
+  }
+
+  // GMV by KOL posting platform
+  const byPlatform = await prisma.$queryRaw<{ platform_id: number; platform_name: string; gmv: number }[]>`
+    WITH metric_agg AS (
+      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
+      WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
+    )
+    SELECT pt.id::int AS platform_id, pt.name AS platform_name,
+           COALESCE(SUM(ma.gmv), 0)::float AS gmv
+    FROM placements p
+    JOIN platforms pt ON pt.id = p.platform_id
+    LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+    WHERE p.id IN (${Prisma.join(ids)})
+    GROUP BY pt.id, pt.name
+    ORDER BY gmv DESC
+  `;
+
+  // GMV by KOL content category
+  const byContentCategory = await prisma.$queryRaw<{ category_id: number; category_name: string; gmv: number }[]>`
+    WITH metric_agg AS (
+      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
+      WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
+    )
+    SELECT cc.id::int AS category_id, cc.name AS category_name,
+           COALESCE(SUM(ma.gmv), 0)::float AS gmv
+    FROM placements p
+    JOIN kols k ON k.id = p.kol_id
+    JOIN content_categories cc ON cc.id = k.content_category_id
+    LEFT JOIN metric_agg ma ON ma.placement_id = p.id
+    WHERE p.id IN (${Prisma.join(ids)})
+    GROUP BY cc.id, cc.name
+    ORDER BY gmv DESC
+  `;
+
+  // GMV by product category (canonical resolve — see buildProductDashboard)
+  const byProductCategory = await prisma.$queryRaw<{ category_id: number | null; category_name: string | null; gmv: number }[]>`
+    WITH resolved AS (
+      SELECT pl.id AS placement_id, COALESCE(pr.canonical_product_id, pr.id) AS canonical_id
+      FROM placements pl JOIN products pr ON pr.id = pl.product_id
+      WHERE pl.id IN (${Prisma.join(ids)})
+    ),
+    metric_agg AS (
+      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
+      WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
+    )
+    SELECT pc.id::int AS category_id, pc.name AS category_name,
+           COALESCE(SUM(ma.gmv), 0)::float AS gmv
+    FROM resolved r
+    JOIN products c ON c.id = r.canonical_id
+    LEFT JOIN product_categories pc ON pc.id = c.product_category_id
+    LEFT JOIN metric_agg ma ON ma.placement_id = r.placement_id
+    GROUP BY pc.id, pc.name
+    ORDER BY gmv DESC
+  `;
+
+  // GMV by product SKU (canonical), top 8 + others
+  const skuRows = await prisma.$queryRaw<{ canonical_id: number; model_code: string; gmv: number }[]>`
+    WITH resolved AS (
+      SELECT pl.id AS placement_id, COALESCE(pr.canonical_product_id, pr.id) AS canonical_id
+      FROM placements pl JOIN products pr ON pr.id = pl.product_id
+      WHERE pl.id IN (${Prisma.join(ids)})
+    ),
+    metric_agg AS (
+      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
+      WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
+    )
+    SELECT c.id::int AS canonical_id, c.model_code,
+           COALESCE(SUM(ma.gmv), 0)::float AS gmv
+    FROM resolved r
+    JOIN products c ON c.id = r.canonical_id
+    LEFT JOIN metric_agg ma ON ma.placement_id = r.placement_id
+    GROUP BY c.id, c.model_code
+    ORDER BY gmv DESC
+  `;
+  const top = skuRows.slice(0, SKU_TOP_N).map(r => ({ canonical_id: r.canonical_id, model_code: r.model_code, gmv: r.gmv }));
+  const restGmv = skuRows.slice(SKU_TOP_N).reduce((s, r) => s + r.gmv, 0);
+  const byProductSku = restGmv > 0
+    ? [...top, { canonical_id: -1, model_code: null as string | null, gmv: restGmv }]
+    : top;
+
+  return {
+    summary: {
+      total_gmv: totalGmv, kol_cost: kolCost, ads_cost: adsCost, total_cost: kolCost + adsCost,
+      visits_shopee: visitsShopee, visits_lazada: visitsLazada, total_visits: totalVisits,
+    },
+    byPlatform, byProductCategory, byProductSku, byContentCategory,
+  };
+}
+
+app.get('/marketing', requireRole('admin', 'manager', 'marketing'), async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const result = await buildMarketingDashboard(prisma, user, {
+      brand_id: c.req.query('brand_id'),
+      date_from: c.req.query('date_from'),
+      date_to: c.req.query('date_to'),
+    });
+    return c.json(result);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load marketing dashboard' }, 500);
   }
 });
 
