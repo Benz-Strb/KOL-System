@@ -11,6 +11,11 @@ import PlatformLogo from '../components/PlatformLogo.js';
 import BrandLogo from '../components/BrandLogo.js';
 import { numberLocale } from '../i18n/locale.js';
 
+function safeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return /^https?:\/\//i.test(url) ? url : null;
+}
+
 const STATUS_STYLE: Record<string, string> = {
   planned:   'bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/25',
   posted:    'bg-green-100 text-green-800 ring-1 ring-green-200 dark:bg-green-500/15 dark:text-green-300 dark:ring-green-500/25',
@@ -82,8 +87,8 @@ export default function PlacementDetailPage() {
           {handle && <KolAvatar handle={handle} avatarUrl={placement.kols?.avatar_url} size="md" />}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              {placement.kols?.profile_url ? (
-                <a href={placement.kols.profile_url} target="_blank" rel="noopener noreferrer"
+              {safeUrl(placement.kols?.profile_url) ? (
+                <a href={safeUrl(placement.kols?.profile_url)!} target="_blank" rel="noopener noreferrer"
                   className="font-semibold text-ink hover:text-accent inline-flex items-center gap-1">
                   {handle} <ExternalLink size={12} className="text-muted" />
                 </a>
@@ -117,9 +122,9 @@ export default function PlacementDetailPage() {
           <DetailRow label={t('placementDetail.pic')}>{placement.users_placements_person_in_charge_idTousers.full_name}</DetailRow>
         )}
         {placement.notes && <DetailRow label={t('placementDetail.notes')}>{placement.notes}</DetailRow>}
-        {placement.post_url && (
+        {safeUrl(placement.post_url) && (
           <DetailRow label={t('placementDetail.postUrl')}>
-            <a href={placement.post_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1">
+            <a href={safeUrl(placement.post_url)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1">
               <ExternalLink size={12} /> {placement.post_url}
             </a>
           </DetailRow>
@@ -153,7 +158,7 @@ export default function PlacementDetailPage() {
             {reposts.map(r => (
               <div key={r.id} className="flex items-center justify-between text-sm py-1.5 border-b border-hairline last:border-0">
                 <span className="font-medium text-ink">Round {r.round_number} · {r.posted_by}</span>
-                {r.post_url && <a href={r.post_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline text-xs inline-flex items-center gap-1"><ExternalLink size={11} /> link</a>}
+                {safeUrl(r.post_url) && <a href={safeUrl(r.post_url)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline text-xs inline-flex items-center gap-1"><ExternalLink size={11} /> link</a>}
               </div>
             ))}
           </div>
