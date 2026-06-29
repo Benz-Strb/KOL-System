@@ -139,4 +139,46 @@ app.get('/', async c => {
   }
 });
 
+app.get('/kol-latest', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const q = c.req.query();
+    const kolId = q.kol_id ? Number(q.kol_id) : null;
+    const bid = q.brand_id ? Number(q.brand_id) : null;
+    if (!kolId || !Number.isInteger(kolId)) return c.json({ error: 'kol_id required' }, 400);
+
+    const isAdmin = user.role === 'admin';
+    let allowedBrandIds: number[] | null = null;
+    if (!isAdmin) {
+      allowedBrandIds = bid && user.brandIds.includes(bid) ? [bid] : user.brandIds;
+    } else if (bid) {
+      allowedBrandIds = [bid];
+    }
+
+    if (allowedBrandIds && allowedBrandIds.length === 0) return c.json({ date: null });
+
+    const conds: string[] = [
+      `p.kol_id = ${kolId}`,
+      `COALESCE(p.target_pub_date, p.publication_date) IS NOT NULL`,
+    ];
+    if (allowedBrandIds) conds.push(`p.brand_id IN (${allowedBrandIds.join(',')})`);
+
+    const rows = await prisma.$queryRawUnsafe<{ d: string | null }[]>(`
+      SELECT TO_CHAR(d, 'YYYY-MM-DD') AS d FROM (
+        SELECT COALESCE(p.target_pub_date, p.publication_date) AS d
+        FROM placements p
+        WHERE ${conds.join(' AND ')}
+      ) t
+      ORDER BY (CASE WHEN d >= CURRENT_DATE THEN 0 ELSE 1 END), ABS(d - CURRENT_DATE)
+      LIMIT 1
+    `);
+
+    return c.json({ date: rows[0]?.d ?? null });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load kol latest date' }, 500);
+  }
+});
+
 export default app;
