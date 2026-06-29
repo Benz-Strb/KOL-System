@@ -102,7 +102,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const [dashboardOpen, setDashboardOpen] = useState(dashboardSectionActive);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (dashboardSectionActive) setDashboardOpen(true);
+    setDashboardOpen(dashboardSectionActive);
   }, [dashboardSectionActive]);
 
   // Mobile off-canvas drawer — closed by default, closes itself on every navigation
@@ -224,8 +224,8 @@ function Layout({ children }: { children: React.ReactNode }) {
                   <span className="flex-1 text-left">Dashboard</span>
                   <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${dashboardOpen ? 'rotate-180' : ''}`} />
                 </button>
-                {dashboardOpen && (
-                  <div className="flex flex-col gap-0.5 mt-0.5 ml-[13px] pl-3 border-l border-white/10">
+                <div className={`grid transition-all duration-200 ease-in-out ${dashboardOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className="overflow-hidden flex flex-col gap-0.5 mt-0.5 ml-[13px] pl-3 border-l border-white/10">
                     <NavLink to="/dashboard" end className={navLinkCls}>
                       <LayoutDashboard size={14} />
                       KOL
@@ -235,7 +235,7 @@ function Layout({ children }: { children: React.ReactNode }) {
                       {t('nav.dashboardProducts')}
                     </NavLink>
                   </div>
-                )}
+                </div>
               </div>
             )}
             <NavLink to="/marketing" className={navLinkCls}>
