@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, CalendarDays, List, X, ExternalLink, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
-import { getCalendar, getCalendarKolLatest, getDropdowns, searchKols, type CalendarEvent, type Brand, type KolResult } from '../api/index.js';
+import { getCalendar, getCalendarKolLatest, getDropdowns, searchKols, type CalendarEvent, type CalendarResponse, type Brand, type KolResult } from '../api/index.js';
+import { getCached, setCached } from '../lib/swrCache.js';
 import KolAvatar from '../components/KolAvatar.js';
 import PlatformLogo from '../components/PlatformLogo.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
@@ -348,7 +349,15 @@ export default function CalendarPage() {
 
   const load = useCallback(async () => {
     const mySeq = ++seqRef.current;
-    setLoading(true);
+    const cacheKey = `calendar:${JSON.stringify({ from, to, brandId, kolId, statusFilter, typeFilter })}`;
+    const cached = getCached<CalendarResponse>(cacheKey);
+    if (cached) {
+      setEvents(cached.events);
+      setNoDateCount(cached.meta.no_date_count);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await getCalendar({
         from, to,
@@ -358,10 +367,11 @@ export default function CalendarPage() {
         placement_type: typeFilter !== 'all' ? typeFilter : undefined,
       });
       if (seqRef.current !== mySeq) return;
+      setCached(cacheKey, res);
       setEvents(res.events);
       setNoDateCount(res.meta.no_date_count);
     } catch {
-      if (seqRef.current === mySeq) { setEvents([]); setNoDateCount(0); }
+      if (seqRef.current === mySeq && !cached) { setEvents([]); setNoDateCount(0); }
     } finally {
       if (seqRef.current === mySeq) setLoading(false);
     }
