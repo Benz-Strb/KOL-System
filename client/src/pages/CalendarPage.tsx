@@ -39,7 +39,8 @@ function buildGrid(year: number, month: number): Date[] {
 }
 
 function monthLabel(year: number, month: number, locale: string): string {
-  return new Date(year, month, 1).toLocaleString(locale, { month: 'long', year: 'numeric' });
+  const l = locale.startsWith('th') ? `${locale}-u-ca-gregory` : locale;
+  return new Date(year, month, 1).toLocaleString(l, { month: 'long', year: 'numeric' });
 }
 
 // ─── status colours ──────────────────────────────────────────────────────────
