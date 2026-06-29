@@ -704,6 +704,38 @@ export const getOffplatformTraffic = (params: { brand_id?: string; date_from?: s
   return api<OffplatformTraffic>(`/api/dashboard/offplatform?${p}`);
 };
 
+// Calendar
+export type CalendarEvent = {
+  id: number;
+  date: string;
+  date_source: 'target' | 'actual';
+  status: string;
+  placement_type: string;
+  kol_id: number;
+  kol_name: string;
+  handle: string;
+  avatar_url: string | null;
+  platform: string | null;
+  product_name: string | null;
+  store_name: string | null;
+  campaign_code: string | null;
+  post_url: string | null;
+};
+export type CalendarResponse = { events: CalendarEvent[]; meta: { no_date_count: number } };
+
+export const getCalendar = (params: {
+  from: string; to: string;
+  brand_id?: string; kol_id?: string;
+  status?: string; placement_type?: string;
+}) => {
+  const p = new URLSearchParams({ from: params.from, to: params.to });
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.kol_id) p.set('kol_id', params.kol_id);
+  if (params.status && params.status !== 'all') p.set('status', params.status);
+  if (params.placement_type && params.placement_type !== 'all') p.set('placement_type', params.placement_type);
+  return api<CalendarResponse>(`/api/calendar?${p}`);
+};
+
 // Bulk import placements from Excel
 export type ImportKind = 'online' | 'offline';
 

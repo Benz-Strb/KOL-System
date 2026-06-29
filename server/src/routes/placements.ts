@@ -275,6 +275,8 @@ app.post('/', async c => {
     const b = await c.req.json();
 
     if (!b.placement_type) return c.json({ error: 'placement_type required' }, 400);
+    // target_pub_date is required for planned placements so the calendar/schedule has a date to anchor on
+    if (!b.target_pub_date) return c.json({ error: 'target_pub_date required' }, 400);
 
     // Resolve brand_id: use body value or auto-select if user has exactly one brand
     const brand_id = b.brand_id ? Number(b.brand_id) : user.brandIds[0];

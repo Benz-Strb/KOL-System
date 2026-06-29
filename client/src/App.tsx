@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut, Menu, PieChart } from 'lucide-react';
+import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut, Menu, PieChart, CalendarDays } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
@@ -20,6 +20,7 @@ const SamplesPage = lazy(() => import('./pages/SamplesPage.js'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage.js'));
 const ProductDashboardPage = lazy(() => import('./pages/ProductDashboardPage.js'));
 const MarketingDashboardPage = lazy(() => import('./pages/MarketingDashboardPage.js'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage.js'));
 
 const Spinner = (
   <div className="flex items-center justify-center min-h-screen bg-canvas">
@@ -197,6 +198,10 @@ function Layout({ children }: { children: React.ReactNode }) {
               <LayoutList size={15} />
               {t('nav.placements')}
             </NavLink>
+            <NavLink to="/calendar" className={navLinkCls}>
+              <CalendarDays size={15} />
+              {t('nav.calendar')}
+            </NavLink>
             <NavLink to="/kols" className={navLinkCls}>
               <BookUser size={15} />
               KOL
@@ -306,6 +311,11 @@ export default function App() {
           <Route path="/placements/import" element={
             <ProtectedRoute>
               <Layout><ImportPlacementsPage /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/calendar" element={
+            <ProtectedRoute>
+              <Layout><CalendarPage /></Layout>
             </ProtectedRoute>
           } />
           <Route path="/kols" element={

@@ -734,30 +734,6 @@ const selectCls = [
   'focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/40',
 ].join(' ');
 
-function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
-  return (
-    <div className="bg-surface border border-hairline rounded-xl p-4 flex flex-col gap-2 hover:border-accent/30 transition-colors duration-200">
-      <div className="flex items-center gap-1.5">
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-accent/10 text-accent shrink-0">
-          {icon}
-        </span>
-        <span className="text-[11px] font-medium text-muted leading-tight">{label}</span>
-      </div>
-      <div className="text-2xl font-bold text-ink tabular-nums font-mono leading-tight">{value}</div>
-      {sub && <div className="text-[11px] text-muted">{sub}</div>}
-    </div>
-  );
-}
-
-function SkeletonKpiCard() {
-  return (
-    <div className="bg-surface border border-hairline rounded-xl p-4 flex flex-col gap-2 animate-pulse">
-      <div className="h-2.5 bg-canvas rounded-md w-2/3" />
-      <div className="h-5 bg-canvas rounded-md w-1/2" />
-      <div className="h-2 bg-canvas rounded-md w-3/4" />
-    </div>
-  );
-}
 
 function SkeletonChart() {
   return (
@@ -780,6 +756,49 @@ function SkeletonKolRow() {
       <div className="w-16 h-3 bg-canvas rounded-md shrink-0" />
       <div className="w-28 h-3.5 bg-canvas rounded-md shrink-0" />
       <div className="w-6 h-6 rounded-md bg-canvas shrink-0" />
+    </div>
+  );
+}
+
+// A single cell inside the KPI slab — no card border, just spacing + right divider
+function SlabCell({ icon, label, value, sub, accent }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; accent?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 px-5 py-5 border-r border-hairline last:border-r-0">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted leading-tight">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-accent/10 text-accent shrink-0">{icon}</span>
+        {label}
+      </div>
+      <div className={`text-[22px] font-bold tabular-nums font-mono leading-tight ${accent ? 'text-accent' : 'text-ink'}`}>{value}</div>
+      {sub && <div className="text-[10px] text-muted leading-snug">{sub}</div>}
+    </div>
+  );
+}
+
+function SkeletonKpiSlab() {
+  return (
+    <div className="bg-surface border border-hairline rounded-xl overflow-hidden animate-pulse">
+      <div className="overflow-x-auto">
+        <div className="grid grid-cols-7 min-w-[700px]">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="px-5 py-5 border-r border-hairline last:border-r-0 flex flex-col gap-2">
+              <div className="h-2.5 bg-canvas rounded-md w-16" />
+              <div className="h-5 bg-canvas rounded-md w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="h-px bg-hairline" />
+      <div className="h-2 bg-canvas rounded-md w-20 mx-5 mt-3" />
+      <div className="grid grid-cols-2 md:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="px-5 py-4 border-r border-hairline last:border-r-0 flex flex-col gap-2">
+            <div className="h-2.5 bg-canvas rounded-md w-14" />
+            <div className="h-5 bg-canvas rounded-md w-16" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1029,13 +1048,7 @@ export default function DashboardPage() {
                 <div className="h-2.5 bg-canvas rounded-md w-24 animate-pulse shrink-0" />
                 <div className="flex-1 h-px bg-hairline" />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-                {Array.from({ length: 7 }).map((_, i) => <SkeletonKpiCard key={i} />)}
-              </div>
-              <div className="h-2 bg-canvas rounded-md w-16 mt-5 mb-3 animate-pulse" />
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => <SkeletonKpiCard key={i} />)}
-              </div>
+              <SkeletonKpiSlab />
             </div>
 
             <div>
@@ -1067,54 +1080,60 @@ export default function DashboardPage() {
         )
       ) : activeTab === 'overview' ? (
         <div className="flex flex-col gap-8">
-          {/* KPI section */}
+          {/* KPI section — Grouped Panel (แบบ A): รวม 11 KPI ไว้ใน panel เดียว */}
           <div>
             <div className="flex items-center gap-3 mb-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted shrink-0">{t('dashboard.sectionMetrics')}</span>
               <div className="flex-1 h-px bg-hairline" />
             </div>
-            {/* Totals — absolute numbers; Ads Cost last (sparse data, lowest priority) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-              <KpiCard icon={<TrendingUp size={13} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
-              <KpiCard icon={<Wallet size={13} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
-              <KpiCard icon={<ShoppingCart size={13} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
-              <KpiCard
-                icon={<ListChecks size={13} />}
-                label={t('dashboard.totalPlacements')}
-                value={data.summary.total_placements.toLocaleString(numberLocale())}
-                sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
-              />
-              <KpiCard icon={<Megaphone size={13} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
-              <KpiCard icon={<MousePointerClick size={13} />} label={t('dashboard.visitsShopee')} value={visitsShopee.toLocaleString(numberLocale())} />
-              <KpiCard icon={<MousePointerClick size={13} />} label={t('dashboard.visitsLazada')} value={visitsLazada.toLocaleString(numberLocale())} />
-            </div>
-
-            {/* Efficiency — derived ratios (ROI lives here, not with the totals) */}
-            <p className="text-[11px] font-medium text-muted mt-5 mb-3">{t('dashboard.sectionEfficiency')}</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
-              <KpiCard
-                icon={<Gauge size={13} />}
-                label={t('dashboard.totalRoi')}
-                value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
-              />
-              <KpiCard
-                icon={<Coins size={13} />}
-                label={t('dashboard.avgGmvPerPlacement')}
-                value={data.summary.posted_count > 0 ? formatMoney(data.summary.total_gmv / data.summary.posted_count) : '—'}
-                sub={t('dashboard.perPostedPlacement')}
-              />
-              <KpiCard
-                icon={<Percent size={13} />}
-                label={t('dashboard.conversionRate')}
-                value={data.summary.total_visits > 0 ? `${((data.summary.total_orders / data.summary.total_visits) * 100).toFixed(2)}%` : '—'}
-                sub={t('dashboard.ordersPerVisits')}
-              />
-              <KpiCard
-                icon={<CheckCircle2 size={13} />}
-                label={t('dashboard.postedRate')}
-                value={data.summary.total_placements > 0 ? `${((data.summary.posted_count / data.summary.total_placements) * 100).toFixed(0)}%` : '—'}
-                sub={t('dashboard.postedOfTotal', { posted: data.summary.posted_count, total: data.summary.total_placements })}
-              />
+            <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
+              {/* Row 1: 7 absolute-number KPIs — no inner card borders */}
+              <div className="overflow-x-auto">
+                <div className="grid grid-cols-7 min-w-[700px]">
+                  <SlabCell icon={<TrendingUp size={12} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
+                  <SlabCell icon={<Wallet size={12} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
+                  <SlabCell icon={<ShoppingCart size={12} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
+                  <SlabCell
+                    icon={<ListChecks size={12} />}
+                    label={t('dashboard.totalPlacements')}
+                    value={data.summary.total_placements.toLocaleString(numberLocale())}
+                    sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
+                  />
+                  <SlabCell icon={<Megaphone size={12} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
+                  <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsShopee')} value={visitsShopee.toLocaleString(numberLocale())} />
+                  <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsLazada')} value={visitsLazada.toLocaleString(numberLocale())} />
+                </div>
+              </div>
+              {/* Hairline divider between the two rows */}
+              <div className="h-px bg-hairline" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted px-5 pt-3 pb-0">{t('dashboard.sectionEfficiency')}</p>
+              {/* Row 2: 4 derived-ratio KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4">
+                <SlabCell
+                  icon={<Gauge size={12} />}
+                  label={t('dashboard.totalRoi')}
+                  value={data.summary.roi != null ? `x${data.summary.roi.toFixed(2)}` : '—'}
+                  accent
+                />
+                <SlabCell
+                  icon={<Coins size={12} />}
+                  label={t('dashboard.avgGmvPerPlacement')}
+                  value={data.summary.posted_count > 0 ? formatMoney(data.summary.total_gmv / data.summary.posted_count) : '—'}
+                  sub={t('dashboard.perPostedPlacement')}
+                />
+                <SlabCell
+                  icon={<Percent size={12} />}
+                  label={t('dashboard.conversionRate')}
+                  value={data.summary.total_visits > 0 ? `${((data.summary.total_orders / data.summary.total_visits) * 100).toFixed(2)}%` : '—'}
+                  sub={t('dashboard.ordersPerVisits')}
+                />
+                <SlabCell
+                  icon={<CheckCircle2 size={12} />}
+                  label={t('dashboard.postedRate')}
+                  value={data.summary.total_placements > 0 ? `${((data.summary.posted_count / data.summary.total_placements) * 100).toFixed(0)}%` : '—'}
+                  sub={t('dashboard.postedOfTotal', { posted: data.summary.posted_count, total: data.summary.total_placements })}
+                />
+              </div>
             </div>
           </div>
 

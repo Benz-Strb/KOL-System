@@ -122,6 +122,7 @@ export default function NewPlacementPage() {
     if (!kol) { setError(t('newPlacement.kolRequired')); return; }
     if (form.placement_type === 'offline_shop' && !form.store_id) { setError(t('newPlacement.branchRequired')); return; }
     if (!form.brand_id) { setError(t('newPlacement.brandRequired')); return; }
+    if (!form.target_pub_date) { setError(t('newPlacement.targetDateRequired')); return; }
     setError(''); setSubmitting(true);
     try {
       await createPlacement({
@@ -373,8 +374,8 @@ export default function NewPlacementPage() {
                 />
               </div>
               <div>
-                <label className={labelCls}>Target Publication Date</label>
-                <input type="date" value={form.target_pub_date}
+                <label className={labelCls}>Target Publication Date <span className="text-red-500 normal-case">*</span></label>
+                <input type="date" required value={form.target_pub_date}
                   onChange={e => set('target_pub_date', e.target.value)} className={inputCls} />
               </div>
             </div>

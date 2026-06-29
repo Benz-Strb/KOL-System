@@ -13,6 +13,7 @@ import adminRouter from './routes/admin.js';
 import authRouter from './routes/auth.js';
 import samplesRouter from './routes/samples.js';
 import dashboardRouter from './routes/dashboard.js';
+import calendarRouter from './routes/calendar.js';
 
 // Prisma $queryRaw returns PostgreSQL integers as BigInt — patch for JSON serialization
 (BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function () {
@@ -57,5 +58,6 @@ app.route('/api/placements', placementsRouter);
 app.route('/api/campaigns', campaignsRouter);
 app.route('/api/samples', samplesRouter);
 app.route('/api/dashboard', dashboardRouter);
+app.route('/api/calendar', calendarRouter);
 
 export default app;
