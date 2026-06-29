@@ -114,7 +114,7 @@ app.get('/', async c => {
     const prisma = c.get('prisma');
     const user = c.get('user');
     const q = c.req.query();
-    const { status, placement_type, q: search, product_id, campaign_id, payment_type, price_min, price_max, person_in_charge_id, brand_id, page = '1', limit = '20' } = q;
+    const { status, placement_type, q: search, product_id, campaign_id, payment_type, price_min, price_max, person_in_charge_id, brand_id, no_date, page = '1', limit = '20' } = q;
 
     const isAdmin = user.role === 'admin';
     const brandFilter = buildBrandFilter(isAdmin, user.brandIds, brand_id);
@@ -134,6 +134,7 @@ app.get('/', async c => {
         },
       } : {}),
       ...(person_in_charge_id ? { person_in_charge_id: Number(person_in_charge_id) } : {}),
+      ...(no_date === '1' ? { AND: [{ target_pub_date: null }, { publication_date: null }] } : {}),
     };
 
     const take = Number(limit);
