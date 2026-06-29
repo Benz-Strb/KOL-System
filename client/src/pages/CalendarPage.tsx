@@ -314,6 +314,26 @@ export default function CalendarPage() {
   const seqRef = useRef(0);
   const jumpSeqRef = useRef(0);
 
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(year);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  function openPicker() {
+    setPickerYear(year);
+    setPickerOpen(true);
+  }
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [pickerOpen]);
+
   // Load brand list for admin filter
   useEffect(() => {
     if (isAdmin) {
@@ -373,6 +393,9 @@ export default function CalendarPage() {
 
   const locale = document.documentElement.lang || 'th';
   const monthTitle = monthLabel(year, month, locale);
+  const monthNames = Array.from({ length: 12 }, (_, i) =>
+    new Date(2000, i, 1).toLocaleString(locale, { month: 'short' })
+  );
 
   // Day-of-week headers Mon–Sun
   const DOW_LABELS_TH = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
@@ -425,7 +448,54 @@ export default function CalendarPage() {
             >
               <ChevronLeft size={15} />
             </button>
-            <span className="text-sm font-medium text-ink w-36 text-center">{monthTitle}</span>
+
+            {/* Month/year picker trigger */}
+            <div className="relative" ref={pickerRef}>
+              <button
+                onClick={openPicker}
+                className="text-sm font-medium text-ink w-36 text-center px-2 py-1 rounded-lg border border-transparent hover:bg-surface hover:border-hairline transition-all"
+              >
+                {monthTitle}
+              </button>
+
+              {pickerOpen && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 bg-surface border border-hairline rounded-xl shadow-xl p-3 w-52">
+                  {/* Year nav */}
+                  <div className="flex items-center justify-between mb-2.5">
+                    <button
+                      onClick={() => setPickerYear(y => y - 1)}
+                      className="p-1 rounded-lg hover:bg-canvas text-muted hover:text-ink transition-colors"
+                    >
+                      <ChevronLeft size={13} />
+                    </button>
+                    <span className="text-sm font-semibold text-ink">{pickerYear}</span>
+                    <button
+                      onClick={() => setPickerYear(y => y + 1)}
+                      className="p-1 rounded-lg hover:bg-canvas text-muted hover:text-ink transition-colors"
+                    >
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
+                  {/* Month grid */}
+                  <div className="grid grid-cols-3 gap-1">
+                    {monthNames.map((name, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setYear(pickerYear); setMonth(i); setPickerOpen(false); }}
+                        className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          pickerYear === year && i === month
+                            ? 'bg-accent text-white'
+                            : 'text-ink hover:bg-canvas'
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={nextMonth}
               className="p-1.5 rounded-lg hover:bg-surface border border-transparent hover:border-hairline text-muted hover:text-ink transition-all"
