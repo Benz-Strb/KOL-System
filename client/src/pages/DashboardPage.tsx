@@ -588,7 +588,13 @@ function ChannelTooltip({ active, payload }: TooltipContentProps) {
   );
 }
 
-function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: number; mode: 'gmv' | 'roi'; onSelect: (kolId: number) => void }) {
+function KolRankRow({ k, rank, mode, channel, onSelect }: {
+  k: DashboardKolRow;
+  rank: number;
+  mode: 'gmv' | 'roi';
+  channel: string;
+  onSelect: (kolId: number) => void;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -600,6 +606,10 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
     clearTimeout(timer.current);
     setExpanded(false);
   };
+
+  const displayGmv = channel === 'all'
+    ? k.total_gmv
+    : (k.byChannel.find(c => c.channel === channel)?.gmv ?? 0);
 
   return (
     <div
@@ -621,12 +631,12 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
           {k.gen_name && <div className="text-[11px] text-muted truncate">{k.gen_name}</div>}
         </div>
         <span className="text-xs text-muted tabular-nums font-mono shrink-0">{k.placement_count} placement</span>
-        {mode === 'roi' && (
+        {mode === 'roi' && channel === 'all' && (
           <span className="text-xs font-semibold text-emerald-600 tabular-nums font-mono w-16 text-right shrink-0">
             {k.roi != null ? `x${k.roi.toFixed(2)}` : '—'}
           </span>
         )}
-        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(k.total_gmv)}</span>
+        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(displayGmv)}</span>
         {k.profile_url && (
           <a href={k.profile_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
             className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-accent hover:bg-canvas transition-colors shrink-0">
@@ -637,7 +647,7 @@ function KolRankRow({ k, rank, mode, onSelect }: { k: DashboardKolRow; rank: num
       {expanded && k.byChannel.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-2 pb-2 -mt-0.5 pl-[44px]">
           {k.byChannel.map(c => (
-            <span key={c.channel} className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-canvas text-muted">
+            <span key={c.channel} className={`inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded-full text-muted ${c.channel === channel ? 'bg-accent/10 ring-1 ring-accent/30' : 'bg-canvas'}`}>
               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? '#94a3b8' }} />
               {CHANNEL_LABEL[c.channel] ?? c.channel} · {formatMoney(c.gmv)}
             </span>
@@ -817,6 +827,7 @@ export default function DashboardPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
+  const [rankChannel, setRankChannel] = useState<string>('all');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -898,7 +909,31 @@ export default function DashboardPage() {
       .map(([date, revenue]) => ({ date: date.slice(5), revenue }));
   }, [offplatformData]);
 
-  const rankedKols = data ? (rankMode === 'gmv' ? data.topKolsByGmv : data.topKolsByRoi) : [];
+  const availableChannels = useMemo(() => {
+    if (!data) return [] as string[];
+    const seen = new Set<string>();
+    for (const k of data.kolValueList) {
+      for (const c of k.byChannel) if (c.gmv > 0) seen.add(c.channel);
+    }
+    return (['shopee', 'lazada', 'website', 'tiktok', 'youtube', 'lamon8'] as const).filter(ch => seen.has(ch));
+  }, [data]);
+
+  const rankedKols = useMemo((): DashboardKolRow[] => {
+    if (!data) return [];
+    if (rankChannel === 'all') {
+      return rankMode === 'gmv' ? data.topKolsByGmv : data.topKolsByRoi;
+    }
+    const withChannelGmv = data.kolValueList.map(k => ({
+      kol: k,
+      channelGmv: k.byChannel.find(c => c.channel === rankChannel)?.gmv ?? 0,
+    }));
+    return withChannelGmv
+      .filter(x => x.channelGmv > 0)
+      .sort((a, b) => b.channelGmv - a.channelGmv)
+      .slice(0, 10)
+      .map(x => x.kol);
+  }, [data, rankMode, rankChannel]);
+
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? t('kolTrend.noCampaign') }))
     : [];
@@ -1240,7 +1275,7 @@ export default function DashboardPage() {
           {/* Top KOL ranking */}
           <div className="bg-surface border border-hairline rounded-xl p-5">
             {/* Title row */}
-            <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
                   <Trophy size={14} className="text-accent" /> {t('dashboard.rankingTitle')}
@@ -1251,22 +1286,50 @@ export default function DashboardPage() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
-                <button
-                  onClick={() => setRankMode('gmv')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                >
-                  {t('dashboard.byGmv')}
-                </button>
-                <button
-                  onClick={() => setRankMode('roi')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                >
-                  {t('dashboard.byRoi')}
-                </button>
-              </div>
+              {rankChannel === 'all' && (
+                <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+                  <button
+                    onClick={() => setRankMode('gmv')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                  >
+                    {t('dashboard.byGmv')}
+                  </button>
+                  <button
+                    onClick={() => setRankMode('roi')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+                  >
+                    {t('dashboard.byRoi')}
+                  </button>
+                </div>
+              )}
             </div>
-            {rankMode === 'roi' && (
+
+            {/* Channel tabs */}
+            {availableChannels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button
+                  onClick={() => setRankChannel('all')}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${rankChannel === 'all' ? 'bg-ink text-white' : 'bg-canvas text-muted hover:text-ink'}`}
+                >
+                  {t('common.all')}
+                </button>
+                {availableChannels.map(ch => (
+                  <button
+                    key={ch}
+                    onClick={() => setRankChannel(ch)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      rankChannel === ch ? 'text-white' : 'bg-canvas text-muted hover:text-ink'
+                    }`}
+                    style={rankChannel === ch ? { background: CHANNEL_COLOR[ch] ?? '#64748b' } : {}}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: rankChannel === ch ? 'rgba(255,255,255,0.7)' : (CHANNEL_COLOR[ch] ?? '#94a3b8') }} />
+                    {CHANNEL_LABEL[ch] ?? ch}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {rankMode === 'roi' && rankChannel === 'all' && (
               <p className="text-[11px] text-muted mb-3">{t('dashboard.roiExplain')}</p>
             )}
             {/* Search row */}
@@ -1274,11 +1337,11 @@ export default function DashboardPage() {
               <KolSearchBox onSelect={setTrendKolId} />
             </div>
             {rankedKols.length === 0 ? (
-              <p className="text-sm text-muted">{rankMode === 'roi' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
+              <p className="text-sm text-muted">{rankMode === 'roi' && rankChannel === 'all' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {rankedKols.map((k, i) => (
-                  <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} onSelect={setTrendKolId} />
+                  <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} channel={rankChannel} onSelect={setTrendKolId} />
                 ))}
               </div>
             )}
