@@ -478,7 +478,15 @@ export default function CalendarPage() {
                     >
                       <ChevronLeft size={13} />
                     </button>
-                    <span className="text-sm font-semibold text-ink">{pickerYear}</span>
+                    <input
+                      type="number"
+                      value={pickerYear}
+                      onChange={e => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 2000 && v <= 2099) setPickerYear(v);
+                      }}
+                      className="w-16 text-center text-sm font-semibold text-ink bg-transparent outline-none border-b border-hairline focus:border-accent transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                     <button
                       onClick={() => setPickerYear(y => y + 1)}
                       className="p-1 rounded-lg hover:bg-canvas text-muted hover:text-ink transition-colors"
