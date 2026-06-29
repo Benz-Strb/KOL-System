@@ -136,7 +136,7 @@ export const getPlacements = (params: {
   status?: string; placement_type?: string; q?: string;
   product_id?: string; campaign_id?: string; payment_type?: string;
   price_min?: string; price_max?: string; person_in_charge_id?: string;
-  brand_id?: string; page?: number;
+  brand_id?: string; no_date?: string; page?: number;
 }) => {
   const p = new URLSearchParams();
   if (params.status) p.set('status', params.status);
@@ -149,9 +149,12 @@ export const getPlacements = (params: {
   if (params.price_max) p.set('price_max', params.price_max);
   if (params.person_in_charge_id) p.set('person_in_charge_id', params.person_in_charge_id);
   if (params.brand_id) p.set('brand_id', params.brand_id);
+  if (params.no_date) p.set('no_date', params.no_date);
   if (params.page) p.set('page', String(params.page));
   return api<PlacementsResponse>(`/api/placements?${p}`);
 };
+
+export const getPlacement = (id: number) => api<PlacementRow>(`/api/placements/${id}`);
 
 export const createPlacement = (body: Record<string, unknown>) =>
   api('/api/placements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -734,6 +737,12 @@ export const getCalendar = (params: {
   if (params.status && params.status !== 'all') p.set('status', params.status);
   if (params.placement_type && params.placement_type !== 'all') p.set('placement_type', params.placement_type);
   return api<CalendarResponse>(`/api/calendar?${p}`);
+};
+
+export const getCalendarKolLatest = (params: { kol_id: string; brand_id?: string }) => {
+  const p = new URLSearchParams({ kol_id: params.kol_id });
+  if (params.brand_id) p.set('brand_id', params.brand_id);
+  return api<{ date: string | null }>(`/api/calendar/kol-latest?${p}`);
 };
 
 // Bulk import placements from Excel

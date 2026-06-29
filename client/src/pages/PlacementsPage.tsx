@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, X, Pencil, ClipboardList, BarChart2, ExternalLink, List, TrendingUp, Repeat2 } from 'lucide-react';
 import { getPlacements, getKolGmv, getDropdowns, getProducts, type PlacementRow, type KolGmvRow, type Product, type Campaign, type UserOption, type Brand } from '../api/index.js';
@@ -136,6 +137,8 @@ export default function PlacementsPage() {
   const [perfPlacement, setPerfPlacement] = useState<PlacementRow | null>(null);
   const [metricsPlacement, setMetricsPlacement] = useState<PlacementRow | null>(null);
   const [repostPlacement, setRepostPlacement] = useState<PlacementRow | null>(null);
+  const [noDate, setNoDate] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const LIMIT = 20;
 
@@ -146,6 +149,21 @@ export default function PlacementsPage() {
       setUsers(d.users);
       setBrands(d.brands);
     });
+  }, []);
+
+  // Deep-link support — อ่าน query param ตอน mount (มาจาก banner ปฏิทิน ฯลฯ)
+  // แล้วล้าง URL ทิ้งเพื่อไม่ให้ค้างเวลา user เคลียร์ filter เอง
+  useEffect(() => {
+    const nd = searchParams.get('no_date');
+    const st = searchParams.get('status');
+    const br = searchParams.get('brand_id');
+    const query = searchParams.get('q');
+    if (nd === '1') setNoDate(true);
+    if (st) setStatus(st);
+    if (br) setBrandId(br);
+    if (query) setQ(query);
+    if (nd || st || br || query) setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [debouncedQ, setDebouncedQ] = useState('');
@@ -175,7 +193,8 @@ export default function PlacementsPage() {
       product_id: productId, campaign_id: campaignId,
       payment_type: paymentType,
       price_min: debouncedPriceMin, price_max: debouncedPriceMax,
-      person_in_charge_id: picId, brand_id: brandId, page,
+      person_in_charge_id: picId, brand_id: brandId,
+      no_date: noDate ? '1' : undefined, page,
     };
     const cacheKey = `placements:${JSON.stringify(params)}`;
     const cached = getCached<{ rows: PlacementRow[]; total: number }>(cacheKey);
@@ -197,7 +216,7 @@ export default function PlacementsPage() {
     } finally {
       if (loadSeq.current === seq) setLoading(false);
     }
-  }, [status, type, debouncedQ, productId, campaignId, paymentType, debouncedPriceMin, debouncedPriceMax, picId, brandId, page]);
+  }, [status, type, debouncedQ, productId, campaignId, paymentType, debouncedPriceMin, debouncedPriceMax, picId, brandId, noDate, page]);
 
   const loadGmvSeq = useRef(0);
   const loadGmv = useCallback(async () => {
@@ -243,12 +262,12 @@ export default function PlacementsPage() {
     !!productId, !!picId, !!brandId, !!priceMin, !!priceMax,
   ].filter(Boolean).length;
 
-  const hasActiveFilters = status !== 'all' || !!campaignId || !!q || secondaryActiveCount > 0;
+  const hasActiveFilters = status !== 'all' || !!campaignId || !!q || secondaryActiveCount > 0 || noDate;
 
   function clearAll() {
     setStatus('all'); setType('all'); setPaymentType('all');
     setProductId(''); setCampaignId(''); setPicId(''); setBrandId('');
-    setPriceMin(''); setPriceMax(''); setQ('');
+    setPriceMin(''); setPriceMax(''); setQ(''); setNoDate(false);
     setPage(1);
   }
 
@@ -316,6 +335,16 @@ export default function PlacementsPage() {
             value={campaignId}
             onChange={v => { setCampaignId(v); setPage(1); }}
           />
+
+          {noDate && (
+            <button
+              onClick={() => { setNoDate(false); setPage(1); }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 hover:opacity-80 transition-opacity"
+            >
+              {t('placements.noDateChip')}
+              <X size={11} />
+            </button>
+          )}
 
           <div className="ml-auto flex items-center gap-2">
             <button
