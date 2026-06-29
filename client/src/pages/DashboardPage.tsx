@@ -1309,7 +1309,7 @@ export default function DashboardPage() {
               <div className="flex flex-wrap gap-1.5 mb-3">
                 <button
                   onClick={() => setRankChannel('all')}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${rankChannel === 'all' ? 'bg-ink text-white' : 'bg-canvas text-muted hover:text-ink'}`}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${rankChannel === 'all' ? 'bg-ink text-canvas' : 'bg-canvas text-muted hover:text-ink'}`}
                 >
                   {t('common.all')}
                 </button>
