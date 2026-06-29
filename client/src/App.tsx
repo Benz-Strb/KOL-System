@@ -21,6 +21,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage.js'));
 const ProductDashboardPage = lazy(() => import('./pages/ProductDashboardPage.js'));
 const MarketingDashboardPage = lazy(() => import('./pages/MarketingDashboardPage.js'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage.js'));
+const PlacementDetailPage = lazy(() => import('./pages/PlacementDetailPage.js'));
 
 const Spinner = (
   <div className="flex items-center justify-center min-h-screen bg-canvas">
@@ -297,6 +298,11 @@ export default function App() {
             <RequireSession>
               <ChangePasswordPage />
             </RequireSession>
+          } />
+          <Route path="/placements/:id" element={
+            <ProtectedRoute>
+              <Layout><PlacementDetailPage /></Layout>
+            </ProtectedRoute>
           } />
           <Route path="/placements" element={
             <ProtectedRoute>

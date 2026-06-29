@@ -126,7 +126,7 @@ function EventDetailModal({ event, onClose }: { event: CalendarEvent; onClose: (
         {/* Link to placements */}
         <div className="mt-4 pt-4 border-t border-hairline">
           <Link
-            to={`/placements`}
+            to={`/placements/${event.id}`}
             onClick={requestClose}
             className="flex items-center justify-center gap-2 w-full py-2 bg-canvas hover:bg-hairline rounded-xl text-sm font-medium text-ink transition-colors"
           >
