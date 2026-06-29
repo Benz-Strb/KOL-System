@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, CalendarDays, List, X, ExternalLink, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
-import { getCalendar, getDropdowns, searchKols, type CalendarEvent, type Brand, type KolResult } from '../api/index.js';
+import { getCalendar, getCalendarKolLatest, getDropdowns, searchKols, type CalendarEvent, type Brand, type KolResult } from '../api/index.js';
 import KolAvatar from '../components/KolAvatar.js';
 import PlatformLogo from '../components/PlatformLogo.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
@@ -312,6 +312,7 @@ export default function CalendarPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
 
   const seqRef = useRef(0);
+  const jumpSeqRef = useRef(0);
 
   // Load brand list for admin filter
   useEffect(() => {
@@ -456,10 +457,21 @@ export default function CalendarPage() {
           <KolSearchInput
             value={kolId}
             label={kolLabel}
-            onSelect={kol => {
+            onSelect={async kol => {
               const primary = kol.platforms.find(p => p.is_primary) ?? kol.platforms[0];
               setKolId(String(kol.id));
               setKolLabel(primary?.handle ?? kol.handle);
+              // กระโดดไปเดือนที่ KOL คนนี้มีงานใกล้สุด (race guard กันเลือกรัวๆ)
+              const mySeq = ++jumpSeqRef.current;
+              try {
+                const { date } = await getCalendarKolLatest({ kol_id: String(kol.id), brand_id: brandId || undefined });
+                if (jumpSeqRef.current !== mySeq) return;
+                if (date) {
+                  const d = new Date(date + 'T00:00:00');
+                  setYear(d.getFullYear());
+                  setMonth(d.getMonth());
+                }
+              } catch { /* เงียบไว้ — ถ้าหาเดือนไม่ได้ก็อยู่เดือนเดิม */ }
             }}
             onClear={() => { setKolId(''); setKolLabel(''); }}
           />
