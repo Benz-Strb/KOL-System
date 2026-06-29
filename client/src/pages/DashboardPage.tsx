@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal, Coins, Percent, CheckCircle2, MousePointerClick } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal, Coins, Percent, CheckCircle2, MousePointerClick, Image as ImageIcon } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid,
@@ -9,15 +9,20 @@ import {
 import { useAuth } from '../context/AuthContext.js';
 import {
   getDashboardOverview, getDropdowns, searchKols, exportDashboard, getOffplatformTraffic,
+  getProductDashboard, getMarketingDashboard,
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
-  type OffplatformTraffic,
+  type OffplatformTraffic, type ProductDashboardOverview, type MarketingDashboard,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
+import ProductTrendModal from '../components/ProductTrendModal.js';
 import PlatformLogo from '../components/PlatformLogo.js';
 import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
+import Paginator from '../components/Paginator.js';
+import ChartTableCard from '../components/ChartTableCard.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
+import { todayStr } from '../lib/exportTable.js';
 
 const HOVER_EXPAND_DELAY = 400;
 
@@ -169,6 +174,8 @@ function MetricBenchmarkCard({
 // shared shape for barter-vs-paid and follower-tier comparisons (both are
 // "which group of GMV.metricValue is biggest" not a "type a value" lookup
 // like MetricBenchmarkCard above).
+const GROUP_PAGE_SIZE = 10;
+
 function KolsByGroupCard({
   title, description, groups, kolMap, onSelectKol,
 }: {
@@ -180,10 +187,18 @@ function KolsByGroupCard({
 }) {
   const { t } = useTranslation();
   const [activeGroup, setActiveGroup] = useState(() => groups[0]?.key ?? '');
+  const [page, setPage] = useState(1);
   const currentGroup = groups.find(g => g.key === activeGroup);
   const sorted = currentGroup
     ? [...currentGroup.kols].sort((a, b) => b.total_gmv - a.total_gmv)
     : [];
+  const pages = Math.max(1, Math.ceil(sorted.length / GROUP_PAGE_SIZE));
+  const pageRows = sorted.slice((page - 1) * GROUP_PAGE_SIZE, page * GROUP_PAGE_SIZE);
+
+  function changeGroup(key: string) {
+    setActiveGroup(key);
+    setPage(1);
+  }
 
   return (
     <div className="bg-surface border border-hairline rounded-xl p-5">
@@ -195,7 +210,7 @@ function KolsByGroupCard({
           {groups.map(g => (
             <button
               key={g.key}
-              onClick={() => setActiveGroup(g.key)}
+              onClick={() => changeGroup(g.key)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${activeGroup === g.key ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
             >
               {g.label}
@@ -217,16 +232,17 @@ function KolsByGroupCard({
             <span className="text-[10px] font-medium text-muted uppercase tracking-wide w-28 text-right shrink-0">GMV</span>
             <span className="w-6 shrink-0" />
           </div>
-          <div className="flex flex-col gap-1 max-h-80 overflow-y-auto">
-            {sorted.map((entry, i) => {
+          <div className="flex flex-col gap-1">
+            {pageRows.map((entry, i) => {
               const kol = kolMap.get(entry.kol_id);
+              const rank = (page - 1) * GROUP_PAGE_SIZE + i + 1;
               return (
                 <div
                   key={entry.kol_id}
                   onClick={() => onSelectKol(entry.kol_id)}
                   className="flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-canvas transition-colors"
                 >
-                  <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                  <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{rank}</span>
                   <RankAvatar handle={kol?.handle ?? String(entry.kol_id)} avatarUrl={kol?.avatar_url ?? null} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-ink truncate">{kol?.handle ?? `KOL #${entry.kol_id}`}</div>
@@ -239,6 +255,9 @@ function KolsByGroupCard({
               );
             })}
           </div>
+          {sorted.length > GROUP_PAGE_SIZE && (
+            <Paginator page={page} pages={pages} total={sorted.length} pageSize={GROUP_PAGE_SIZE} onPage={setPage} />
+          )}
         </>
       )}
     </div>
@@ -813,6 +832,20 @@ function SkeletonKpiSlab() {
   );
 }
 
+function ProductImage({ url }: { url: string | null }) {
+  const [errored, setErrored] = useState(false);
+  if (url && !errored) {
+    return <img src={url} alt="" onError={() => setErrored(true)} className="w-9 h-9 rounded-lg object-cover shrink-0 bg-canvas border border-hairline" />;
+  }
+  return (
+    <span className="w-9 h-9 rounded-lg shrink-0 bg-canvas border border-hairline flex items-center justify-center text-muted">
+      <ImageIcon size={14} />
+    </span>
+  );
+}
+
+const PRODUCT_DONUT_COLORS = ['#f97316', '#3b82f6', '#8b5cf6', '#111827', '#ef4444', '#10b981', '#eab308', '#ec4899', '#06b6d4'];
+
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { appUser } = useAuth();
@@ -831,10 +864,17 @@ export default function DashboardPage() {
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'tools'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'kol' | 'products' | 'tools'>('overview');
   const [offplatformDays, setOffplatformDays] = useState(30);
   const [offplatformData, setOffplatformData] = useState<OffplatformTraffic | null>(null);
   const [offplatformLoading, setOffplatformLoading] = useState(true);
+
+  // Products tab state
+  const [productData, setProductData] = useState<ProductDashboardOverview | null>(null);
+  const [productLoading, setProductLoading] = useState(false);
+  const [marketingData, setMarketingData] = useState<MarketingDashboard | null>(null);
+  const [marketingLoading, setMarketingLoading] = useState(false);
+  const [trendProductId, setTrendProductId] = useState<number | null>(null);
 
   async function handleExport() {
     setExporting(true); setExportError('');
@@ -897,6 +937,37 @@ export default function DashboardPage() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadOffplatform(); }, [loadOffplatform]);
+
+  const productSeq = useRef(0);
+  const loadProducts = useCallback(async () => {
+    const seq = ++productSeq.current;
+    const params = { brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo };
+    const pKey = `products:${JSON.stringify(params)}`;
+    const mKey = `marketing:${JSON.stringify(params)}`;
+    const cachedP = getCached<ProductDashboardOverview>(pKey);
+    const cachedM = getCached<MarketingDashboard>(mKey);
+    if (cachedP) setProductData(cachedP);
+    if (cachedM) setMarketingData(cachedM);
+    if (cachedP && cachedM) return;
+    if (!cachedP) setProductLoading(true);
+    if (!cachedM) setMarketingLoading(true);
+    try {
+      const [pd, md] = await Promise.all([
+        cachedP ? Promise.resolve(null) : getProductDashboard(params),
+        cachedM ? Promise.resolve(null) : getMarketingDashboard(params),
+      ]);
+      if (productSeq.current !== seq) return;
+      if (pd) { setCached(pKey, pd); setProductData(pd); }
+      if (md) { setCached(mKey, md); setMarketingData(md); }
+    } finally {
+      if (productSeq.current === seq) { setProductLoading(false); setMarketingLoading(false); }
+    }
+  }, [brandId, campaignId, categoryId, dateFrom, dateTo]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    if (activeTab === 'products') loadProducts();
+  }, [activeTab, loadProducts]);
 
   const offplatformBarData = useMemo(() => {
     if (!offplatformData) return [];
@@ -1060,60 +1131,52 @@ export default function DashboardPage() {
 
       {exportError && <Toast message={exportError} onClose={() => setExportError('')} />}
 
-      <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 mb-6 w-fit">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-        >
-          {t('dashboard.tabOverview')}
-        </button>
-        <button
-          onClick={() => setActiveTab('tools')}
-          className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'tools' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-        >
-          {t('dashboard.tabTools')}
-        </button>
+      {/* Tab bar — 4 tabs */}
+      <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 mb-6 w-fit flex-wrap">
+        {(
+          [
+            { id: 'overview', label: t('dashboard.tabOverview') },
+            { id: 'kol', label: t('dashboard.tabKol') },
+            { id: 'products', label: t('dashboard.tabProducts') },
+            { id: 'tools', label: t('dashboard.tabTools') },
+          ] as const
+        ).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {loading || !data ? (
-        activeTab === 'overview' ? (
-          <div className="flex flex-col gap-8">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-2.5 bg-canvas rounded-md w-24 animate-pulse shrink-0" />
-                <div className="flex-1 h-px bg-hairline" />
-              </div>
-              <SkeletonKpiSlab />
+      {/* ======= TAB: OVERVIEW — skeleton ======= */}
+      {activeTab === 'overview' && (loading || !data) && (
+        <div className="flex flex-col gap-8">
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-2.5 bg-canvas rounded-md w-24 animate-pulse shrink-0" />
+              <div className="flex-1 h-px bg-hairline" />
             </div>
-
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-2.5 bg-canvas rounded-md w-28 animate-pulse shrink-0" />
-                <div className="flex-1 h-px bg-hairline" />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <SkeletonChart />
-                <SkeletonChart />
-              </div>
+            <SkeletonKpiSlab />
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-2.5 bg-canvas rounded-md w-28 animate-pulse shrink-0" />
+              <div className="flex-1 h-px bg-hairline" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <SkeletonChart />
               <SkeletonChart />
             </div>
+            <SkeletonChart />
+          </div>
+        </div>
+      )}
 
-            <div className="bg-surface border border-hairline rounded-xl p-5">
-              <div className="h-3.5 bg-canvas rounded-md w-52 mb-4 animate-pulse" />
-              <div className="flex flex-col gap-1">
-                {Array.from({ length: 10 }).map((_, i) => <SkeletonKolRow key={i} />)}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <SkeletonChart />
-            <SkeletonChart />
-            <SkeletonChart />
-            <SkeletonChart />
-          </div>
-        )
-      ) : activeTab === 'overview' ? (
+      {/* ======= TAB: OVERVIEW — content ======= */}
+      {activeTab === 'overview' && !loading && data && (
         <div className="flex flex-col gap-8">
           {/* KPI section — Grouped Panel (แบบ A): รวม 11 KPI ไว้ใน panel เดียว */}
           <div>
@@ -1257,94 +1320,13 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Row 2: Funnel (B) + Category (C) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Funnel */}
+            <div className="mb-6">
               <FunnelCard
                 total={{ visits: data.summary.total_visits, atc: data.summary.total_atc, orders: data.summary.total_orders }}
                 channels={data.channelBreakdown}
               />
-              <CategoryBreakdownCard rows={data.categoryBreakdown} />
             </div>
-
-            {/* Row 3: Platform breakdown full width */}
-            {data.platformBreakdown.length > 0 && (
-              <PlatformBreakdownCard rows={data.platformBreakdown} />
-            )}
-          </div>
-
-          {/* Top KOL ranking */}
-          <div className="bg-surface border border-hairline rounded-xl p-5">
-            {/* Title row */}
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
-                  <Trophy size={14} className="text-accent" /> {t('dashboard.rankingTitle')}
-                </h2>
-                {categoryId && (
-                  <p className="text-[11px] text-muted mt-0.5">
-                    {t('dashboard.compareWithinCategory', { category: categories.find(c => String(c.id) === categoryId)?.name ?? '' })}
-                  </p>
-                )}
-              </div>
-              {rankChannel === 'all' && (
-                <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
-                  <button
-                    onClick={() => setRankMode('gmv')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                  >
-                    {t('dashboard.byGmv')}
-                  </button>
-                  <button
-                    onClick={() => setRankMode('roi')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-                  >
-                    {t('dashboard.byRoi')}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Channel tabs */}
-            {availableChannels.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                <button
-                  onClick={() => setRankChannel('all')}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${rankChannel === 'all' ? 'bg-ink text-canvas' : 'bg-canvas text-muted hover:text-ink'}`}
-                >
-                  {t('common.all')}
-                </button>
-                {availableChannels.map(ch => (
-                  <button
-                    key={ch}
-                    onClick={() => setRankChannel(ch)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                      rankChannel === ch ? 'text-white' : 'bg-canvas text-muted hover:text-ink'
-                    }`}
-                    style={rankChannel === ch ? { background: CHANNEL_COLOR[ch] ?? '#64748b' } : {}}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: rankChannel === ch ? 'rgba(255,255,255,0.7)' : (CHANNEL_COLOR[ch] ?? '#94a3b8') }} />
-                    {CHANNEL_LABEL[ch] ?? ch}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {rankMode === 'roi' && rankChannel === 'all' && (
-              <p className="text-[11px] text-muted mb-3">{t('dashboard.roiExplain')}</p>
-            )}
-            {/* Search row */}
-            <div className="mb-4">
-              <KolSearchBox onSelect={setTrendKolId} />
-            </div>
-            {rankedKols.length === 0 ? (
-              <p className="text-sm text-muted">{rankMode === 'roi' && rankChannel === 'all' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {rankedKols.map((k, i) => (
-                  <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} channel={rankChannel} onSelect={setTrendKolId} />
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Off-Platform Traffic widget */}
@@ -1366,7 +1348,6 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
-
             {offplatformLoading ? (
               <div className="h-32 flex items-center justify-center">
                 <p className="text-sm text-muted">{t('common.loading')}</p>
@@ -1375,7 +1356,6 @@ export default function DashboardPage() {
               <p className="text-sm text-muted">{t('dashboard.offplatformNoData')}</p>
             ) : (
               <>
-                {/* KPI row */}
                 <div className="grid grid-cols-3 gap-3 mb-5">
                   <div className="bg-canvas rounded-lg p-3">
                     <p className="text-[11px] text-muted mb-1">{t('dashboard.offplatformRevenue')}</p>
@@ -1390,8 +1370,6 @@ export default function DashboardPage() {
                     <p className="text-base font-semibold text-ink font-mono">{offplatformData.summary.total_visits.toLocaleString(numberLocale())}</p>
                   </div>
                 </div>
-
-                {/* Chart + breakdown */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   <div>
                     <h3 className="text-xs font-medium text-muted mb-3">{t('dashboard.offplatformDailyTrend')}</h3>
@@ -1409,31 +1387,18 @@ export default function DashboardPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-
                   <div>
                     <h3 className="text-xs font-medium text-muted mb-3">{t('dashboard.offplatformChannelBreakdown')}</h3>
                     <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-2">
                       <div className="w-36 h-36 shrink-0">
                         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 144, height: 144 }}>
                           <PieChart>
-                            <Pie
-                              data={offplatformData.channelBreakdown}
-                              dataKey="revenue"
-                              nameKey="channel"
-                              innerRadius="60%"
-                              outerRadius="95%"
-                              paddingAngle={2}
-                              stroke="none"
-                              animationDuration={500}
-                            >
+                            <Pie data={offplatformData.channelBreakdown} dataKey="revenue" nameKey="channel" innerRadius="60%" outerRadius="95%" paddingAngle={2} stroke="none" animationDuration={500}>
                               {offplatformData.channelBreakdown.map((ch, i) => (
                                 <Cell key={ch.channel} fill={OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length]} />
                               ))}
                             </Pie>
-                            <Tooltip
-                              contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
-                              formatter={(v, name) => [formatMoney(Number(v ?? 0)), String(name)]}
-                            />
+                            <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }} formatter={(v, name) => [formatMoney(Number(v ?? 0)), String(name)]} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
@@ -1454,7 +1419,244 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* ======= TAB: KOL — skeleton ======= */}
+      {activeTab === 'kol' && (loading || !data) && (
+        <div className="flex flex-col gap-6">
+          <div className="bg-surface border border-hairline rounded-xl p-5">
+            <div className="h-3.5 bg-canvas rounded-md w-52 mb-4 animate-pulse" />
+            <div className="flex flex-col gap-1">{Array.from({ length: 10 }).map((_, i) => <SkeletonKolRow key={i} />)}</div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><SkeletonChart /><SkeletonChart /></div>
+        </div>
+      )}
+
+      {/* ======= TAB: KOL — content ======= */}
+      {activeTab === 'kol' && !loading && data && (
+        <div className="flex flex-col gap-6">
+          {/* KOL Ranking */}
+          <div className="bg-surface border border-hairline rounded-xl p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-ink flex items-center gap-1.5">
+                  <Trophy size={14} className="text-accent" /> {t('dashboard.rankingTitle')}
+                </h2>
+                {categoryId && (
+                  <p className="text-[11px] text-muted mt-0.5">
+                    {t('dashboard.compareWithinCategory', { category: categories.find(c => String(c.id) === categoryId)?.name ?? '' })}
+                  </p>
+                )}
+              </div>
+              {rankChannel === 'all' && (
+                <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+                  <button onClick={() => setRankMode('gmv')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('dashboard.byGmv')}</button>
+                  <button onClick={() => setRankMode('roi')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${rankMode === 'roi' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('dashboard.byRoi')}</button>
+                </div>
+              )}
+            </div>
+            {availableChannels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button onClick={() => setRankChannel('all')} className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${rankChannel === 'all' ? 'bg-ink text-canvas' : 'bg-canvas text-muted hover:text-ink'}`}>{t('common.all')}</button>
+                {availableChannels.map(ch => (
+                  <button
+                    key={ch}
+                    onClick={() => setRankChannel(ch)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${rankChannel === ch ? 'text-white' : 'bg-canvas text-muted hover:text-ink'}`}
+                    style={rankChannel === ch ? { background: CHANNEL_COLOR[ch] ?? '#64748b' } : {}}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: rankChannel === ch ? 'rgba(255,255,255,0.7)' : (CHANNEL_COLOR[ch] ?? '#94a3b8') }} />
+                    {CHANNEL_LABEL[ch] ?? ch}
+                  </button>
+                ))}
+              </div>
+            )}
+            {rankMode === 'roi' && rankChannel === 'all' && (
+              <p className="text-[11px] text-muted mb-3">{t('dashboard.roiExplain')}</p>
+            )}
+            <div className="mb-4"><KolSearchBox onSelect={setTrendKolId} /></div>
+            {rankedKols.length === 0 ? (
+              <p className="text-sm text-muted">{rankMode === 'roi' && rankChannel === 'all' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {rankedKols.map((k, i) => <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} channel={rankChannel} onSelect={setTrendKolId} />)}
+              </div>
+            )}
+          </div>
+
+          {/* Platform + Category breakdown */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PlatformBreakdownCard rows={data.platformBreakdown} />
+            <CategoryBreakdownCard rows={data.categoryBreakdown} />
+          </div>
+        </div>
+      )}
+
+      {/* ======= TAB: PRODUCTS — skeleton ======= */}
+      {activeTab === 'products' && (productLoading || marketingLoading || (!productData && !marketingData)) && (
+        <div className="flex flex-col gap-6">
+          <SkeletonChart />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><SkeletonChart /><SkeletonChart /></div>
+        </div>
+      )}
+
+      {/* ======= TAB: PRODUCTS — content ======= */}
+      {activeTab === 'products' && !productLoading && !marketingLoading && (productData || marketingData) && (
+        <div className="flex flex-col gap-6">
+          {productData && (
+            <ChartTableCard
+              title={t('productDashboard.rankingTitle')}
+              chart={
+                productData.ranking.length === 0 ? (
+                  <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {productData.ranking.map((p, i) => (
+                      <button
+                        key={p.canonical_id}
+                        onClick={() => setTrendProductId(p.canonical_id)}
+                        className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-canvas transition-colors text-left w-full"
+                      >
+                        <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                        <ProductImage url={p.image_url} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-ink truncate">{p.model_code}</div>
+                          {p.category_name && <div className="text-[11px] text-muted truncate">{p.category_name}</div>}
+                        </div>
+                        <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{p.placement_count} {t('dashboard.colPlacements')}</span>
+                        <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{p.total_orders} {t('dashboard.colOrders')}</span>
+                        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(p.total_gmv)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              }
+              table={{
+                columns: [
+                  { key: 'rank', header: t('dashboard.colRank'), align: 'center' as const, width: '40px' },
+                  { key: 'model_code', header: t('dashboard.colProduct') },
+                  { key: 'category_name', header: t('dashboard.colCategory') },
+                  { key: 'placement_count', header: t('dashboard.colPlacements'), align: 'right' as const },
+                  { key: 'total_orders', header: t('dashboard.colOrders'), align: 'right' as const },
+                  { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                ],
+                rows: productData.ranking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—' } as Record<string, unknown>)),
+              }}
+              exportFilename={`product_ranking_${todayStr()}.xlsx`}
+              emptyMessage={t('dashboard.noData')}
+            />
+          )}
+
+          {marketingData && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* GMV by product category */}
+              <ChartTableCard
+                title={t('marketing.gmvByProductCategory')}
+                chart={(() => {
+                  const catRows = marketingData.byProductCategory.filter(r => r.gmv > 0);
+                  const catTotal = catRows.reduce((s, r) => s + r.gmv, 0);
+                  if (catRows.length === 0) return <p className="text-sm text-muted">{t('dashboard.noData')}</p>;
+                  return (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                      <div className="w-40 h-40 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 160, height: 160 }}>
+                          <PieChart>
+                            <Pie data={catRows} dataKey="gmv" nameKey="category_name" innerRadius="60%" outerRadius="95%" paddingAngle={2} stroke="none" animationDuration={500}>
+                              {catRows.map((r, i) => <Cell key={r.category_id ?? i} fill={PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }} formatter={(v, n) => [formatMoney(Number(v ?? 0)), String(n)]} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex-1 flex flex-col gap-2 min-w-0 w-full">
+                        {catRows.map((r, i) => (
+                          <div key={r.category_id ?? i} className="flex items-center gap-2.5 text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length] }} />
+                            <span className="font-medium text-ink truncate flex-1 min-w-0">{r.category_name ?? '—'}</span>
+                            <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
+                            <span className="w-12 text-right text-muted tabular-nums shrink-0">{catTotal > 0 ? ((r.gmv / catTotal) * 100).toFixed(1) : '0.0'}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                table={{
+                  columns: [
+                    { key: 'category_name', header: t('dashboard.colCategory') },
+                    { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'pct', header: '%', align: 'right' as const },
+                  ],
+                  rows: (() => {
+                    const rows = marketingData.byProductCategory.filter(r => r.gmv > 0);
+                    const total = rows.reduce((s, r) => s + r.gmv, 0);
+                    return rows.map(r => ({ ...r, category_name: r.category_name ?? '—', pct: total > 0 ? `${((r.gmv / total) * 100).toFixed(1)}%` : '0.0%' } as Record<string, unknown>));
+                  })(),
+                }}
+                exportFilename={`gmv_by_category_${todayStr()}.xlsx`}
+              />
+
+              {/* GMV by product SKU */}
+              <ChartTableCard
+                title={t('marketing.gmvByProductSku')}
+                chart={(() => {
+                  const skuRows = marketingData.byProductSku.filter(r => r.gmv > 0);
+                  const skuTotal = skuRows.reduce((s, r) => s + r.gmv, 0);
+                  if (skuRows.length === 0) return <p className="text-sm text-muted">{t('dashboard.noData')}</p>;
+                  return (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                      <div className="w-40 h-40 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 160, height: 160 }}>
+                          <PieChart>
+                            <Pie data={skuRows.slice(0, 9)} dataKey="gmv" nameKey="model_code" innerRadius="60%" outerRadius="95%" paddingAngle={2} stroke="none" animationDuration={500}>
+                              {skuRows.slice(0, 9).map((r, i) => <Cell key={r.canonical_id} fill={PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }} formatter={(v, n) => [formatMoney(Number(v ?? 0)), String(n)]} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex-1 flex flex-col gap-2 min-w-0 w-full">
+                        {skuRows.slice(0, 8).map((r, i) => (
+                          <div key={r.canonical_id} className="flex items-center gap-2.5 text-sm">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length] }} />
+                            <span className="font-medium text-ink truncate flex-1 min-w-0">{r.model_code ?? '—'}</span>
+                            <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
+                            <span className="w-12 text-right text-muted tabular-nums shrink-0">{skuTotal > 0 ? ((r.gmv / skuTotal) * 100).toFixed(1) : '0.0'}%</span>
+                          </div>
+                        ))}
+                        {skuRows.length > 8 && <p className="text-[11px] text-muted">+{skuRows.length - 8} {t('dashboard.othersLabel')}</p>}
+                      </div>
+                    </div>
+                  );
+                })()}
+                table={{
+                  columns: [
+                    { key: 'model_code', header: t('dashboard.colSku') },
+                    { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'pct', header: '%', align: 'right' as const },
+                  ],
+                  rows: (() => {
+                    const rows = marketingData.byProductSku.filter(r => r.gmv > 0);
+                    const total = rows.reduce((s, r) => s + r.gmv, 0);
+                    return rows.map(r => ({ ...r, model_code: r.model_code ?? '—', pct: total > 0 ? `${((r.gmv / total) * 100).toFixed(1)}%` : '0.0%' } as Record<string, unknown>));
+                  })(),
+                }}
+                exportFilename={`gmv_by_sku_${todayStr()}.xlsx`}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======= TAB: TOOLS — skeleton ======= */}
+      {activeTab === 'tools' && (loading || !data) && (
+        <div className="flex flex-col gap-6">
+          <SkeletonChart /><SkeletonChart /><SkeletonChart /><SkeletonChart />
+        </div>
+      )}
+
+      {/* ======= TAB: TOOLS — content ======= */}
+      {activeTab === 'tools' && !loading && data && (
         <div className="flex flex-col gap-6">
           <MetricBenchmarkCard
             title={t('dashboard.priceBenchmarkTitle')}
@@ -1467,7 +1669,6 @@ export default function DashboardPage() {
             formatValue={formatMoney}
             onSelectKol={setTrendKolId}
           />
-
           <MetricBenchmarkCard
             title={t('dashboard.followerBenchmarkTitle')}
             description={pct => t('dashboard.followerBenchmarkDesc', { pct })}
@@ -1479,7 +1680,6 @@ export default function DashboardPage() {
             formatValue={v => Math.round(v).toLocaleString(numberLocale())}
             onSelectKol={setTrendKolId}
           />
-
           <KolsByGroupCard
             title={t('dashboard.paymentCompareTitle')}
             description={t('dashboard.paymentCompareDesc')}
@@ -1487,7 +1687,6 @@ export default function DashboardPage() {
             kolMap={kolMap}
             onSelectKol={setTrendKolId}
           />
-
           <KolsByGroupCard
             title={t('dashboard.tierCompareTitle')}
             description={t('dashboard.tierCompareDesc')}
@@ -1500,6 +1699,17 @@ export default function DashboardPage() {
 
       {trendKolId != null && (
         <KolTrendModal kolId={trendKolId} brandId={brandId || undefined} onClose={() => setTrendKolId(null)} />
+      )}
+      {trendProductId != null && (
+        <ProductTrendModal
+          productId={trendProductId}
+          brandId={brandId || undefined}
+          campaignId={campaignId || undefined}
+          dateFrom={dateFrom || undefined}
+          dateTo={dateTo || undefined}
+          onClose={() => setTrendProductId(null)}
+          onSelectKol={setTrendKolId}
+        />
       )}
     </div>
   );

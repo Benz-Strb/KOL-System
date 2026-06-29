@@ -809,3 +809,5 @@ export const updateAdminUser = (id: number, body: { role?: string; is_active?: b
   api<AdminUser>(`/api/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 export const resetUserPassword = (id: number, password: string) =>
   api<{ ok: boolean }>(`/api/admin/users/${id}/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+export const createProduct = (body: { model_code: string; brand_id: number; product_category_id?: number | null; image_url?: string | null }) =>
+  api<{ id: number; model_code: string }>('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

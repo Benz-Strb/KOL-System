@@ -11,6 +11,7 @@ import Select from '../components/Select.js';
 import PlatformLogo from '../components/PlatformLogo.js';
 import Modal from '../components/Modal.js';
 import Toast from '../components/Toast.js';
+import AddModelModal from '../components/AddModelModal.js';
 
 type PaymentType = 'paid' | 'free' | 'barter';
 const PAYMENT_TYPES: PaymentType[] = ['paid', 'free', 'barter'];
@@ -68,6 +69,7 @@ export default function NewPlacementPage() {
   const [showAddBranch, setShowAddBranch] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [branchError, setBranchError] = useState('');
+  const [showAddModel, setShowAddModel] = useState(false);
 
   useEffect(() => {
     Promise.all([getDropdowns(), getShops()]).then(([d, s]) => {
@@ -182,6 +184,18 @@ export default function NewPlacementPage() {
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast('')} />}
+      {showAddModel && form.brand_id && dropdowns && (
+        <AddModelModal
+          onClose={() => setShowAddModel(false)}
+          brandId={Number(form.brand_id)}
+          productCategories={dropdowns.productCategories}
+          onCreated={product => {
+            setProducts(prev => [...prev, product]);
+            set('product_id', String(product.id));
+            setToast(t('addModel.addModelSuccess'));
+          }}
+        />
+      )}
       {error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-sm flex items-start gap-2">
           <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
@@ -311,6 +325,15 @@ export default function NewPlacementPage() {
                 <p className="text-xs text-amber-500 mt-1.5">
                   {t('newPlacement.noProductsWarning')}
                 </p>
+              )}
+              {form.brand_id && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddModel(true)}
+                  className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent-hover mt-1.5 transition-colors"
+                >
+                  {t('addModel.addModelButton')}
+                </button>
               )}
             </div>
           ) : (

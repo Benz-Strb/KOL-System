@@ -17,6 +17,7 @@ model brands {
   kol_commercial_terms kol_commercial_terms[]
   kol_samples          kol_samples[]
   placements           placements[]
+  products             products[]
   user_brands          user_brands[]
 }
 
@@ -191,8 +192,10 @@ model products {
   canonical_product_id Int?
   is_canonical         Boolean             @default(true)
   image_url            String?
+  brand_id             Int?
   kol_samples          kol_samples[]
   placements           placements[]
+  brands               brands?             @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   products             products?           @relation("productsToproducts", fields: [canonical_product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_products       products[]          @relation("productsToproducts")
   product_categories   product_categories? @relation(fields: [product_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

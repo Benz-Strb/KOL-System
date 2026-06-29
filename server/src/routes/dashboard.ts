@@ -550,7 +550,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
   }
 }
 
-app.get('/', requireRole('admin', 'manager'), async c => {
+app.get('/', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -583,7 +583,7 @@ function styleExportHeaderRow(ws: ExcelJS.Worksheet) {
 
 // ─── GET /export — same data as GET /, rendered as a multi-sheet .xlsx ──
 // so the download always matches whatever filters are currently on screen.
-app.get('/export', requireRole('admin', 'manager'), async c => {
+app.get('/export', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -707,7 +707,7 @@ app.get('/export', requireRole('admin', 'manager'), async c => {
 });
 
 // ─── GET /kol/:id — per-KOL campaign trend + delivery reliability ───
-app.get('/kol/:id', requireRole('admin', 'manager'), async c => {
+app.get('/kol/:id', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -897,7 +897,7 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
   }
 }
 
-app.get('/products', requireRole('admin', 'manager'), async c => {
+app.get('/products', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -916,7 +916,7 @@ app.get('/products', requireRole('admin', 'manager'), async c => {
 });
 
 // ─── GET /products/export — same data as GET /products, as a .xlsx ──────
-app.get('/products/export', requireRole('admin', 'manager'), async c => {
+app.get('/products/export', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -953,7 +953,7 @@ app.get('/products/export', requireRole('admin', 'manager'), async c => {
 });
 
 // ─── GET /products/:id — KOLs who reviewed this product, ranked by GMV ───
-app.get('/products/:id', requireRole('admin', 'manager'), async c => {
+app.get('/products/:id', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
@@ -1071,7 +1071,7 @@ function buildOffplatformBrandStrings(role: string, brandIds: number[], brand_id
 }
 
 // ─── GET /offplatform — off-platform traffic summary (Shopee Ads) ─────────────
-app.get('/offplatform', requireRole('admin', 'manager'), async c => {
+app.get('/offplatform', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');

@@ -13,8 +13,12 @@ app.get('/', async c => {
       ? await prisma.$queryRaw<{ id: number; model_code: string }[]>`
           SELECT DISTINCT pd.id, pd.model_code
           FROM products_dropdown pd
-          JOIN placements pl ON pl.product_id = pd.id
-          WHERE pl.brand_id = ${Number(brand_id)}
+          JOIN products p ON p.id = pd.id
+          WHERE p.brand_id = ${Number(brand_id)}
+             OR pd.id IN (
+               SELECT product_id FROM placements
+               WHERE brand_id = ${Number(brand_id)} AND product_id IS NOT NULL
+             )
           ORDER BY pd.model_code`
       : await prisma.$queryRaw<{ id: number; model_code: string }[]>`
           SELECT id, model_code FROM products_dropdown ORDER BY model_code`;
@@ -22,6 +26,63 @@ app.get('/', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to load products' }, 500);
+  }
+});
+
+app.post('/', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const body = await c.req.json<{
+      model_code?: string;
+      brand_id?: number;
+      product_category_id?: number | null;
+      image_url?: string | null;
+    }>();
+
+    const model_code = (body.model_code ?? '').trim();
+    if (!model_code) {
+      return c.json({ error: 'model_code is required' }, 400);
+    }
+
+    const brand_id = body.brand_id;
+    if (!brand_id) {
+      return c.json({ error: 'brand_id is required' }, 400);
+    }
+
+    // Check brand exists
+    const brand = await prisma.brands.findUnique({ where: { id: brand_id } });
+    if (!brand) {
+      return c.json({ error: 'brand not found' }, 400);
+    }
+
+    // Non-admin must belong to the brand
+    if (user.role !== 'admin' && !user.brandIds.includes(brand_id)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+
+    // Check duplicate model_code
+    const existing = await prisma.products.findUnique({ where: { model_code } });
+    if (existing) {
+      return c.json({ error: 'duplicate', message: 'model code นี้มีอยู่แล้ว' }, 409);
+    }
+
+    const product = await prisma.products.create({
+      data: {
+        model_code,
+        brand_id,
+        product_category_id: body.product_category_id ?? null,
+        image_url: body.image_url ?? null,
+        is_canonical: true,
+        active: true,
+      },
+      select: { id: true, model_code: true },
+    });
+
+    return c.json(product, 201);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to create product' }, 500);
   }
 });
 

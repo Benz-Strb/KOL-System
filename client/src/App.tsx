@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, Boxes, ChevronDown, LogOut, Menu, PieChart, CalendarDays } from 'lucide-react';
+import { LayoutList, Plus, Moon, Sun, Users, ShieldOff, BookUser, Package, LayoutDashboard, LogOut, Menu, CalendarDays } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
 import LoginPage from './pages/LoginPage.js';
 import UserAvatar from './components/UserAvatar.js';
@@ -18,8 +18,6 @@ const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage.js'));
 const KolsPage = lazy(() => import('./pages/KolsPage.js'));
 const SamplesPage = lazy(() => import('./pages/SamplesPage.js'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage.js'));
-const ProductDashboardPage = lazy(() => import('./pages/ProductDashboardPage.js'));
-const MarketingDashboardPage = lazy(() => import('./pages/MarketingDashboardPage.js'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage.js'));
 const PlacementDetailPage = lazy(() => import('./pages/PlacementDetailPage.js'));
 
@@ -29,11 +27,9 @@ const Spinner = (
   </div>
 );
 
-// No standalone "home" page — landing destination depends on role: admin/manager
-// go straight to the analytics Dashboard, everyone else goes to the Placements list.
+// No standalone "home" page — landing destination depends on role.
 function homePathFor(role?: string) {
-  if (role === 'admin' || role === 'manager') return '/dashboard';
-  if (role === 'marketing') return '/marketing';
+  if (role === 'admin' || role === 'manager' || role === 'marketing') return '/dashboard';
   return '/placements';
 }
 
@@ -83,13 +79,6 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 }
 
 // Manager or admin role guard (must be inside ProtectedRoute)
-function RequireManagerOrAdmin({ children }: { children: React.ReactNode }) {
-  const { appUser } = useAuth();
-  if (!appUser) return Spinner;
-  if (appUser.role !== 'admin' && appUser.role !== 'manager') return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-
 function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { appUser, signOut, deactivated } = useAuth();
@@ -97,13 +86,6 @@ function Layout({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(() =>
     document.documentElement.classList.contains('dark')
   );
-
-  const dashboardSectionActive = location.pathname.startsWith('/dashboard');
-  const [dashboardOpen, setDashboardOpen] = useState(dashboardSectionActive);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDashboardOpen(dashboardSectionActive);
-  }, [dashboardSectionActive]);
 
   // Mobile off-canvas drawer — closed by default, closes itself on every navigation
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -211,37 +193,12 @@ function Layout({ children }: { children: React.ReactNode }) {
               <Package size={15} />
               Sample
             </NavLink>
-            {(appUser?.role === 'admin' || appUser?.role === 'manager') && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setDashboardOpen(o => !o)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    dashboardSectionActive ? 'text-white font-medium' : 'text-white/60 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <LayoutDashboard size={15} />
-                  <span className="flex-1 text-left">Dashboard</span>
-                  <ChevronDown size={14} className={`shrink-0 transition-transform duration-200 ${dashboardOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`grid transition-all duration-200 ease-in-out ${dashboardOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden flex flex-col gap-0.5 mt-0.5 ml-[13px] pl-3 border-l border-white/10">
-                    <NavLink to="/dashboard" end className={navLinkCls}>
-                      <LayoutDashboard size={14} />
-                      KOL
-                    </NavLink>
-                    <NavLink to="/dashboard/products" className={navLinkCls}>
-                      <Boxes size={14} />
-                      {t('nav.dashboardProducts')}
-                    </NavLink>
-                  </div>
-                </div>
-              </div>
+            {(appUser?.role === 'admin' || appUser?.role === 'manager' || appUser?.role === 'marketing') && (
+              <NavLink to="/dashboard" className={navLinkCls}>
+                <LayoutDashboard size={15} />
+                Dashboard
+              </NavLink>
             )}
-            <NavLink to="/marketing" className={navLinkCls}>
-              <PieChart size={15} />
-              {t('nav.marketingDashboard')}
-            </NavLink>
             {appUser?.role === 'admin' && (
               <NavLink to="/admin/users" className={navLinkCls}>
                 <Users size={15} />
@@ -336,23 +293,11 @@ export default function App() {
           } />
           <Route path="/dashboard" element={
             <ProtectedRoute>
-              <RequireManagerOrAdmin>
-                <Layout><DashboardPage /></Layout>
-              </RequireManagerOrAdmin>
+              <Layout><DashboardPage /></Layout>
             </ProtectedRoute>
           } />
-          <Route path="/dashboard/products" element={
-            <ProtectedRoute>
-              <RequireManagerOrAdmin>
-                <Layout><ProductDashboardPage /></Layout>
-              </RequireManagerOrAdmin>
-            </ProtectedRoute>
-          } />
-          <Route path="/marketing" element={
-            <ProtectedRoute>
-              <Layout><MarketingDashboardPage /></Layout>
-            </ProtectedRoute>
-          } />
+          <Route path="/dashboard/products" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/marketing" element={<Navigate to="/dashboard" replace />} />
           <Route path="/admin/users" element={
             <ProtectedRoute>
               <RequireAdmin>
