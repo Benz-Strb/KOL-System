@@ -109,6 +109,56 @@ app.get('/:id/metrics', async c => {
   }
 });
 
+app.get('/:id', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
+    if (!Number.isInteger(id)) return c.json({ error: 'invalid id' }, 400);
+
+    const raw = await prisma.placements.findUnique({
+      where: { id },
+      include: {
+        kols: {
+          select: {
+            id: true, gen_name: true, content_categories: { select: { name: true } },
+            kol_platforms: { where: { is_primary: true }, select: { handle: true, profile_url: true, follower_count: true, avatar_url: true } },
+          },
+        },
+        platforms: { select: { name: true } },
+        products: { select: { model_code: true } },
+        stores: { select: { name: true, branch: true } },
+        campaigns: { select: { code: true, label: true } },
+        brands: { select: { id: true, name: true, logo_url: true } },
+        users_placements_person_in_charge_idTousers: { select: { full_name: true } },
+      },
+    });
+
+    if (!raw) return c.json({ error: 'Placement not found' }, 404);
+    if (user.role !== 'admin' && !user.brandIds.includes(raw.brand_id)) {
+      return c.json({ error: 'No access to this placement' }, 403);
+    }
+
+    const primary = raw.kols?.kol_platforms[0];
+    const row = {
+      ...raw,
+      kols: raw.kols ? {
+        id: raw.kols.id,
+        handle: primary?.handle ?? '',
+        gen_name: raw.kols.gen_name,
+        profile_url: primary?.profile_url ?? null,
+        follower_count: primary?.follower_count ?? null,
+        avatar_url: primary?.avatar_url ?? null,
+        content_categories: raw.kols.content_categories,
+      } : null,
+    };
+    return c.json(row);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to load placement' }, 500);
+  }
+});
+
 app.get('/', async c => {
   try {
     const prisma = c.get('prisma');
