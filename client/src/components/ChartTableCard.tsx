@@ -25,10 +25,13 @@ interface Props {
   headerRight?: React.ReactNode;
   defaultView?: 'chart' | 'table';
   emptyMessage?: string;
+  /** Render without the outer card chrome (border/padding) so it can be embedded
+   *  as a sub-section inside another card. Title renders as a smaller sub-header. */
+  bare?: boolean;
 }
 
 export default function ChartTableCard({
-  title, description, chart, table, exportFilename, headerRight, defaultView = 'chart', emptyMessage,
+  title, description, chart, table, exportFilename, headerRight, defaultView = 'chart', emptyMessage, bare = false,
 }: Props) {
   const { t } = useTranslation();
   const [view, setView] = useState<'chart' | 'table'>(defaultView);
@@ -51,11 +54,13 @@ export default function ChartTableCard({
     header: c.headerKey ? t(c.headerKey) : (c.header ?? ''),
   }));
 
-  return (
-    <div className="bg-surface border border-hairline rounded-xl p-5">
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-sm font-semibold text-ink">{title}</h2>
+          {bare
+            ? <h3 className="text-xs font-medium text-muted">{title}</h3>
+            : <h2 className="text-sm font-semibold text-ink">{title}</h2>}
           {description && <p className="text-[11px] text-muted mt-0.5">{description}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
@@ -90,6 +95,9 @@ export default function ChartTableCard({
           emptyMessage={emptyMessage}
         />
       )}
-    </div>
+    </>
   );
+
+  if (bare) return inner;
+  return <div className="bg-surface border border-hairline rounded-xl p-5">{inner}</div>;
 }

@@ -23,7 +23,8 @@ import ChartTableCard from '../components/ChartTableCard.js';
 import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
-import { todayStr } from '../lib/exportTable.js';
+import { todayStr, exportTableToExcel, type ExportColumn } from '../lib/exportTable.js';
+import i18n from '../i18n/index.js';
 
 const HOVER_EXPAND_DELAY = 400;
 
@@ -274,34 +275,45 @@ function PlatformBreakdownCard({
   const total = rows.reduce((s, r) => s + r.placement_count, 0);
   const maxCount = Math.max(...rows.map(r => r.placement_count), 1);
   return (
-    <div className="bg-surface border border-hairline rounded-xl p-5">
-      <div className="flex items-baseline gap-3 mb-4">
-        <h2 className="text-sm font-semibold text-ink">{t('dashboard.platformBreakdownTitle')}</h2>
-        <p className="text-[11px] text-muted">{t('dashboard.platformBreakdownDesc')}</p>
-      </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {rows.map(r => {
-            const pct = total > 0 ? (r.placement_count / total) * 100 : 0;
-            return (
-              <div key={r.platform_id} className="flex items-center gap-2.5">
-                <PlatformLogo name={r.platform_name} size={18} />
-                <span className="text-sm font-medium text-ink w-24 shrink-0 truncate">{r.platform_name}</span>
-                <div className="flex-1 h-1.5 rounded-full bg-canvas overflow-hidden">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${(r.placement_count / maxCount) * 100}%` }} />
+    <ChartTableCard
+      title={t('dashboard.platformBreakdownTitle')}
+      description={t('dashboard.platformBreakdownDesc')}
+      chart={
+        rows.length === 0 ? (
+          <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {rows.map(r => {
+              const pct = total > 0 ? (r.placement_count / total) * 100 : 0;
+              return (
+                <div key={r.platform_id} className="flex items-center gap-2.5">
+                  <PlatformLogo name={r.platform_name} size={18} />
+                  <span className="text-sm font-medium text-ink w-24 shrink-0 truncate">{r.platform_name}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-canvas overflow-hidden">
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${(r.placement_count / maxCount) * 100}%` }} />
+                  </div>
+                  <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">
+                    {formatMoney(r.total_gmv)}
+                  </span>
+                  <span className="text-[11px] text-muted tabular-nums w-9 text-right shrink-0">{pct.toFixed(0)}%</span>
                 </div>
-                <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">
-                  {formatMoney(r.total_gmv)}
-                </span>
-                <span className="text-[11px] text-muted tabular-nums w-9 text-right shrink-0">{pct.toFixed(0)}%</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )
+      }
+      table={{
+        columns: [
+          { key: 'platform_name', headerKey: 'dashboard.colPlatform' },
+          { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
+          { key: 'kol_count', headerKey: 'dashboard.colKolCount', align: 'right' as const },
+          { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+        ],
+        rows: rows as unknown as Record<string, unknown>[],
+      }}
+      exportFilename={`platform_breakdown_${todayStr()}.xlsx`}
+      emptyMessage={t('dashboard.noData')}
+    />
   );
 }
 
@@ -313,34 +325,45 @@ function MonthlyTrendCard({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="bg-surface border border-hairline rounded-xl p-5">
-      <div className="flex items-baseline gap-3 mb-4">
-        <h2 className="text-sm font-semibold text-ink">{t('dashboard.monthlyTrendTitle')}</h2>
-        <p className="text-[11px] text-muted">{t('dashboard.monthlyTrendDesc')}</p>
-      </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">{t('dashboard.noData')}</p>
-      ) : (
-        <ResponsiveContainer width="100%" height={260} initialDimension={{ width: 600, height: 260 }}>
-          <ComposedChart data={rows} margin={{ left: -16, right: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
-            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-            <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={v => String(Math.round(Number(v)))} />
-            <Tooltip
-              contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
-              labelStyle={{ color: 'var(--ink)' }}
-              formatter={(v, n) => n === 'gmv'
-                ? [formatMoney(Number(v ?? 0)), t('kolTrend.gmv')]
-                : [Number(v ?? 0).toLocaleString(numberLocale()), t('dashboard.totalOrders')]}
-            />
-            <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('dashboard.totalOrders'))} wrapperStyle={{ fontSize: 11 }} />
-            <Bar yAxisId="left" dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
-            <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} animationDuration={500} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      )}
-    </div>
+    <ChartTableCard
+      title={t('dashboard.monthlyTrendTitle')}
+      description={t('dashboard.monthlyTrendDesc')}
+      chart={
+        rows.length === 0 ? (
+          <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={260} initialDimension={{ width: 600, height: 260 }}>
+            <ComposedChart data={rows} margin={{ left: -16, right: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={v => String(Math.round(Number(v)))} />
+              <Tooltip
+                contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                labelStyle={{ color: 'var(--ink)' }}
+                formatter={(v, n) => n === 'gmv'
+                  ? [formatMoney(Number(v ?? 0)), t('kolTrend.gmv')]
+                  : [Number(v ?? 0).toLocaleString(numberLocale()), t('dashboard.totalOrders')]}
+              />
+              <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('dashboard.totalOrders'))} wrapperStyle={{ fontSize: 11 }} />
+              <Bar yAxisId="left" dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+              <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} animationDuration={500} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )
+      }
+      table={{
+        columns: [
+          { key: 'month', headerKey: 'dashboard.colMonth' },
+          { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
+          { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+          { key: 'orders', headerKey: 'dashboard.colOrders', align: 'right' as const },
+        ],
+        rows: rows as unknown as Record<string, unknown>[],
+      }}
+      exportFilename={`monthly_trend_${todayStr()}.xlsx`}
+      emptyMessage={t('dashboard.noData')}
+    />
   );
 }
 
@@ -390,6 +413,18 @@ function FunnelCard({
   };
   const leadCls = (isLead: boolean) => `tabular-nums font-mono ${isLead ? 'text-accent font-semibold' : 'text-ink'}`;
 
+  async function handleFunnelExport(lang: ExportLang) {
+    const tt = i18n.getFixedT(lang);
+    const cols: ExportColumn<typeof rows[number]>[] = [
+      { key: 'label', header: tt('dashboard.funnelChannelCol') },
+      { key: 'visits', header: 'Visits' },
+      { key: 'orders', header: 'Orders' },
+      { key: 'atcRate', header: 'ATC %', format: (v) => (v != null ? `${Number(v).toFixed(1)}%` : '') },
+      { key: 'convRate', header: 'Conv %', format: (v) => (v != null ? `${Number(v).toFixed(2)}%` : '') },
+    ];
+    await exportTableToExcel(cols, rows, `funnel_${todayStr()}.xlsx`, { sheetName: tt('export.sheetName'), totalLabel: tt('export.totalRow') });
+  }
+
   // card-flip between the funnel face and the compare table; only the body
   // flips (header + toggle stay put so you can always flip back). The 3D
   // container needs an explicit height — measure the visible face so it
@@ -414,7 +449,8 @@ function FunnelCard({
     <div className="bg-surface border border-hairline rounded-xl p-5">
       <div className="flex items-start justify-between gap-3 mb-1">
         <h2 className="text-sm font-semibold text-ink shrink-0">{t('dashboard.funnelTitle')}</h2>
-        {(selectable.length > 1 || canCompare) && (
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {(selectable.length > 1 || canCompare) && (
           <div className="flex flex-wrap items-center justify-end gap-1 bg-canvas rounded-lg p-1">
             {canCompare && (
               <button
@@ -434,7 +470,9 @@ function FunnelCard({
               </button>
             ))}
           </div>
-        )}
+          )}
+          {rows.length > 0 && <ExportLangMenu label="Excel" onPick={handleFunnelExport} />}
+        </div>
       </div>
       <p className="text-[11px] text-muted mb-4">
         {active === 'compare' ? t('dashboard.funnelCompareHint') : t('dashboard.funnelDesc')}
@@ -1248,75 +1286,106 @@ export default function DashboardPage() {
 
             {/* Row 1: Donut + Bar chart */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div className="bg-surface border border-hairline rounded-xl p-5">
-                <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvByChannel')}</h2>
-                {data.channelBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted">{t('dashboard.noGmvData')}</p>
-                ) : (() => {
-                  const totalGmv = data.channelBreakdown.reduce((s, r) => s + r.gmv, 0);
-                  return (
-                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                      <div className="w-44 h-44 shrink-0">
-                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 176, height: 176 }}>
-                          <PieChart>
-                            <Pie
-                              data={data.channelBreakdown}
-                              dataKey="gmv"
-                              nameKey="channel"
-                              innerRadius="60%"
-                              outerRadius="95%"
-                              paddingAngle={2}
-                              stroke="none"
-                              animationDuration={500}
-                            >
-                              {data.channelBreakdown.map((c, i) => (
-                                <Cell key={c.channel} fill={CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip content={ChannelTooltip} />
-                          </PieChart>
-                        </ResponsiveContainer>
+              <ChartTableCard
+                title={t('dashboard.gmvByChannel')}
+                chart={
+                  data.channelBreakdown.length === 0 ? (
+                    <p className="text-sm text-muted">{t('dashboard.noGmvData')}</p>
+                  ) : (() => {
+                    const totalGmv = data.channelBreakdown.reduce((s, r) => s + r.gmv, 0);
+                    return (
+                      <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                        <div className="w-44 h-44 shrink-0">
+                          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 176, height: 176 }}>
+                            <PieChart>
+                              <Pie
+                                data={data.channelBreakdown}
+                                dataKey="gmv"
+                                nameKey="channel"
+                                innerRadius="60%"
+                                outerRadius="95%"
+                                paddingAngle={2}
+                                stroke="none"
+                                animationDuration={500}
+                              >
+                                {data.channelBreakdown.map((c, i) => (
+                                  <Cell key={c.channel} fill={CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip content={ChannelTooltip} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-2.5 min-w-0">
+                          {data.channelBreakdown.map((c, i) => {
+                            const pct = totalGmv > 0 ? ((c.gmv / totalGmv) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div key={c.channel} className="flex items-center gap-2.5 text-sm">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
+                                <span className="font-medium text-ink w-16 shrink-0">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
+                                <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(c.gmv)}</span>
+                                <span className="w-12 text-right text-muted tabular-nums shrink-0">{pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="flex-1 flex flex-col gap-2.5 min-w-0">
-                        {data.channelBreakdown.map((c, i) => {
-                          const pct = totalGmv > 0 ? ((c.gmv / totalGmv) * 100).toFixed(1) : '0.0';
-                          return (
-                            <div key={c.channel} className="flex items-center gap-2.5 text-sm">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHANNEL_COLOR[c.channel] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length] }} />
-                              <span className="font-medium text-ink w-16 shrink-0">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
-                              <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(c.gmv)}</span>
-                              <span className="w-12 text-right text-muted tabular-nums shrink-0">{pct}%</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+                    );
+                  })()
+                }
+                table={{
+                  columns: [
+                    { key: 'channel_label', headerKey: 'dashboard.colChannel' },
+                    { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'pct', headerKey: 'dashboard.colPercent', align: 'right' as const },
+                  ],
+                  rows: (() => {
+                    const total = data.channelBreakdown.reduce((s, r) => s + r.gmv, 0);
+                    return data.channelBreakdown.map(c => ({
+                      ...c,
+                      channel_label: CHANNEL_LABEL[c.channel] ?? c.channel,
+                      pct: total > 0 ? `${((c.gmv / total) * 100).toFixed(1)}%` : '0.0%',
+                    } as Record<string, unknown>));
+                  })(),
+                }}
+                exportFilename={`gmv_by_channel_${todayStr()}.xlsx`}
+                emptyMessage={t('dashboard.noGmvData')}
+              />
 
-              <div className="bg-surface border border-hairline rounded-xl p-5">
-                <h2 className="text-sm font-semibold text-ink mb-4">{t('dashboard.gmvVsSpendByCampaign')}</h2>
-                {campaignTrendData.length === 0 ? (
-                  <p className="text-sm text-muted">{t('dashboard.noData')}</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={224}>
-                    <BarChart data={campaignTrendData} margin={{ left: -16 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
-                      <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
-                        labelStyle={{ color: 'var(--ink)' }}
-                        formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
-                      />
-                      <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
-                      <Bar dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+              <ChartTableCard
+                title={t('dashboard.gmvVsSpendByCampaign')}
+                chart={
+                  campaignTrendData.length === 0 ? (
+                    <p className="text-sm text-muted">{t('dashboard.noData')}</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={224}>
+                      <BarChart data={campaignTrendData} margin={{ left: -16 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
+                          labelStyle={{ color: 'var(--ink)' }}
+                          formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
+                        />
+                        <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Bar dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )
+                }
+                table={{
+                  columns: [
+                    { key: 'name', headerKey: 'dashboard.colCampaign' },
+                    { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'spend', headerKey: 'dashboard.colSpend', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                  ],
+                  rows: campaignTrendData as unknown as Record<string, unknown>[],
+                }}
+                exportFilename={`gmv_vs_spend_campaign_${todayStr()}.xlsx`}
+                emptyMessage={t('dashboard.noData')}
+              />
             </div>
 
             {/* Funnel */}
@@ -1328,7 +1397,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Off-Platform Traffic widget */}
+          {/* Off-Platform Traffic — Daily Trend */}
           <div className="bg-surface border border-hairline rounded-xl p-5">
             <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
               <div>
@@ -1369,10 +1438,11 @@ export default function DashboardPage() {
                     <p className="text-base font-semibold text-ink font-mono">{offplatformData.summary.total_visits.toLocaleString(numberLocale())}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  <div>
-                    <h3 className="text-xs font-medium text-muted mb-3">{t('dashboard.offplatformDailyTrend')}</h3>
-                    <ResponsiveContainer width="100%" height={180} initialDimension={{ width: 400, height: 180 }}>
+                <ChartTableCard
+                  bare
+                  title={t('dashboard.offplatformDailyTrend')}
+                  chart={
+                    <ResponsiveContainer width="100%" height={220} initialDimension={{ width: 800, height: 220 }}>
                       <BarChart data={offplatformBarData} margin={{ left: -16 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
@@ -1385,34 +1455,56 @@ export default function DashboardPage() {
                         <Bar dataKey="revenue" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-medium text-muted mb-3">{t('dashboard.offplatformChannelBreakdown')}</h3>
-                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-2">
-                      <div className="w-36 h-36 shrink-0">
-                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 144, height: 144 }}>
-                          <PieChart>
-                            <Pie data={offplatformData.channelBreakdown} dataKey="revenue" nameKey="channel" innerRadius="60%" outerRadius="95%" paddingAngle={2} stroke="none" animationDuration={500}>
-                              {offplatformData.channelBreakdown.map((ch, i) => (
-                                <Cell key={ch.channel} fill={OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }} formatter={(v, name) => [formatMoney(Number(v ?? 0)), String(name)]} />
-                          </PieChart>
-                        </ResponsiveContainer>
+                  }
+                  table={{
+                    columns: [
+                      { key: 'date', headerKey: 'dashboard.colDate' },
+                      { key: 'revenue', headerKey: 'dashboard.colRevenue', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    ],
+                    rows: offplatformBarData as unknown as Record<string, unknown>[],
+                  }}
+                  exportFilename={`offplatform_daily_${todayStr()}.xlsx`}
+                />
+                <div className="mt-6 pt-5 border-t border-hairline">
+                  <ChartTableCard
+                    bare
+                    title={t('dashboard.offplatformChannelBreakdown')}
+                    chart={
+                      <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8">
+                        <div className="w-40 h-40 shrink-0">
+                          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 160, height: 160 }}>
+                            <PieChart>
+                              <Pie data={offplatformData.channelBreakdown} dataKey="revenue" nameKey="channel" innerRadius="60%" outerRadius="95%" paddingAngle={2} stroke="none" animationDuration={500}>
+                                {offplatformData.channelBreakdown.map((ch, i) => (
+                                  <Cell key={ch.channel} fill={OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }} formatter={(v, name) => [formatMoney(Number(v ?? 0)), String(name)]} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-2.5 min-w-0 w-full">
+                          {offplatformData.channelBreakdown.map((ch, i) => (
+                            <div key={ch.channel} className="flex items-center gap-2 text-xs">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length] }} />
+                              <span className="font-medium text-ink shrink-0 w-20 truncate">{ch.channel}</span>
+                              <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(ch.revenue)}</span>
+                              <span className="w-24 text-right text-muted tabular-nums font-mono shrink-0">{ch.orders.toLocaleString(numberLocale())} orders</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex-1 flex flex-col gap-2 min-w-0">
-                        {offplatformData.channelBreakdown.map((ch, i) => (
-                          <div key={ch.channel} className="flex items-center gap-2 text-xs">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: OFFPLATFORM_COLORS[i % OFFPLATFORM_COLORS.length] }} />
-                            <span className="font-medium text-ink shrink-0 w-16 truncate">{ch.channel}</span>
-                            <span className="flex-1 text-right text-ink tabular-nums font-mono">{formatMoney(ch.revenue)}</span>
-                            <span className="w-20 text-right text-muted tabular-nums font-mono shrink-0">{ch.orders.toLocaleString(numberLocale())} orders</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                    }
+                    table={{
+                      columns: [
+                        { key: 'channel', headerKey: 'dashboard.colChannel' },
+                        { key: 'revenue', headerKey: 'dashboard.colRevenue', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                        { key: 'orders', headerKey: 'dashboard.colOrders', align: 'right' as const },
+                      ],
+                      rows: offplatformData.channelBreakdown as unknown as Record<string, unknown>[],
+                    }}
+                    exportFilename={`offplatform_channel_${todayStr()}.xlsx`}
+                  />
                 </div>
               </>
             )}
