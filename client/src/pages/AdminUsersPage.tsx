@@ -4,6 +4,7 @@ import { Users, Plus, Copy, Check, Eye, EyeOff, RefreshCw, Pencil, Tag, X, Check
 import {
   getAdminUsers, createAdminUser, updateAdminUser, resetUserPassword,
   getAdminBrands, createAdminBrand, updateAdminBrand,
+  clearDropdownCache,
   type AdminUser, type Brand,
 } from '../api/index.js';
 import Modal from '../components/Modal.js';
@@ -240,6 +241,7 @@ export default function AdminUsersPage() {
     try {
       const brand = await createAdminBrand(newBrandName.trim(), newBrandLogoUrl.trim() || undefined);
       setBrands(prev => [...prev, brand].sort((a, b) => a.name.localeCompare(b.name)));
+      clearDropdownCache(); // bust cache so NewPlacementPage sees the new brand immediately
       setSelectedBrandIds([]);
       setNewBrandName('');
       setNewBrandLogoUrl('');

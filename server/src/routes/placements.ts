@@ -319,6 +319,57 @@ app.patch('/:id/performance', async c => {
   }
 });
 
+// Reschedule a placement's date from the calendar (drag-to-move).
+// planned → writes target_pub_date · posted → writes publication_date · cancelled → 400.
+// Only admin/marketing may reschedule (manager is view-only on the calendar).
+app.patch('/:id/schedule', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
+
+    if (user.role !== 'admin' && user.role !== 'marketing') {
+      return c.json({ error: 'No permission to reschedule' }, 403);
+    }
+
+    const { date } = await c.req.json();
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return c.json({ error: 'date must be YYYY-MM-DD' }, 400);
+    }
+
+    const existing = await prisma.placements.findUnique({
+      where: { id },
+      select: { brand_id: true, status: true, target_pub_date: true, publication_date: true },
+    });
+    if (!existing) return c.json({ error: 'Placement not found' }, 404);
+
+    if (user.role !== 'admin' && !user.brandIds.includes(existing.brand_id)) {
+      return c.json({ error: 'No access to this placement' }, 403);
+    }
+
+    let field: 'target_pub_date' | 'publication_date';
+    if (existing.status === 'cancelled') {
+      return c.json({ error: 'cannot reschedule cancelled placement' }, 400);
+    } else if (existing.status === 'planned') {
+      field = 'target_pub_date';
+    } else if (existing.status === 'posted') {
+      field = 'publication_date';
+    } else {
+      return c.json({ error: 'cannot reschedule this placement' }, 400);
+    }
+
+    await prisma.placements.update({
+      where: { id },
+      data: { [field]: new Date(date) },
+    });
+
+    return c.json({ ok: true, id, date, status: existing.status, field });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to reschedule' }, 500);
+  }
+});
+
 app.post('/', async c => {
   try {
     const prisma = c.get('prisma');

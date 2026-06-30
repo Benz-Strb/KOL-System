@@ -11,6 +11,7 @@ import {
 } from '../api/index.js';
 import Toast from '../components/Toast.js';
 import Select from '../components/Select.js';
+import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
 
 const cardCls = 'bg-surface border border-hairline rounded-xl p-5';
 
@@ -76,9 +77,9 @@ export default function ImportPlacementsPage() {
     handleReset();
   }
 
-  async function handleDownloadTemplate() {
+  async function handleDownloadTemplate(lang: ExportLang) {
     try {
-      await downloadImportTemplate(kind, brandId ? Number(brandId) : undefined);
+      await downloadImportTemplate(kind, brandId ? Number(brandId) : undefined, lang);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('download.templateFailed'));
     }
@@ -181,10 +182,11 @@ export default function ImportPlacementsPage() {
         <div className={cardCls}>
           <SectionHeader icon={<Download size={15} />} title={t('importPlacements.step1Title')} />
           <p className="text-sm text-muted mb-3">{t('importPlacements.step1HintStart')}<strong className="text-ink">{t('importPlacements.step1HintBold')}</strong>{t('importPlacements.step1HintEnd')}</p>
-          <button type="button" onClick={handleDownloadTemplate} disabled={!brandId}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-hairline text-ink text-sm font-medium rounded-full hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all">
-            <Download size={14} /> {t('importPlacements.downloadTemplate', { kind: kind === 'online' ? 'Online' : 'Offline' })}
-          </button>
+          <ExportLangMenu
+            label={t('importPlacements.downloadTemplate', { kind: kind === 'online' ? 'Online' : 'Offline' })}
+            onPick={handleDownloadTemplate}
+            disabled={!brandId}
+          />
           {!brandId && brands.length > 1 && <p className="text-xs text-yellow-600 mt-2">{t('importPlacements.selectBrandFirst')}</p>}
         </div>
 

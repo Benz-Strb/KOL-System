@@ -11,3 +11,12 @@ export function getCached<T>(key: string): T | undefined {
 export function setCached<T>(key: string, value: T): void {
   store.set(key, value);
 }
+
+// Drop every entry whose key starts with `prefix` — used after a mutation
+// (e.g. rescheduling a placement) so the next visit refetches fresh data
+// instead of showing the pre-mutation snapshot for any filter combination.
+export function invalidateCachePrefix(prefix: string): void {
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) store.delete(key);
+  }
+}

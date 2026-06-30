@@ -45,11 +45,13 @@ const EMPTY_RESPONSE = {
     placement_count: number;
     gmv: number;
     spend: number;
+    orders: number;
   }[],
   paymentTypeBreakdown: [] as PaymentTypeRow[],
   tierBreakdown: [] as TierRow[],
   platformBreakdown: [] as PlatformRow[],
   kolPaymentBreakdown: [] as { kol_id: number; payment_type: string; placement_count: number; total_gmv: number; total_spend: number }[],
+  placementDetail: [] as PlacementDetailRow[],
 };
 
 type PaymentTypeRow = {
@@ -57,6 +59,8 @@ type PaymentTypeRow = {
   placement_count: number;
   total_gmv: number;
   avg_gmv: number;
+  total_spend: number;
+  total_orders: number;
 };
 
 type TierRow = {
@@ -66,6 +70,8 @@ type TierRow = {
   placement_count: number;
   total_gmv: number;
   avg_gmv_per_kol: number;
+  total_orders: number;
+  total_spend: number;
 };
 
 type PlatformRow = {
@@ -74,6 +80,8 @@ type PlatformRow = {
   placement_count: number;
   kol_count: number;
   total_gmv: number;
+  total_orders: number;
+  total_spend: number;
 };
 
 // monthly GMV/orders/placement trend (A) — the only "over time" view; campaign
@@ -83,6 +91,7 @@ type MonthlyTrendRow = {
   placement_count: number;
   gmv: number;
   orders: number;
+  spend: number;
 };
 
 // GMV grouped by the KOL's content category (C) — category was filter-only before
@@ -93,6 +102,36 @@ type CategoryRow = {
   placement_count: number;
   gmv: number;
   orders: number;
+  spend: number;
+};
+
+type PlacementDetailRow = {
+  id: number;
+  brand_name: string | null;
+  campaign_code: string | null;
+  handle: string | null;
+  gen_name: string | null;
+  platform_name: string | null;
+  follower_count: number | null;
+  tier_name: string | null;
+  category_name: string | null;
+  model_code: string | null;
+  store_name: string | null;
+  store_branch: string | null;
+  placement_type: string;
+  payment_type: string;
+  final_price: number | null;
+  pay_amount: number | null;
+  ads_cost: number | null;
+  target_pub_date: string | null;
+  publication_date: string | null;
+  status: string;
+  gmv: number;
+  orders: number;
+  visits: number;
+  atc: number;
+  person_in_charge: string | null;
+  post_url: string | null;
 };
 
 // Marketing dashboard (privacy-scoped: no per-KOL data) — KPI summary +
@@ -144,6 +183,7 @@ type ProductRankRow = {
   placement_count: number;
   total_gmv: number;
   total_orders: number;
+  total_spend: number;
 };
 
 type ProductKolRow = {
@@ -308,17 +348,19 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     `;
 
     // barter vs paid (vs free) — average GMV per post by payment type
-    const paymentTypeAgg = await prisma.$queryRaw<{ payment_type: string; placement_count: number; total_gmv: number }[]>`
+    const paymentTypeAgg = await prisma.$queryRaw<{ payment_type: string; placement_count: number; total_gmv: number; total_spend: number; total_orders: number }[]>`
       WITH metric_agg AS (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
       )
       SELECT
         p.payment_type,
-        COUNT(DISTINCT p.id)::int          AS placement_count,
-        COALESCE(SUM(ma.gmv), 0)::float    AS total_gmv
+        COUNT(DISTINCT p.id)::int                                        AS placement_count,
+        COALESCE(SUM(ma.gmv), 0)::float                                  AS total_gmv,
+        COALESCE(SUM(COALESCE(p.pay_amount, p.final_price, 0)), 0)::float AS total_spend,
+        COALESCE(SUM(ma.orders), 0)::int                                 AS total_orders
       FROM placements p
       LEFT JOIN metric_agg ma ON ma.placement_id = p.id
       WHERE p.id IN (${Prisma.join(ids)})
@@ -330,6 +372,8 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         placement_count: r.placement_count,
         total_gmv: r.total_gmv,
         avg_gmv: r.placement_count > 0 ? r.total_gmv / r.placement_count : 0,
+        total_spend: r.total_spend,
+        total_orders: r.total_orders,
       }))
       .sort((a, b) => (PAYMENT_TYPE_ORDER[a.payment_type] ?? 99) - (PAYMENT_TYPE_ORDER[b.payment_type] ?? 99));
 
@@ -345,10 +389,14 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         placement_count: 0,
         total_gmv: 0,
         avg_gmv_per_kol: 0,
+        total_orders: 0,
+        total_spend: 0,
       };
       entry.kol_count += 1;
       entry.placement_count += r.placement_count;
       entry.total_gmv += r.total_gmv;
+      entry.total_orders += r.total_orders;
+      entry.total_spend += r.total_spend;
       tierMap.set(r.kol_tier_id, entry);
     }
     const tierBreakdown: TierRow[] = [...tierMap.values()]
@@ -358,9 +406,13 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     // hiring distribution by KOL platform (Facebook/Instagram/TikTok/YouTube etc.)
     // — groups by placements.platform_id (the channel the KOL posts on), not
     // placement_metrics.channel (the sales channel that tracks actual GMV)
-    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number }[]>`
-      WITH metric_agg AS (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv
+    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number; total_orders: number; total_spend: number }[]>`
+      WITH placement_spend AS (
+        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        FROM placements WHERE id IN (${Prisma.join(ids)})
+      ),
+      metric_agg AS (
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -370,9 +422,12 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         pt.name                                     AS platform_name,
         COUNT(DISTINCT p.id)::int                   AS placement_count,
         COUNT(DISTINCT p.kol_id)::int               AS kol_count,
-        COALESCE(SUM(ma.gmv), 0)::float             AS total_gmv
+        COALESCE(SUM(ma.gmv), 0)::float             AS total_gmv,
+        COALESCE(SUM(ma.orders), 0)::int            AS total_orders,
+        COALESCE(SUM(ps.spend), 0)::float           AS total_spend
       FROM placements p
       JOIN platforms pt ON pt.id = p.platform_id
+      LEFT JOIN placement_spend ps ON ps.id = p.id
       LEFT JOIN metric_agg ma ON ma.placement_id = p.id
       WHERE p.id IN (${Prisma.join(ids)})
       GROUP BY pt.id, pt.name
@@ -452,6 +507,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       placement_count: number;
       gmv: number;
       spend: number;
+      orders: number;
     }[]>`
       SELECT
         c.id                                                       AS campaign_id,
@@ -460,11 +516,12 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         c.start_date,
         COUNT(DISTINCT p.id)::int                                  AS placement_count,
         COALESCE(SUM(pm.gmv::numeric), 0)::float                   AS gmv,
-        COALESCE(SUM(COALESCE(p.pay_amount, p.final_price, 0)), 0)::float AS spend
+        COALESCE(SUM(COALESCE(p.pay_amount, p.final_price, 0)), 0)::float AS spend,
+        COALESCE(SUM(pm.orders), 0)::int                           AS orders
       FROM placements p
       LEFT JOIN campaigns c ON p.campaign_id = c.id
       LEFT JOIN (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -477,7 +534,11 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     // monthly trend (A) — group by publication_date month; placements without a
     // publication_date are dropped (no time bucket to put them in)
     const monthlyTrend = await prisma.$queryRaw<MonthlyTrendRow[]>`
-      WITH metric_agg AS (
+      WITH placement_spend AS (
+        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        FROM placements WHERE id IN (${Prisma.join(ids)})
+      ),
+      metric_agg AS (
         SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
@@ -487,8 +548,10 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         to_char(p.publication_date, 'YYYY-MM')  AS month,
         COUNT(DISTINCT p.id)::int               AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float         AS gmv,
-        COALESCE(SUM(ma.orders), 0)::int        AS orders
+        COALESCE(SUM(ma.orders), 0)::int        AS orders,
+        COALESCE(SUM(ps.spend), 0)::float       AS spend
       FROM placements p
+      LEFT JOIN placement_spend ps ON ps.id = p.id
       LEFT JOIN metric_agg ma ON ma.placement_id = p.id
       WHERE p.id IN (${Prisma.join(ids)}) AND p.publication_date IS NOT NULL
       GROUP BY month
@@ -497,7 +560,11 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
 
     // GMV by content category (C) — categories live on the KOL, not the placement
     const categoryBreakdown = await prisma.$queryRaw<CategoryRow[]>`
-      WITH metric_agg AS (
+      WITH placement_spend AS (
+        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        FROM placements WHERE id IN (${Prisma.join(ids)})
+      ),
+      metric_agg AS (
         SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
@@ -509,10 +576,12 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.kol_id)::int           AS kol_count,
         COUNT(DISTINCT p.id)::int               AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float         AS gmv,
-        COALESCE(SUM(ma.orders), 0)::int        AS orders
+        COALESCE(SUM(ma.orders), 0)::int        AS orders,
+        COALESCE(SUM(ps.spend), 0)::float       AS spend
       FROM placements p
       JOIN kols k ON k.id = p.kol_id
       JOIN content_categories cc ON cc.id = k.content_category_id
+      LEFT JOIN placement_spend ps ON ps.id = p.id
       LEFT JOIN metric_agg ma ON ma.placement_id = p.id
       WHERE p.id IN (${Prisma.join(ids)})
       GROUP BY cc.id, cc.name
@@ -520,6 +589,61 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     `;
 
     const totalSpendWithAds = totalSpend + totalAdsCost;
+
+    // placement-level detail for raw-data export sheet (§3.1)
+    const placementDetail = await prisma.$queryRaw<PlacementDetailRow[]>`
+      WITH metric_agg AS (
+        SELECT placement_id,
+               SUM(gmv::numeric)  AS gmv,
+               SUM(orders)        AS orders,
+               SUM(visits)        AS visits,
+               SUM(atc)           AS atc
+        FROM placement_metrics
+        WHERE placement_id IN (${Prisma.join(ids)})
+        GROUP BY placement_id
+      )
+      SELECT
+        p.id,
+        b.name                        AS brand_name,
+        c.code                        AS campaign_code,
+        kp.handle,
+        k.gen_name,
+        pt.name                       AS platform_name,
+        kp.follower_count,
+        kt.name                       AS tier_name,
+        cc.name                       AS category_name,
+        pr.model_code,
+        s.name                        AS store_name,
+        s.branch                      AS store_branch,
+        p.placement_type,
+        p.payment_type,
+        p.final_price::float          AS final_price,
+        p.pay_amount::float           AS pay_amount,
+        p.ads_cost::float             AS ads_cost,
+        p.target_pub_date::text       AS target_pub_date,
+        p.publication_date::text      AS publication_date,
+        p.status,
+        COALESCE(ma.gmv, 0)::float    AS gmv,
+        COALESCE(ma.orders, 0)::int   AS orders,
+        COALESCE(ma.visits, 0)::int   AS visits,
+        COALESCE(ma.atc, 0)::int      AS atc,
+        u.full_name                   AS person_in_charge,
+        p.post_url
+      FROM placements p
+      LEFT JOIN brands b             ON b.id = p.brand_id
+      LEFT JOIN campaigns c          ON c.id = p.campaign_id
+      LEFT JOIN kols k               ON k.id = p.kol_id
+      LEFT JOIN kol_platforms kp     ON kp.kol_id = k.id AND kp.is_primary = true
+      LEFT JOIN kol_tiers kt         ON kt.id = kp.kol_tier_id
+      LEFT JOIN content_categories cc ON cc.id = k.content_category_id
+      LEFT JOIN platforms pt         ON pt.id = p.platform_id
+      LEFT JOIN products pr          ON pr.id = p.product_id
+      LEFT JOIN stores s             ON s.id = p.store_id
+      LEFT JOIN users u              ON u.id = p.person_in_charge_id
+      LEFT JOIN metric_agg ma        ON ma.placement_id = p.id
+      WHERE p.id IN (${Prisma.join(ids)})
+      ORDER BY p.publication_date DESC NULLS LAST, p.id DESC
+    `;
 
     return {
       summary: {
@@ -546,6 +670,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       tierBreakdown,
       platformBreakdown,
       kolPaymentBreakdown,
+      placementDetail,
     };
   }
 }
@@ -573,12 +698,271 @@ const EXPORT_CHANNEL_LABEL: Record<string, string> = {
 };
 const EXPORT_PAYMENT_LABEL: Record<string, string> = { paid: 'จ่ายเงิน', barter: 'Barter', free: 'Free' };
 
-function styleExportHeaderRow(ws: ExcelJS.Worksheet) {
-  const row = ws.getRow(1);
-  row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
-  row.alignment = { vertical: 'middle' };
-  row.height = 20;
+// ─── Export helpers ──────────────────────────────────────────────────────────
+
+const CHANNEL_EXPORT_COLS = ['shopee', 'lazada', 'website', 'tiktok', 'youtube', 'lamon8'] as const;
+
+// ─── Trilingual i18n for server-side .xlsx exports ───────────────────────────
+
+type DashExportLang = 'th' | 'en' | 'zh';
+type SumFmt = 'thb' | 'int' | 'roi' | 'str';
+
+interface DashI18N {
+  tsLocale: string;
+  metaTitle: string; metaDate: string; metaBrand: string; metaCampaign: string;
+  metaCategory: string; metaDateRange: string; metaColItem: string; metaColValue: string;
+  allBrands: string; noCampaign: string; all: string; dateTo: string; noCampaignValue: string;
+  s1: string; s2: string; s3: string; s4: string; s5: string;
+  s6: string; s7: string; s8: string; s9: string; s10: string;
+  sum: [string, SumFmt][];
+  h2: string[]; h3: string[]; h4: string[]; h5: string[];
+  h6: string[]; h7: string[]; h8: string[]; h9: string[]; h10: string[];
+  payPaid: string;
+}
+
+interface ProdI18N {
+  tsLocale: string;
+  metaTitle: string; metaDate: string; metaBrand: string; metaCampaign: string;
+  metaCategory: string; metaDateRange: string; metaColItem: string; metaColValue: string;
+  allBrands: string; noCampaign: string; all: string; dateTo: string; noCategory: string;
+  s1: string; s2: string; s3: string;
+  sum: [string, SumFmt][];
+  h2: string[]; h3: string[];
+}
+
+const DASH_EXPORT_I18N: Record<DashExportLang, DashI18N> = {
+  th: {
+    tsLocale: 'th-TH',
+    metaTitle: 'รายงาน Dashboard — KOL Performance',
+    metaDate: 'วันที่ export', metaBrand: 'แบรนด์', metaCampaign: 'แคมเปญ',
+    metaCategory: 'หมวดคอนเทนต์', metaDateRange: 'ช่วงวันที่',
+    metaColItem: 'รายการ', metaColValue: 'ค่า',
+    allBrands: 'ทุกแบรนด์', noCampaign: 'ทั้งหมด', all: 'ทั้งหมด', dateTo: 'ถึง', noCampaignValue: 'ไม่มีแคมเปญ',
+    s1: 'สรุป', s2: 'แยกตามช่องทาง', s3: 'Trend รายเดือน', s4: 'แยกตามหมวดคอนเทนต์',
+    s5: 'Ranking KOL (GMV)', s6: 'Trend ต่อแคมเปญ', s7: 'Barter vs จ่ายเงิน',
+    s8: 'เทียบตาม Tier', s9: 'แยกตาม Platform', s10: 'ข้อมูลดิบ (Placement)',
+    sum: [
+      ['Placement ทั้งหมด', 'int'], ['โพสต์แล้ว', 'int'], ['วางแผนไว้', 'int'], ['ยกเลิก', 'int'],
+      ['% โพสต์แล้ว', 'str'], ['จำนวน KOL ที่จ้าง', 'int'],
+      ['ค่าใช้จ่าย KOL (บาท)', 'thb'], ['Ads Cost (บาท)', 'thb'], ['GMV รวม (บาท)', 'thb'],
+      ['Orders รวม', 'int'], ['Visits รวม', 'int'], ['ATC รวม', 'int'],
+      ['Conversion rate (Orders/Visits)', 'str'], ['ATC rate (ATC/Visits)', 'str'],
+      ['AOV — GMV/Orders (บาท)', 'thb'], ['GMV เฉลี่ยต่อ Placement (บาท)', 'thb'],
+      ['ROI (รวม Ads Cost)', 'roi'], ['ROI (ไม่รวม Ads Cost)', 'roi'],
+    ],
+    h2: ['ช่องทาง', 'GMV (บาท)', '% GMV', 'Orders', 'Visits', 'ATC', 'AOV (บาท)', 'Conversion (%)', 'ATC rate (%)'],
+    h3: ['เดือน', 'Placement', 'GMV (บาท)', 'Orders', 'Spend (บาท)', 'ROI', 'AOV (บาท)', 'GMV/Placement (บาท)', 'GMV สะสม (บาท)'],
+    h4: ['หมวดคอนเทนต์', 'จำนวน KOL', 'Placement', 'GMV (บาท)', '% GMV', 'Orders', 'Spend (บาท)', 'ROI', 'AOV (บาท)', 'avg GMV/KOL (บาท)'],
+    h5: ['อันดับ', 'Handle', 'ชื่อ', 'Tier', 'Follower', 'Placement', 'GMV รวม (บาท)', 'GMV Shopee', 'GMV Lazada', 'GMV Website', 'GMV TikTok', 'GMV YouTube', 'GMV Lemon8', 'ค่าใช้จ่าย (บาท)', 'Orders', 'AOV (บาท)', 'GMV/Placement (บาท)', 'ROI', 'Profile URL'],
+    h6: ['แคมเปญ', 'วันเริ่ม', 'Placement', 'GMV (บาท)', 'Spend (บาท)', 'Orders', 'ROI', 'AOV (บาท)', 'GMV/Placement (บาท)'],
+    h7: ['ประเภทการจ่ายเงิน', 'Placement', 'GMV รวม (บาท)', '% GMV', 'GMV เฉลี่ย/โพสต์ (บาท)', 'Spend (บาท)', 'Orders', 'ROI'],
+    h8: ['Tier', 'จำนวน KOL', 'Placement', 'GMV รวม (บาท)', 'GMV เฉลี่ย/KOL (บาท)', 'Orders', 'Spend (บาท)', 'ROI', 'avg Placement/KOL'],
+    h9: ['Platform', 'Placement', '% Placement', 'จำนวน KOL', 'GMV รวม (บาท)', 'Orders', 'Spend (บาท)', 'AOV (บาท)', 'avg GMV/KOL (บาท)'],
+    h10: ['ID', 'แบรนด์', 'แคมเปญ', 'Handle', 'ชื่อ KOL', 'Platform', 'Follower', 'Tier', 'หมวดคอนเทนต์', 'สินค้า', 'ห้าง', 'สาขา', 'ประเภท Placement', 'Payment type', 'ราคา (บาท)', 'จ่ายจริง (บาท)', 'Ads cost (บาท)', 'กำหนดโพสต์', 'วันโพสต์จริง', 'Status', 'GMV (บาท)', 'Orders', 'Visits', 'ATC', 'ROI', 'ผู้รับผิดชอบ', 'Post URL'],
+    payPaid: 'จ่ายเงิน',
+  },
+  en: {
+    tsLocale: 'en-US',
+    metaTitle: 'Dashboard Report — KOL Performance',
+    metaDate: 'Export date', metaBrand: 'Brand', metaCampaign: 'Campaign',
+    metaCategory: 'Content category', metaDateRange: 'Date range',
+    metaColItem: 'Item', metaColValue: 'Value',
+    allBrands: 'All brands', noCampaign: 'All', all: 'All', dateTo: 'to', noCampaignValue: 'No campaign',
+    s1: 'Summary', s2: 'By Channel', s3: 'Monthly Trend', s4: 'By Content Category',
+    s5: 'KOL Ranking (GMV)', s6: 'Campaign Trend', s7: 'Barter vs Paid',
+    s8: 'By Follower Tier', s9: 'By Platform', s10: 'Raw Data (Placement)',
+    sum: [
+      ['Total Placements', 'int'], ['Posted', 'int'], ['Planned', 'int'], ['Cancelled', 'int'],
+      ['% Posted', 'str'], ['KOLs Hired', 'int'],
+      ['KOL Spend (THB)', 'thb'], ['Ads Cost (THB)', 'thb'], ['Total GMV (THB)', 'thb'],
+      ['Total Orders', 'int'], ['Total Visits', 'int'], ['Total ATC', 'int'],
+      ['Conversion Rate (Orders/Visits)', 'str'], ['ATC Rate (ATC/Visits)', 'str'],
+      ['AOV — GMV/Orders (THB)', 'thb'], ['Avg GMV per Placement (THB)', 'thb'],
+      ['ROI (incl. Ads Cost)', 'roi'], ['ROI (excl. Ads Cost)', 'roi'],
+    ],
+    h2: ['Channel', 'GMV (THB)', '% GMV', 'Orders', 'Visits', 'ATC', 'AOV (THB)', 'Conversion (%)', 'ATC Rate (%)'],
+    h3: ['Month', 'Placement', 'GMV (THB)', 'Orders', 'Spend (THB)', 'ROI', 'AOV (THB)', 'GMV/Placement (THB)', 'Cumulative GMV (THB)'],
+    h4: ['Content Category', 'KOL Count', 'Placement', 'GMV (THB)', '% GMV', 'Orders', 'Spend (THB)', 'ROI', 'AOV (THB)', 'Avg GMV/KOL (THB)'],
+    h5: ['Rank', 'Handle', 'Name', 'Tier', 'Follower', 'Placement', 'Total GMV (THB)', 'GMV Shopee', 'GMV Lazada', 'GMV Website', 'GMV TikTok', 'GMV YouTube', 'GMV Lemon8', 'Spend (THB)', 'Orders', 'AOV (THB)', 'GMV/Placement (THB)', 'ROI', 'Profile URL'],
+    h6: ['Campaign', 'Start Date', 'Placement', 'GMV (THB)', 'Spend (THB)', 'Orders', 'ROI', 'AOV (THB)', 'GMV/Placement (THB)'],
+    h7: ['Payment Type', 'Placement', 'Total GMV (THB)', '% GMV', 'Avg GMV/Post (THB)', 'Spend (THB)', 'Orders', 'ROI'],
+    h8: ['Tier', 'KOL Count', 'Placement', 'Total GMV (THB)', 'Avg GMV/KOL (THB)', 'Orders', 'Spend (THB)', 'ROI', 'Avg Placement/KOL'],
+    h9: ['Platform', 'Placement', '% Placement', 'KOL Count', 'Total GMV (THB)', 'Orders', 'Spend (THB)', 'AOV (THB)', 'Avg GMV/KOL (THB)'],
+    h10: ['ID', 'Brand', 'Campaign', 'Handle', 'KOL Name', 'Platform', 'Follower', 'Tier', 'Content Category', 'Product', 'Store', 'Branch', 'Placement Type', 'Payment Type', 'Price (THB)', 'Actual Pay (THB)', 'Ads Cost (THB)', 'Planned Date', 'Posted Date', 'Status', 'GMV (THB)', 'Orders', 'Visits', 'ATC', 'ROI', 'Person in Charge', 'Post URL'],
+    payPaid: 'Paid',
+  },
+  zh: {
+    tsLocale: 'zh-CN',
+    metaTitle: 'Dashboard 报告 — KOL 成效',
+    metaDate: '导出日期', metaBrand: '品牌', metaCampaign: 'Campaign',
+    metaCategory: '内容分类', metaDateRange: '日期范围',
+    metaColItem: '项目', metaColValue: '值',
+    allBrands: '所有品牌', noCampaign: '全部', all: '全部', dateTo: '至', noCampaignValue: '无 Campaign',
+    s1: '摘要', s2: '按渠道', s3: '月度趋势', s4: '按内容分类',
+    s5: 'KOL 排名 (GMV)', s6: 'Campaign 趋势', s7: 'Barter vs Paid',
+    s8: '按 Follower Tier', s9: '按 Platform', s10: '原始数据 (Placement)',
+    sum: [
+      ['Placement 总数', 'int'], ['已发布', 'int'], ['已计划', 'int'], ['已取消', 'int'],
+      ['% 已发布', 'str'], ['KOL 数量', 'int'],
+      ['KOL 费用 (泰铢)', 'thb'], ['广告费用 (泰铢)', 'thb'], ['GMV 总计 (泰铢)', 'thb'],
+      ['Orders 总计', 'int'], ['Visits 总计', 'int'], ['ATC 总计', 'int'],
+      ['转化率 (Orders/Visits)', 'str'], ['ATC 率 (ATC/Visits)', 'str'],
+      ['AOV — GMV/Orders (泰铢)', 'thb'], ['平均 GMV/Placement (泰铢)', 'thb'],
+      ['ROI (含广告费)', 'roi'], ['ROI (不含广告费)', 'roi'],
+    ],
+    h2: ['渠道', 'GMV (泰铢)', '% GMV', 'Orders', 'Visits', 'ATC', 'AOV (泰铢)', '转化率 (%)', 'ATC 率 (%)'],
+    h3: ['月份', 'Placement', 'GMV (泰铢)', 'Orders', 'Spend (泰铢)', 'ROI', 'AOV (泰铢)', 'GMV/Placement (泰铢)', '累计 GMV (泰铢)'],
+    h4: ['内容分类', 'KOL 数', 'Placement', 'GMV (泰铢)', '% GMV', 'Orders', 'Spend (泰铢)', 'ROI', 'AOV (泰铢)', '均 GMV/KOL (泰铢)'],
+    h5: ['排名', 'Handle', '姓名', 'Tier', 'Follower', 'Placement', 'GMV 总计 (泰铢)', 'GMV Shopee', 'GMV Lazada', 'GMV Website', 'GMV TikTok', 'GMV YouTube', 'GMV Lemon8', 'Spend (泰铢)', 'Orders', 'AOV (泰铢)', 'GMV/Placement (泰铢)', 'ROI', 'Profile URL'],
+    h6: ['Campaign', '开始日期', 'Placement', 'GMV (泰铢)', 'Spend (泰铢)', 'Orders', 'ROI', 'AOV (泰铢)', 'GMV/Placement (泰铢)'],
+    h7: ['付款类型', 'Placement', 'GMV 总计 (泰铢)', '% GMV', '均 GMV/发帖 (泰铢)', 'Spend (泰铢)', 'Orders', 'ROI'],
+    h8: ['Tier', 'KOL 数', 'Placement', 'GMV 总计 (泰铢)', '均 GMV/KOL (泰铢)', 'Orders', 'Spend (泰铢)', 'ROI', '均 Placement/KOL'],
+    h9: ['Platform', 'Placement', '% Placement', 'KOL 数', 'GMV 总计 (泰铢)', 'Orders', 'Spend (泰铢)', 'AOV (泰铢)', '均 GMV/KOL (泰铢)'],
+    h10: ['ID', '品牌', 'Campaign', 'Handle', 'KOL 姓名', 'Platform', 'Follower', 'Tier', '内容分类', '产品', '商场', '分店', 'Placement 类型', '付款类型', '价格 (泰铢)', '实付金额 (泰铢)', '广告费 (泰铢)', '计划日期', '发布日期', 'Status', 'GMV (泰铢)', 'Orders', 'Visits', 'ATC', 'ROI', '负责人', 'Post URL'],
+    payPaid: 'Paid',
+  },
+};
+
+const PROD_EXPORT_I18N: Record<DashExportLang, ProdI18N> = {
+  th: {
+    tsLocale: 'th-TH',
+    metaTitle: 'รายงาน Dashboard — Product Performance',
+    metaDate: 'วันที่ export', metaBrand: 'แบรนด์', metaCampaign: 'แคมเปญ',
+    metaCategory: 'หมวดคอนเทนต์', metaDateRange: 'ช่วงวันที่',
+    metaColItem: 'รายการ', metaColValue: 'ค่า',
+    allBrands: 'ทุกแบรนด์', noCampaign: 'ทั้งหมด', all: 'ทั้งหมด', dateTo: 'ถึง', noCategory: 'ไม่มีหมวดหมู่',
+    s1: 'สรุปสินค้า', s2: 'Ranking สินค้า', s3: 'แยกตามหมวดหมู่สินค้า',
+    sum: [
+      ['จำนวนสินค้า', 'int'], ['Placement ทั้งหมด', 'int'], ['GMV รวม (บาท)', 'thb'],
+      ['Orders รวม', 'int'], ['Spend (บาท)', 'thb'], ['ROI', 'roi'],
+      ['AOV — GMV/Orders (บาท)', 'thb'], ['GMV เฉลี่ยต่อสินค้า (บาท)', 'thb'],
+    ],
+    h2: ['อันดับ', 'รุ่นสินค้า', 'หมวดหมู่', 'Placement', 'GMV (บาท)', '% GMV', 'Orders', 'Spend (บาท)', 'ROI', 'AOV (บาท)', 'GMV/Placement (บาท)'],
+    h3: ['หมวดหมู่', 'จำนวนสินค้า', 'Placement', 'GMV (บาท)', '% GMV', 'Orders', 'Spend (บาท)', 'ROI', 'AOV (บาท)'],
+  },
+  en: {
+    tsLocale: 'en-US',
+    metaTitle: 'Dashboard Report — Product Performance',
+    metaDate: 'Export date', metaBrand: 'Brand', metaCampaign: 'Campaign',
+    metaCategory: 'Content category', metaDateRange: 'Date range',
+    metaColItem: 'Item', metaColValue: 'Value',
+    allBrands: 'All brands', noCampaign: 'All', all: 'All', dateTo: 'to', noCategory: 'No category',
+    s1: 'Product Summary', s2: 'Product Ranking', s3: 'By Product Category',
+    sum: [
+      ['Product Count', 'int'], ['Total Placements', 'int'], ['Total GMV (THB)', 'thb'],
+      ['Total Orders', 'int'], ['Spend (THB)', 'thb'], ['ROI', 'roi'],
+      ['AOV — GMV/Orders (THB)', 'thb'], ['Avg GMV per Product (THB)', 'thb'],
+    ],
+    h2: ['Rank', 'Product', 'Category', 'Placement', 'GMV (THB)', '% GMV', 'Orders', 'Spend (THB)', 'ROI', 'AOV (THB)', 'GMV/Placement (THB)'],
+    h3: ['Category', 'Product Count', 'Placement', 'GMV (THB)', '% GMV', 'Orders', 'Spend (THB)', 'ROI', 'AOV (THB)'],
+  },
+  zh: {
+    tsLocale: 'zh-CN',
+    metaTitle: 'Dashboard 报告 — 产品成效',
+    metaDate: '导出日期', metaBrand: '品牌', metaCampaign: 'Campaign',
+    metaCategory: '内容分类', metaDateRange: '日期范围',
+    metaColItem: '项目', metaColValue: '值',
+    allBrands: '所有品牌', noCampaign: '全部', all: '全部', dateTo: '至', noCategory: '无分类',
+    s1: '产品摘要', s2: '产品排名', s3: '按产品分类',
+    sum: [
+      ['产品数量', 'int'], ['Placement 总数', 'int'], ['GMV 总计 (泰铢)', 'thb'],
+      ['Orders 总计', 'int'], ['Spend (泰铢)', 'thb'], ['ROI', 'roi'],
+      ['AOV — GMV/Orders (泰铢)', 'thb'], ['平均 GMV/产品 (泰铢)', 'thb'],
+    ],
+    h2: ['排名', '产品型号', '分类', 'Placement', 'GMV (泰铢)', '% GMV', 'Orders', 'Spend (泰铢)', 'ROI', 'AOV (泰铢)', 'GMV/Placement (泰铢)'],
+    h3: ['分类', '产品数量', 'Placement', 'GMV (泰铢)', '% GMV', 'Orders', 'Spend (泰铢)', 'ROI', 'AOV (泰铢)'],
+  },
+};
+
+function dashT(lang?: string | null): DashI18N {
+  return DASH_EXPORT_I18N[lang === 'en' || lang === 'zh' ? lang : 'th'];
+}
+
+function prodT(lang?: string | null): ProdI18N {
+  return PROD_EXPORT_I18N[lang === 'en' || lang === 'zh' ? lang : 'th'];
+}
+
+function colLetter(n: number): string {
+  let result = '';
+  while (n > 0) { n--; result = String.fromCharCode(65 + (n % 26)) + result; n = Math.floor(n / 26); }
+  return result;
+}
+
+interface SheetStyleOpts {
+  moneyCols?: number[];
+  intCols?: number[];
+  pctCols?: number[];
+  roiCols?: number[];
+  totalsCols?: number[];
+  dataBarCols?: number[];
+  roiColorCols?: number[];
+}
+
+function styleSheet(ws: ExcelJS.Worksheet, opts: SheetStyleOpts = {}): void {
+  const {
+    moneyCols = [], intCols = [], pctCols = [], roiCols = [],
+    totalsCols = [], dataBarCols = [], roiColorCols = [],
+  } = opts;
+
+  const lastDataRow = ws.rowCount;
+  const lastCol = ws.columnCount;
+
+  // Style header (row 1)
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+  headerRow.alignment = { vertical: 'middle' };
+  headerRow.height = 20;
+
+  // Freeze row 1
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+  // AutoFilter on header row
+  if (lastCol > 0) {
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: lastCol } };
+  }
+
+  // Number formats
+  for (const c of moneyCols) ws.getColumn(c).numFmt = '#,##0.00';
+  for (const c of intCols) ws.getColumn(c).numFmt = '#,##0';
+  for (const c of pctCols) ws.getColumn(c).numFmt = '0.0%';
+  for (const c of roiCols) ws.getColumn(c).numFmt = '0.00';
+
+  // Conditional formatting (before totals so range is only data rows)
+  // ExcelJS expects flat structure: cfvo/color at rule level, not nested inside dataBar/colorScale
+  if (lastDataRow > 1) {
+    for (const c of dataBarCols) {
+      const letter = colLetter(c);
+      try {
+        ws.addConditionalFormatting({
+          ref: `${letter}2:${letter}${lastDataRow}`,
+          rules: [{ type: 'dataBar', priority: 1, cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: 'FF638EC6' } } as unknown as ExcelJS.ConditionalFormattingRule],
+        });
+      } catch { /* fallback: no cf */ }
+    }
+    for (const c of roiColorCols) {
+      const letter = colLetter(c);
+      try {
+        ws.addConditionalFormatting({
+          ref: `${letter}2:${letter}${lastDataRow}`,
+          rules: [{ type: 'colorScale', priority: 1, cfvo: [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }], color: [{ argb: 'FFF8696B' }, { argb: 'FFFFEB84' }, { argb: 'FF63BE7B' }] } as unknown as ExcelJS.ConditionalFormattingRule],
+        });
+      } catch { /* fallback: no cf */ }
+    }
+  }
+
+  // Totals row
+  if (totalsCols.length > 0 && lastDataRow > 1) {
+    const totalsRow = ws.addRow([]);
+    totalsRow.getCell(1).value = 'รวม';
+    totalsRow.font = { bold: true };
+    for (const c of totalsCols) {
+      const letter = colLetter(c);
+      totalsRow.getCell(c).value = { formula: `SUM(${letter}2:${letter}${lastDataRow})`, result: 0 };
+      totalsRow.getCell(c).border = { top: { style: 'thin', color: { argb: 'FF000000' } } };
+    }
+    totalsRow.getCell(1).border = { top: { style: 'thin', color: { argb: 'FF000000' } } };
+  }
 }
 
 // ─── GET /export — same data as GET /, rendered as a multi-sheet .xlsx ──
@@ -587,110 +971,228 @@ app.get('/export', requireRole('admin', 'manager', 'marketing'), async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
-    const data = await buildDashboardOverview(prisma, user, {
-      brand_id: c.req.query('brand_id'),
-      campaign_id: c.req.query('campaign_id'),
-      category_id: c.req.query('category_id'),
-      date_from: c.req.query('date_from'),
-      date_to: c.req.query('date_to'),
-    });
+    const brand_id = c.req.query('brand_id');
+    const campaign_id = c.req.query('campaign_id');
+    const category_id = c.req.query('category_id');
+    const date_from = c.req.query('date_from');
+    const date_to = c.req.query('date_to');
+    const T = dashT(c.req.query('lang'));
+
+    const data = await buildDashboardOverview(prisma, user, { brand_id, campaign_id, category_id, date_from, date_to });
+
+    // Resolve filter names for meta block
+    const brandName = brand_id
+      ? ((await prisma.brands.findUnique({ where: { id: Number(brand_id) }, select: { name: true } }))?.name ?? brand_id)
+      : T.allBrands;
+    const campaignCode = campaign_id && campaign_id !== 'none'
+      ? ((await prisma.campaigns.findUnique({ where: { id: Number(campaign_id) }, select: { code: true } }))?.code ?? campaign_id)
+      : campaign_id === 'none' ? T.noCampaignValue : T.noCampaign;
+    const categoryName = category_id
+      ? ((await prisma.content_categories.findUnique({ where: { id: Number(category_id) }, select: { name: true } }))?.name ?? category_id)
+      : T.all;
+    const dateRange = date_from || date_to ? `${date_from ?? ''} ${T.dateTo} ${date_to ?? ''}` : T.all;
+    const exportedAt = new Date().toLocaleString(T.tsLocale, { timeZone: 'Asia/Bangkok', hour12: false });
 
     const wb = new ExcelJS.Workbook();
+    const s = data.summary;
+    const totalGmv = s.total_gmv;
 
-    const summaryWs = wb.addWorksheet('สรุป');
-    summaryWs.addRow(['รายการ', 'ค่า']);
-    summaryWs.addRows([
-      ['Placement ทั้งหมด', data.summary.total_placements],
-      ['โพสต์แล้ว', data.summary.posted_count],
-      ['วางแผนไว้', data.summary.planned_count],
-      ['ยกเลิก', data.summary.cancelled_count],
-      ['ค่าใช้จ่าย KOL (บาท)', data.summary.total_spend],
-      ['Ads Cost (บาท)', data.summary.total_ads_cost],
-      ['GMV รวม (บาท)', data.summary.total_gmv],
-      ['Orders รวม', data.summary.total_orders],
-      ['ROI รวม (รวม Ads Cost)', data.summary.roi],
-    ]);
-    summaryWs.columns = [{ width: 28 }, { width: 18 }];
-    styleExportHeaderRow(summaryWs);
+    // ── ชีต 1: สรุป ──────────────────────────────────────────────────────────
+    const summaryWs = wb.addWorksheet(T.s1);
+    summaryWs.columns = [{ width: 32 }, { width: 22 }];
+    // Meta block (rows 1-6)
+    const metaRows: [string, string | null][] = [
+      [T.metaTitle, null],
+      [T.metaDate, exportedAt],
+      [T.metaBrand, brandName],
+      [T.metaCampaign, campaignCode],
+      [T.metaCategory, categoryName],
+      [T.metaDateRange, dateRange],
+    ];
+    for (const [label, val] of metaRows) {
+      const row = summaryWs.addRow(val !== null ? [label, val] : [label]);
+      row.getCell(1).font = { bold: true, color: { argb: 'FF1D4ED8' } };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      if (val !== null) row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+    }
+    summaryWs.addRow([]); // blank separator
+    // Header + data rows
+    const summaryHeader = summaryWs.addRow([T.metaColItem, T.metaColValue]);
+    summaryHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    summaryHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+    summaryHeader.height = 20;
 
-    const channelWs = wb.addWorksheet('แยกตามช่องทาง');
-    channelWs.addRow(['ช่องทาง', 'GMV (บาท)', 'Orders', 'Visits', 'ATC']);
+    const kolCount = data.kolValueList.length;
+    const roiNoAds = s.total_spend > 0 ? s.total_gmv / s.total_spend : null;
+    const convRate = s.total_visits > 0 ? s.total_orders / s.total_visits : null;
+    const atcRate = s.total_visits > 0 ? s.total_atc / s.total_visits : null;
+    const aov = s.total_orders > 0 ? s.total_gmv / s.total_orders : null;
+    const avgGmvPerPlacement = s.total_placements > 0 ? s.total_gmv / s.total_placements : null;
+    const pctPosted = s.total_placements > 0 ? s.posted_count / s.total_placements : null;
+
+    const sumValues: (number | string | null)[] = [
+      s.total_placements, s.posted_count, s.planned_count, s.cancelled_count,
+      pctPosted !== null ? `${(pctPosted * 100).toFixed(1)}%` : '-',
+      kolCount, s.total_spend, s.total_ads_cost, s.total_gmv,
+      s.total_orders, s.total_visits, s.total_atc,
+      convRate !== null ? `${(convRate * 100).toFixed(2)}%` : '-',
+      atcRate !== null ? `${(atcRate * 100).toFixed(2)}%` : '-',
+      aov !== null ? aov : '-', avgGmvPerPlacement !== null ? avgGmvPerPlacement : '-',
+      s.roi !== null ? s.roi : '-', roiNoAds !== null ? roiNoAds : '-',
+    ];
+    for (let si = 0; si < T.sum.length; si++) {
+      const [label, fmt] = T.sum[si];
+      const val = sumValues[si];
+      const row = summaryWs.addRow([label, val]);
+      if (typeof val === 'number') {
+        row.getCell(2).numFmt = fmt === 'thb' ? '#,##0.00' : fmt === 'roi' ? '0.00' : '#,##0';
+      }
+    }
+
+    // ── ชีต 2: แยกตามช่องทาง ────────────────────────────────────────────────
+    const channelWs = wb.addWorksheet(T.s2);
+    channelWs.addRow(T.h2);
     for (const ch of data.channelBreakdown) {
-      channelWs.addRow([EXPORT_CHANNEL_LABEL[ch.channel] ?? ch.channel, ch.gmv, ch.orders, ch.visits, ch.atc]);
+      const pctGmv = totalGmv > 0 ? ch.gmv / totalGmv : 0;
+      const chAov = ch.orders > 0 ? ch.gmv / ch.orders : 0;
+      const chConv = ch.visits > 0 ? (ch.orders / ch.visits) * 100 : 0;
+      const chAtc = ch.visits > 0 ? (ch.atc / ch.visits) * 100 : 0;
+      channelWs.addRow([EXPORT_CHANNEL_LABEL[ch.channel] ?? ch.channel, ch.gmv, pctGmv, ch.orders, ch.visits, ch.atc, chAov, chConv, chAtc]);
     }
-    channelWs.columns = [{ width: 18 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 }];
-    channelWs.getColumn(2).numFmt = '#,##0.00';
-    styleExportHeaderRow(channelWs);
+    channelWs.columns = [{ width: 18 }, { width: 16 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 16 }, { width: 14 }];
+    styleSheet(channelWs, { moneyCols: [2, 7], pctCols: [3], intCols: [4, 5, 6], roiCols: [8, 9], totalsCols: [2, 4, 5, 6], dataBarCols: [2] });
 
-    const monthlyWs = wb.addWorksheet('Trend รายเดือน');
-    monthlyWs.addRow(['เดือน', 'Placement', 'GMV (บาท)', 'Orders']);
+    // ── ชีต 3: Trend รายเดือน ───────────────────────────────────────────────
+    const monthlyWs = wb.addWorksheet(T.s3);
+    monthlyWs.addRow(T.h3);
+    let cumGmv = 0;
     for (const m of data.monthlyTrend) {
-      monthlyWs.addRow([m.month, m.placement_count, m.gmv, m.orders]);
+      cumGmv += m.gmv;
+      const roi = m.spend > 0 ? m.gmv / m.spend : null;
+      const mAov = m.orders > 0 ? m.gmv / m.orders : null;
+      const gmvPerPlacement = m.placement_count > 0 ? m.gmv / m.placement_count : null;
+      monthlyWs.addRow([m.month, m.placement_count, m.gmv, m.orders, m.spend, roi ?? '', mAov ?? '', gmvPerPlacement ?? '', cumGmv]);
     }
-    monthlyWs.columns = [{ width: 12 }, { width: 12 }, { width: 16 }, { width: 12 }];
-    monthlyWs.getColumn(3).numFmt = '#,##0.00';
-    styleExportHeaderRow(monthlyWs);
+    monthlyWs.columns = [{ width: 12 }, { width: 12 }, { width: 16 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 16 }, { width: 20 }, { width: 20 }];
+    styleSheet(monthlyWs, { moneyCols: [3, 5, 7, 8, 9], intCols: [2, 4], roiCols: [6], totalsCols: [2, 3, 4, 5], dataBarCols: [3], roiColorCols: [6] });
 
-    const categoryWs = wb.addWorksheet('แยกตามหมวดคอนเทนต์');
-    categoryWs.addRow(['หมวดคอนเทนต์', 'จำนวน KOL', 'Placement', 'GMV (บาท)', 'Orders']);
+    // ── ชีต 4: แยกตามหมวดคอนเทนต์ ─────────────────────────────────────────
+    const categoryWs = wb.addWorksheet(T.s4);
+    categoryWs.addRow(T.h4);
     for (const cat of data.categoryBreakdown) {
-      categoryWs.addRow([cat.category_name, cat.kol_count, cat.placement_count, cat.gmv, cat.orders]);
+      const pctShare = totalGmv > 0 ? cat.gmv / totalGmv : 0;
+      const roi = cat.spend > 0 ? cat.gmv / cat.spend : null;
+      const catAov = cat.orders > 0 ? cat.gmv / cat.orders : null;
+      const avgGmvPerKol = cat.kol_count > 0 ? cat.gmv / cat.kol_count : null;
+      categoryWs.addRow([cat.category_name, cat.kol_count, cat.placement_count, cat.gmv, pctShare, cat.orders, cat.spend, roi ?? '', catAov ?? '', avgGmvPerKol ?? '']);
     }
-    categoryWs.columns = [{ width: 18 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 12 }];
-    categoryWs.getColumn(4).numFmt = '#,##0.00';
-    styleExportHeaderRow(categoryWs);
+    categoryWs.columns = [{ width: 22 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 16 }, { width: 20 }];
+    styleSheet(categoryWs, { intCols: [2, 3, 6], moneyCols: [4, 7, 9, 10], pctCols: [5], roiCols: [8], totalsCols: [2, 3, 4, 6, 7], dataBarCols: [4], roiColorCols: [8] });
 
-    const kolWs = wb.addWorksheet('Ranking KOL (GMV)');
-    kolWs.addRow(['อันดับ', 'Handle', 'ชื่อ', 'Follower', 'Placement', 'GMV (บาท)', 'ค่าใช้จ่าย (บาท)', 'Orders', 'ROI']);
-    data.topKolsByGmv.forEach((k, i) => {
-      kolWs.addRow([i + 1, k.handle, k.gen_name ?? '', k.follower_count ?? '', k.placement_count, k.total_gmv, k.total_spend, k.total_orders, k.roi ?? '']);
+    // ── ชีต 5: Ranking KOL (GMV) — ทุกคนที่มี GMV > 0 ─────────────────────
+    const kolWs = wb.addWorksheet(T.s5);
+    kolWs.addRow(T.h5);
+    const kolsForExport = [...data.kolValueList]
+      .filter(k => k.total_gmv > 0)
+      .sort((a, b) => b.total_gmv - a.total_gmv);
+    kolsForExport.forEach((k, i) => {
+      const kAov = k.total_orders > 0 ? k.total_gmv / k.total_orders : '';
+      const kGmvPerPlacement = k.placement_count > 0 ? k.total_gmv / k.placement_count : '';
+      kolWs.addRow([
+        i + 1, k.handle, k.gen_name ?? '', k.tier_name ?? '', k.follower_count ?? '', k.placement_count,
+        k.total_gmv,
+        ...CHANNEL_EXPORT_COLS.map(ch => k.byChannel.find(x => x.channel === ch)?.gmv ?? 0),
+        k.total_spend, k.total_orders, kAov, kGmvPerPlacement, k.roi ?? '',
+        k.profile_url ?? '',
+      ]);
     });
-    kolWs.columns = [{ width: 8 }, { width: 24 }, { width: 24 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 16 }, { width: 10 }, { width: 10 }];
-    kolWs.getColumn(6).numFmt = '#,##0.00';
-    kolWs.getColumn(7).numFmt = '#,##0.00';
-    kolWs.getColumn(9).numFmt = '0.00';
-    styleExportHeaderRow(kolWs);
+    kolWs.columns = [
+      { width: 8 }, { width: 24 }, { width: 24 }, { width: 14 }, { width: 12 }, { width: 10 },
+      { width: 16 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 },
+      { width: 16 }, { width: 10 }, { width: 16 }, { width: 20 }, { width: 10 },
+      { width: 36 },
+    ];
+    styleSheet(kolWs, {
+      intCols: [5, 6, 15], moneyCols: [7, 8, 9, 10, 11, 12, 13, 14, 16, 17], roiCols: [18],
+      totalsCols: [7, 8, 9, 10, 11, 12, 13, 14, 15],
+      dataBarCols: [7], roiColorCols: [18],
+    });
 
-    const campaignWs = wb.addWorksheet('Trend ต่อแคมเปญ');
-    campaignWs.addRow(['แคมเปญ', 'Placement', 'GMV (บาท)', 'ค่าใช้จ่าย (บาท)']);
+    // ── ชีต 6: Trend ต่อแคมเปญ ──────────────────────────────────────────────
+    const campaignWs = wb.addWorksheet(T.s6);
+    campaignWs.addRow(T.h6);
     for (const c2 of data.campaignTrend) {
-      campaignWs.addRow([c2.code ?? 'ไม่มีแคมเปญ', c2.placement_count, c2.gmv, c2.spend]);
+      const roi = c2.spend > 0 ? c2.gmv / c2.spend : null;
+      const cAov = c2.orders > 0 ? c2.gmv / c2.orders : null;
+      const cGpp = c2.placement_count > 0 ? c2.gmv / c2.placement_count : null;
+      campaignWs.addRow([c2.code ?? T.noCampaignValue, c2.start_date ?? '', c2.placement_count, c2.gmv, c2.spend, c2.orders, roi ?? '', cAov ?? '', cGpp ?? '']);
     }
-    campaignWs.columns = [{ width: 16 }, { width: 12 }, { width: 16 }, { width: 16 }];
-    campaignWs.getColumn(3).numFmt = '#,##0.00';
-    campaignWs.getColumn(4).numFmt = '#,##0.00';
-    styleExportHeaderRow(campaignWs);
+    campaignWs.columns = [{ width: 16 }, { width: 12 }, { width: 12 }, { width: 16 }, { width: 16 }, { width: 12 }, { width: 10 }, { width: 16 }, { width: 20 }];
+    styleSheet(campaignWs, { intCols: [3, 6], moneyCols: [4, 5, 8, 9], roiCols: [7], totalsCols: [3, 4, 5, 6], dataBarCols: [4], roiColorCols: [7] });
 
-    const paymentWs = wb.addWorksheet('Barter vs จ่ายเงิน');
-    paymentWs.addRow(['ประเภทการจ่ายเงิน', 'Placement', 'GMV รวม (บาท)', 'GMV เฉลี่ยต่อโพสต์ (บาท)']);
+    // ── ชีต 7: Barter vs จ่ายเงิน ──────────────────────────────────────────
+    const paymentWs = wb.addWorksheet(T.s7);
+    paymentWs.addRow(T.h7);
+    const paymentLabel: Record<string, string> = { paid: T.payPaid, barter: 'Barter', free: 'Free' };
     for (const r of data.paymentTypeBreakdown) {
-      paymentWs.addRow([EXPORT_PAYMENT_LABEL[r.payment_type] ?? r.payment_type, r.placement_count, r.total_gmv, r.avg_gmv]);
+      const pShare = totalGmv > 0 ? r.total_gmv / totalGmv : 0;
+      const roi = r.total_spend > 0 ? r.total_gmv / r.total_spend : null;
+      paymentWs.addRow([paymentLabel[r.payment_type] ?? r.payment_type, r.placement_count, r.total_gmv, pShare, r.avg_gmv, r.total_spend, r.total_orders, roi ?? '']);
     }
-    paymentWs.columns = [{ width: 20 }, { width: 12 }, { width: 18 }, { width: 22 }];
-    paymentWs.getColumn(3).numFmt = '#,##0.00';
-    paymentWs.getColumn(4).numFmt = '#,##0.00';
-    styleExportHeaderRow(paymentWs);
+    paymentWs.columns = [{ width: 20 }, { width: 12 }, { width: 18 }, { width: 10 }, { width: 22 }, { width: 16 }, { width: 12 }, { width: 10 }];
+    styleSheet(paymentWs, { intCols: [2, 7], moneyCols: [3, 5, 6], pctCols: [4], roiCols: [8], totalsCols: [2, 3, 6, 7] });
 
-    const tierWs = wb.addWorksheet('เทียบตาม Tier');
-    tierWs.addRow(['Tier', 'จำนวน KOL', 'Placement', 'GMV รวม (บาท)', 'GMV เฉลี่ยต่อ KOL (บาท)']);
+    // ── ชีต 8: เทียบตาม Tier ────────────────────────────────────────────────
+    const tierWs = wb.addWorksheet(T.s8);
+    tierWs.addRow(T.h8);
     for (const r of data.tierBreakdown) {
-      tierWs.addRow([r.tier_name, r.kol_count, r.placement_count, r.total_gmv, r.avg_gmv_per_kol]);
+      const roi = r.total_spend > 0 ? r.total_gmv / r.total_spend : null;
+      const avgPlacement = r.kol_count > 0 ? r.placement_count / r.kol_count : null;
+      tierWs.addRow([r.tier_name, r.kol_count, r.placement_count, r.total_gmv, r.avg_gmv_per_kol, r.total_orders, r.total_spend, roi ?? '', avgPlacement ?? '']);
     }
-    tierWs.columns = [{ width: 16 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 22 }];
-    tierWs.getColumn(4).numFmt = '#,##0.00';
-    tierWs.getColumn(5).numFmt = '#,##0.00';
-    styleExportHeaderRow(tierWs);
+    tierWs.columns = [{ width: 16 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 22 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 18 }];
+    styleSheet(tierWs, { intCols: [2, 3, 6], moneyCols: [4, 5, 7], roiCols: [8, 9], totalsCols: [2, 3, 4, 6, 7], dataBarCols: [4] });
 
-    const platformWs = wb.addWorksheet('แยกตาม Platform');
-    platformWs.addRow(['Platform', 'Placement', 'จำนวน KOL', 'GMV รวม (บาท)']);
+    // ── ชีต 9: แยกตาม Platform ──────────────────────────────────────────────
+    const platformWs = wb.addWorksheet(T.s9);
     const totalPlatformPlacements = data.platformBreakdown.reduce((s, r) => s + r.placement_count, 0);
+    platformWs.addRow(T.h9);
     for (const r of data.platformBreakdown) {
-      const pct = totalPlatformPlacements > 0 ? ((r.placement_count / totalPlatformPlacements) * 100).toFixed(1) + '%' : '0%';
-      platformWs.addRow([r.platform_name, r.placement_count, r.kol_count, r.total_gmv, pct]);
+      const pct = totalPlatformPlacements > 0 ? r.placement_count / totalPlatformPlacements : 0;
+      const pAov = r.total_orders > 0 ? r.total_gmv / r.total_orders : 0;
+      const avgKolGmv = r.kol_count > 0 ? r.total_gmv / r.kol_count : 0;
+      platformWs.addRow([r.platform_name, r.placement_count, pct, r.kol_count, r.total_gmv, r.total_orders, r.total_spend, pAov, avgKolGmv]);
     }
-    platformWs.columns = [{ width: 18 }, { width: 12 }, { width: 14 }, { width: 18 }, { width: 10 }];
-    platformWs.getColumn(4).numFmt = '#,##0.00';
-    styleExportHeaderRow(platformWs);
+    platformWs.columns = [{ width: 18 }, { width: 12 }, { width: 14 }, { width: 12 }, { width: 18 }, { width: 12 }, { width: 16 }, { width: 16 }, { width: 20 }];
+    styleSheet(platformWs, { intCols: [2, 4, 6], pctCols: [3], moneyCols: [5, 7, 8, 9], totalsCols: [2, 4, 5, 6, 7], dataBarCols: [5] });
+
+    // ── ชีต 10: ข้อมูลดิบ (Placement) ──────────────────────────────────────
+    const rawWs = wb.addWorksheet(T.s10);
+    rawWs.addRow(T.h10);
+    for (const p of data.placementDetail) {
+      const roi = (p.pay_amount ?? p.final_price ?? 0) > 0 ? p.gmv / (p.pay_amount ?? p.final_price ?? 1) : null;
+      rawWs.addRow([
+        p.id, p.brand_name ?? '', p.campaign_code ?? '', p.handle ?? '', p.gen_name ?? '',
+        p.platform_name ?? '', p.follower_count ?? '', p.tier_name ?? '',
+        p.category_name ?? '', p.model_code ?? '', p.store_name ?? '', p.store_branch ?? '',
+        p.placement_type, p.payment_type,
+        p.final_price ?? '', p.pay_amount ?? '', p.ads_cost ?? '',
+        p.target_pub_date ?? '', p.publication_date ?? '', p.status,
+        p.gmv, p.orders, p.visits, p.atc, roi ?? '',
+        p.person_in_charge ?? '', p.post_url ?? '',
+      ]);
+    }
+    rawWs.columns = [
+      { width: 8 }, { width: 14 }, { width: 12 }, { width: 22 }, { width: 22 }, { width: 14 }, { width: 12 }, { width: 14 },
+      { width: 18 }, { width: 20 }, { width: 16 }, { width: 14 }, { width: 18 }, { width: 14 },
+      { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 12 },
+      { width: 16 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 22 }, { width: 36 },
+    ];
+    styleSheet(rawWs, {
+      intCols: [7, 22, 23, 24], moneyCols: [15, 16, 17, 21], roiCols: [25],
+      totalsCols: [15, 16, 17, 21, 22, 23, 24],
+      dataBarCols: [21], roiColorCols: [25],
+    });
 
     const buf = await wb.xlsx.writeBuffer();
     const bytes = Uint8Array.from(buf as unknown as Uint8Array);
@@ -841,7 +1343,7 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
 
     if (matched.length === 0) {
       return {
-        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0 },
+        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0 },
         ranking: [] as ProductRankRow[],
       };
     }
@@ -859,6 +1361,10 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         JOIN products pr ON pr.id = pl.product_id
         WHERE pl.id IN (${Prisma.join(ids)})
       ),
+      placement_spend AS (
+        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        FROM placements WHERE id IN (${Prisma.join(ids)})
+      ),
       metric_agg AS (
         SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
         FROM placement_metrics
@@ -873,10 +1379,12 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         c.image_url,
         COUNT(DISTINCT r.placement_id)::int AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float     AS total_gmv,
-        COALESCE(SUM(ma.orders), 0)::int    AS total_orders
+        COALESCE(SUM(ma.orders), 0)::int    AS total_orders,
+        COALESCE(SUM(ps.spend), 0)::float   AS total_spend
       FROM resolved r
       JOIN products c ON c.id = r.canonical_id
       LEFT JOIN product_categories pc ON pc.id = c.product_category_id
+      LEFT JOIN placement_spend ps ON ps.id = r.placement_id
       LEFT JOIN metric_agg ma ON ma.placement_id = r.placement_id
       WHERE ${categoryFilter}::int IS NULL OR c.product_category_id = ${categoryFilter}::int
       GROUP BY c.id, c.model_code, c.product_category_id, pc.name, c.image_url
@@ -889,8 +1397,9 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         total_orders: acc.total_orders + r.total_orders,
         total_placements: acc.total_placements + r.placement_count,
         product_count: acc.product_count + 1,
+        total_spend: acc.total_spend + r.total_spend,
       }),
-      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0 },
+      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0 },
     );
 
     return { summary, ranking };
@@ -920,23 +1429,117 @@ app.get('/products/export', requireRole('admin', 'manager', 'marketing'), async 
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
-    const data = await buildProductDashboard(prisma, user, {
-      brand_id: c.req.query('brand_id'),
-      campaign_id: c.req.query('campaign_id'),
-      category_id: c.req.query('category_id'),
-      date_from: c.req.query('date_from'),
-      date_to: c.req.query('date_to'),
-    });
+    const brand_id = c.req.query('brand_id');
+    const campaign_id = c.req.query('campaign_id');
+    const category_id = c.req.query('category_id');
+    const date_from = c.req.query('date_from');
+    const date_to = c.req.query('date_to');
+    const TP = prodT(c.req.query('lang'));
+
+    const data = await buildProductDashboard(prisma, user, { brand_id, campaign_id, category_id, date_from, date_to });
+    const s = data.summary;
+
+    // Resolve filter names for meta block
+    const brandName = brand_id
+      ? ((await prisma.brands.findUnique({ where: { id: Number(brand_id) }, select: { name: true } }))?.name ?? brand_id)
+      : TP.allBrands;
+    const campaignCode = campaign_id && campaign_id !== 'none'
+      ? ((await prisma.campaigns.findUnique({ where: { id: Number(campaign_id) }, select: { code: true } }))?.code ?? campaign_id)
+      : campaign_id === 'none' ? TP.noCampaign : TP.all;
+    const categoryName = category_id
+      ? ((await prisma.content_categories.findUnique({ where: { id: Number(category_id) }, select: { name: true } }))?.name ?? category_id)
+      : TP.all;
+    const dateRange = date_from || date_to ? `${date_from ?? ''} ${TP.dateTo} ${date_to ?? ''}` : TP.all;
+    const exportedAt = new Date().toLocaleString(TP.tsLocale, { timeZone: 'Asia/Bangkok', hour12: false });
 
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Ranking สินค้า');
-    ws.addRow(['อันดับ', 'รุ่นสินค้า', 'หมวดหมู่', 'Placement', 'GMV (บาท)', 'Orders']);
+    const totalProductGmv = s.total_gmv;
+
+    // ── ชีต 1: สรุปสินค้า ─────────────────────────────────────────────────
+    const summaryWs = wb.addWorksheet(TP.s1);
+    summaryWs.columns = [{ width: 32 }, { width: 22 }];
+    const metaRows: [string, string | null][] = [
+      [TP.metaTitle, null],
+      [TP.metaDate, exportedAt],
+      [TP.metaBrand, brandName],
+      [TP.metaCampaign, campaignCode],
+      [TP.metaCategory, categoryName],
+      [TP.metaDateRange, dateRange],
+    ];
+    for (const [label, val] of metaRows) {
+      const row = summaryWs.addRow(val !== null ? [label, val] : [label]);
+      row.getCell(1).font = { bold: true, color: { argb: 'FF1D4ED8' } };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      if (val !== null) row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+    }
+    summaryWs.addRow([]);
+    const summaryHeader = summaryWs.addRow([TP.metaColItem, TP.metaColValue]);
+    summaryHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    summaryHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+    summaryHeader.height = 20;
+    const roi = s.total_spend > 0 ? s.total_gmv / s.total_spend : null;
+    const aov = s.total_orders > 0 ? s.total_gmv / s.total_orders : null;
+    const avgGmvPerProduct = s.product_count > 0 ? s.total_gmv / s.product_count : null;
+    const prodSumValues: (number | string | null)[] = [
+      s.product_count, s.total_placements, s.total_gmv,
+      s.total_orders, s.total_spend, roi ?? '-',
+      aov ?? '-', avgGmvPerProduct ?? '-',
+    ];
+    for (let si = 0; si < TP.sum.length; si++) {
+      const [label, fmt] = TP.sum[si];
+      const val = prodSumValues[si];
+      const row = summaryWs.addRow([label, val]);
+      if (typeof val === 'number') {
+        row.getCell(2).numFmt = fmt === 'thb' ? '#,##0.00' : fmt === 'roi' ? '0.00' : '#,##0';
+      }
+    }
+
+    // ── ชีต 2: Ranking สินค้า ─────────────────────────────────────────────
+    const rankWs = wb.addWorksheet(TP.s2);
+    rankWs.addRow(TP.h2);
     data.ranking.forEach((r, i) => {
-      ws.addRow([i + 1, r.model_code, r.category_name ?? '', r.placement_count, r.total_gmv, r.total_orders]);
+      const pShare = totalProductGmv > 0 ? r.total_gmv / totalProductGmv : 0;
+      const pRoi = r.total_spend > 0 ? r.total_gmv / r.total_spend : null;
+      const pAov = r.total_orders > 0 ? r.total_gmv / r.total_orders : null;
+      const pGpp = r.placement_count > 0 ? r.total_gmv / r.placement_count : null;
+      rankWs.addRow([i + 1, r.model_code, r.category_name ?? '', r.placement_count, r.total_gmv, pShare, r.total_orders, r.total_spend, pRoi ?? '', pAov ?? '', pGpp ?? '']);
     });
-    ws.columns = [{ width: 8 }, { width: 24 }, { width: 20 }, { width: 12 }, { width: 16 }, { width: 10 }];
-    ws.getColumn(5).numFmt = '#,##0.00';
-    styleExportHeaderRow(ws);
+    rankWs.columns = [{ width: 8 }, { width: 28 }, { width: 20 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 10 }, { width: 16 }, { width: 10 }, { width: 16 }, { width: 22 }];
+    styleSheet(rankWs, {
+      intCols: [4, 7], moneyCols: [5, 8, 10, 11], pctCols: [6], roiCols: [9],
+      totalsCols: [4, 5, 7, 8], dataBarCols: [5], roiColorCols: [9],
+    });
+
+    // ── ชีต 3: แยกตามหมวดหมู่สินค้า ─────────────────────────────────────
+    const catMap = new Map<string, { kol: Set<number>; placements: number; gmv: number; orders: number; spend: number }>();
+    // (need KOL data per product — use placement detail from main dashboard if available; here we aggregate from ranking only)
+    for (const r of data.ranking) {
+      const cat = r.category_name ?? TP.noCategory;
+      const entry = catMap.get(cat) ?? { kol: new Set(), placements: 0, gmv: 0, orders: 0, spend: 0 };
+      entry.placements += r.placement_count;
+      entry.gmv += r.total_gmv;
+      entry.orders += r.total_orders;
+      entry.spend += r.total_spend;
+      catMap.set(cat, entry);
+    }
+    const catWs = wb.addWorksheet(TP.s3);
+    catWs.addRow(TP.h3);
+    const catEntries = [...catMap.entries()].map(([cat, v]) => ({
+      cat,
+      productCount: data.ranking.filter(r => (r.category_name ?? TP.noCategory) === cat).length,
+      ...v,
+    })).sort((a, b) => b.gmv - a.gmv);
+    for (const e of catEntries) {
+      const pShare = totalProductGmv > 0 ? e.gmv / totalProductGmv : 0;
+      const roi = e.spend > 0 ? e.gmv / e.spend : null;
+      const aovCat = e.orders > 0 ? e.gmv / e.orders : null;
+      catWs.addRow([e.cat, e.productCount, e.placements, e.gmv, pShare, e.orders, e.spend, roi ?? '', aovCat ?? '']);
+    }
+    catWs.columns = [{ width: 24 }, { width: 14 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 10 }, { width: 16 }, { width: 10 }, { width: 16 }];
+    styleSheet(catWs, {
+      intCols: [2, 3, 6], moneyCols: [4, 7, 9], pctCols: [5], roiCols: [8],
+      totalsCols: [2, 3, 4, 6, 7], dataBarCols: [4],
+    });
 
     const buf = await wb.xlsx.writeBuffer();
     const bytes = Uint8Array.from(buf as unknown as Uint8Array);

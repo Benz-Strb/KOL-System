@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, Download, SlidersHorizontal, Coins, Percent, CheckCircle2, MousePointerClick, Image as ImageIcon } from 'lucide-react';
+import { ExternalLink, TrendingUp, Wallet, Megaphone, ListChecks, ShoppingCart, Gauge, X, Trophy, Search, Scale, SlidersHorizontal, Coins, Percent, CheckCircle2, MousePointerClick, Image as ImageIcon } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid,
@@ -20,6 +20,7 @@ import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
 import Paginator from '../components/Paginator.js';
 import ChartTableCard from '../components/ChartTableCard.js';
+import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 import { todayStr } from '../lib/exportTable.js';
@@ -281,13 +282,13 @@ function PlatformBreakdownCard({
       {rows.length === 0 ? (
         <p className="text-sm text-muted">{t('dashboard.noData')}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
+        <div className="flex flex-col gap-3">
           {rows.map(r => {
             const pct = total > 0 ? (r.placement_count / total) * 100 : 0;
             return (
               <div key={r.platform_id} className="flex items-center gap-2.5">
                 <PlatformLogo name={r.platform_name} size={18} />
-                <span className="text-sm font-medium text-ink w-24 shrink-0">{r.platform_name}</span>
+                <span className="text-sm font-medium text-ink w-24 shrink-0 truncate">{r.platform_name}</span>
                 <div className="flex-1 h-1.5 rounded-full bg-canvas overflow-hidden">
                   <div className="h-full rounded-full bg-accent" style={{ width: `${(r.placement_count / maxCount) * 100}%` }} />
                 </div>
@@ -876,10 +877,10 @@ export default function DashboardPage() {
   const [marketingLoading, setMarketingLoading] = useState(false);
   const [trendProductId, setTrendProductId] = useState<number | null>(null);
 
-  async function handleExport() {
+  async function handleExport(lang: ExportLang) {
     setExporting(true); setExportError('');
     try {
-      await exportDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo });
+      await exportDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo, lang });
     } catch (e: unknown) {
       setExportError(e instanceof Error ? e.message : t('download.failed'));
     } finally {
@@ -1057,13 +1058,11 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-ink tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted mt-0.5">{t('dashboard.subtitle')}{appUser?.role === 'manager' ? ' (manager view)' : ''}</p>
         </div>
-        <button
-          onClick={handleExport}
+        <ExportLangMenu
+          label="Export Excel"
+          onPick={handleExport}
           disabled={exporting || loading || !data}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all whitespace-nowrap shadow-sm"
-        >
-          <Download size={12} /> {exporting ? t('common.loading') : 'Export Excel'}
-        </button>
+        />
       </div>
 
       {/* Filter panel */}
@@ -1533,11 +1532,11 @@ export default function DashboardPage() {
               }
               table={{
                 columns: [
-                  { key: 'rank', header: t('dashboard.colRank'), align: 'center' as const, width: '40px' },
-                  { key: 'model_code', header: t('dashboard.colProduct') },
-                  { key: 'category_name', header: t('dashboard.colCategory') },
-                  { key: 'placement_count', header: t('dashboard.colPlacements'), align: 'right' as const },
-                  { key: 'total_orders', header: t('dashboard.colOrders'), align: 'right' as const },
+                  { key: 'rank', headerKey: 'dashboard.colRank', align: 'center' as const, width: '40px' },
+                  { key: 'model_code', headerKey: 'dashboard.colProduct' },
+                  { key: 'category_name', headerKey: 'dashboard.colCategory' },
+                  { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
+                  { key: 'total_orders', headerKey: 'dashboard.colOrders', align: 'right' as const },
                   { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                 ],
                 rows: productData.ranking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—' } as Record<string, unknown>)),
@@ -1583,7 +1582,7 @@ export default function DashboardPage() {
                 })()}
                 table={{
                   columns: [
-                    { key: 'category_name', header: t('dashboard.colCategory') },
+                    { key: 'category_name', headerKey: 'dashboard.colCategory' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                     { key: 'pct', header: '%', align: 'right' as const },
                   ],
@@ -1631,7 +1630,7 @@ export default function DashboardPage() {
                 })()}
                 table={{
                   columns: [
-                    { key: 'model_code', header: t('dashboard.colSku') },
+                    { key: 'model_code', headerKey: 'dashboard.colSku' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                     { key: 'pct', header: '%', align: 'right' as const },
                   ],

@@ -31,6 +31,7 @@ export const th = {
     addNew: 'เพิ่มใหม่',
     currency: 'บาท',
     allBrands: 'ทุกแบรนด์',
+    undo: 'เลิกทำ',
   },
   dashboard: {
     subtitle: 'สรุปผลงาน KOL',
@@ -409,6 +410,13 @@ export const th = {
     searchingKol: 'กำลังค้นหา...',
     noKolFound: 'ไม่พบ KOL',
     clearKol: 'ล้าง KOL',
+    rescheduled: 'เลื่อน @{{handle}} เป็น {{date}} แล้ว',
+    rescheduleFailed: 'เลื่อนวันไม่สำเร็จ ลองใหม่อีกครั้ง',
+    moveDate: 'เลื่อนวัน',
+    cannotMoveCancelled: 'งานที่ยกเลิกแล้วเลื่อนไม่ได้',
+    prevMonth: 'เดือนก่อนหน้า (ลากมาวางเพื่อเลื่อนข้ามเดือน)',
+    nextMonth: 'เดือนถัดไป (ลากมาวางเพื่อเลื่อนข้ามเดือน)',
+    showLess: 'ย่อ',
   },
   nav: {
     placements: 'รายการ',
@@ -516,7 +524,7 @@ export const th = {
     productSection: 'Model',
     storeSection: 'Store / Branch',
     selectProduct: 'เลือกสินค้า',
-    noProductsWarning: 'ยังไม่มีรายการสินค้าของแบรนด์นี้ในระบบ — แจ้งแอดมินให้เพิ่มสินค้าก่อนสร้าง Placement แบบ Online',
+    noProductsWarning: 'ยังไม่มีรายการสินค้าของแบรนด์นี้ในระบบ — กดเพิ่มสินค้าด้านล่างก่อนสร้าง Placement แบบ Online',
     shop: 'ห้าง',
     selectShop: 'เลือกห้าง',
     branch: 'สาขา',
@@ -574,6 +582,10 @@ export const th = {
     cancel: 'ยกเลิก',
     duplicateError: 'model code นี้มีอยู่แล้ว',
     addModelSuccess: 'เพิ่ม model เรียบร้อย',
+  },
+  export: {
+    totalRow: 'รวม',
+    sheetName: 'ข้อมูล',
   },
   changePassword: {
     title: 'ตั้งรหัสผ่านใหม่',

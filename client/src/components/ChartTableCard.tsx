@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { BarChart3, Table, Download } from 'lucide-react';
+import { BarChart3, Table } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import DataTable from './DataTable.js';
 import { exportTableToExcel, type ExportColumn } from '../lib/exportTable.js';
+import ExportLangMenu, { type ExportLang } from './ExportLangMenu.js';
+import i18n from '../i18n/index.js';
 
 interface Column {
   key: string;
-  header: string;
+  header?: string;
+  headerKey?: string;
   align?: 'left' | 'right' | 'center';
   width?: string;
   render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
@@ -30,14 +33,23 @@ export default function ChartTableCard({
   const { t } = useTranslation();
   const [view, setView] = useState<'chart' | 'table'>(defaultView);
 
-  async function handleExport() {
+  async function handleExport(lang: ExportLang) {
+    const tt = i18n.getFixedT(lang);
     const cols: ExportColumn<Record<string, unknown>>[] = table.columns.map(c => ({
       key: c.key,
-      header: c.header,
+      header: c.headerKey ? tt(c.headerKey) : (c.header ?? ''),
       format: c.exportFormat,
     }));
-    await exportTableToExcel(cols, table.rows, exportFilename);
+    await exportTableToExcel(cols, table.rows, exportFilename, {
+      sheetName: tt('export.sheetName'),
+      totalLabel: tt('export.totalRow'),
+    });
   }
+
+  const displayColumns = table.columns.map(c => ({
+    ...c,
+    header: c.headerKey ? t(c.headerKey) : (c.header ?? ''),
+  }));
 
   return (
     <div className="bg-surface border border-hairline rounded-xl p-5">
@@ -64,18 +76,15 @@ export default function ChartTableCard({
               <Table size={13} />
             </button>
           </div>
-          <button
-            onClick={handleExport}
-            title={t('dashboard.exportTable')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-[#217346] bg-[#217346]/10 hover:bg-[#217346]/20 active:scale-95 transition-all shrink-0"
-          >
-            <Download size={12} /> Excel
-          </button>
+          <ExportLangMenu
+            label="Excel"
+            onPick={handleExport}
+          />
         </div>
       </div>
       {view === 'chart' ? chart : (
         <DataTable
-          columns={table.columns}
+          columns={displayColumns}
           rows={table.rows}
           maxHeight={420}
           emptyMessage={emptyMessage}

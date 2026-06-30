@@ -26,6 +26,7 @@ export const en = {
     addNew: 'Add new',
     currency: 'THB',
     allBrands: 'All brands',
+    undo: 'Undo',
   },
   dashboard: {
     subtitle: 'KOL performance summary',
@@ -404,6 +405,13 @@ export const en = {
     searchingKol: 'Searching...',
     noKolFound: 'No KOL found',
     clearKol: 'Clear KOL',
+    rescheduled: 'Moved @{{handle}} to {{date}}',
+    rescheduleFailed: 'Failed to reschedule, try again',
+    moveDate: 'Move date',
+    cannotMoveCancelled: "Cancelled placements can't be moved",
+    prevMonth: 'Previous month (drop here to move across months)',
+    nextMonth: 'Next month (drop here to move across months)',
+    showLess: 'Show less',
   },
   nav: {
     placements: 'List',
@@ -511,7 +519,7 @@ export const en = {
     productSection: 'Model',
     storeSection: 'Store / Branch',
     selectProduct: 'Select a product',
-    noProductsWarning: 'This brand has no products in the system yet — ask an admin to add products before creating an Online Placement.',
+    noProductsWarning: 'This brand has no products yet — use the button below to add one before creating an Online Placement.',
     shop: 'Shop',
     selectShop: 'Select a shop',
     branch: 'Branch',
@@ -569,6 +577,10 @@ export const en = {
     cancel: 'Cancel',
     duplicateError: 'This model code already exists',
     addModelSuccess: 'Model added',
+  },
+  export: {
+    totalRow: 'Total',
+    sheetName: 'Data',
   },
   changePassword: {
     title: 'Set a new password',

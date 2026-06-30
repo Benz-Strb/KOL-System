@@ -10,27 +10,95 @@ app.use('*', requireAuth);
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-const REF_SHEET_NAME = 'รายชื่ออ้างอิง';
 const SHOP_BRANCH_SEP = ' / ';
 const MAX_DATA_ROWS = 1000;
 
 type PlacementKind = 'online' | 'offline_shop';
+type TplLang = 'th' | 'en' | 'zh';
 
-const SHEET_NAME: Record<PlacementKind, string> = {
-  online: 'นำเข้า Placement - Online',
-  offline_shop: 'นำเข้า Placement - Offline',
+// ─── Trilingual strings for template generation ───────────────────────────────
+type TplStrings = {
+  sheetOnline: string; sheetOffline: string; sheetRef: string;
+  hdrBrand: string; hdrShopBranch: string; hdrTargetDate: string;
+  hdrPaymentType: string; hdrFinalPrice: string; hdrAdsCost: string; hdrNotes: string;
+  hdrCampaignDesc: string;
+  datePrompt: string; dateErrTitle: string; dateErr: string;
+  listPromptStrict: string; listPromptSoft: string; listErrTitle: string; listErr: string;
 };
 
-// Column layout per template kind — "ประเภท Placement" is no longer a column;
-// it's implied by which template file you downloaded/uploaded.
-const ONLINE_HEADERS = [
-  'แบรนด์', 'KOL Handle', 'Platform', 'Follower', 'Model', 'Campaign',
-  'Target Publication Date', 'ประเภทการจ่ายเงิน', 'Final Price', 'Ads Cost', 'หมายเหตุ',
-] as const;
-const OFFLINE_HEADERS = [
-  'แบรนด์', 'KOL Handle', 'Platform', 'Follower', 'ห้าง / สาขา', 'Campaign',
-  'Target Publication Date', 'ประเภทการจ่ายเงิน', 'Final Price', 'Ads Cost', 'หมายเหตุ',
-] as const;
+const TEMPLATE_I18N: Record<TplLang, TplStrings> = {
+  th: {
+    sheetOnline: 'นำเข้า Placement - Online',
+    sheetOffline: 'นำเข้า Placement - Offline',
+    sheetRef: 'รายชื่ออ้างอิง',
+    hdrBrand: 'แบรนด์',
+    hdrShopBranch: 'ห้าง / สาขา',
+    hdrTargetDate: 'วันลงโพสต์ (เป้าหมาย)',
+    hdrPaymentType: 'ประเภทการจ่ายเงิน',
+    hdrFinalPrice: 'ราคาสุทธิ',
+    hdrAdsCost: 'ค่าโฆษณา',
+    hdrNotes: 'หมายเหตุ',
+    hdrCampaignDesc: 'คำอธิบาย Campaign',
+    datePrompt: 'คลิกเซลล์แล้วเลือกวันที่จากปฏิทิน หรือพิมพ์รูปแบบ YYYY-MM-DD',
+    dateErrTitle: 'วันที่ไม่ถูกต้อง',
+    dateErr: 'กรุณาเลือกวันที่ให้ถูกต้อง (ระหว่างปี {y1}-{y2})',
+    listPromptStrict: 'เลือก{label}จาก dropdown เท่านั้น',
+    listPromptSoft: 'เลือกจาก dropdown ถ้ามี หรือพิมพ์ค่าใหม่ได้ (เช่นรายการที่ยังไม่มีในระบบ)',
+    listErrTitle: 'ค่าไม่ถูกต้อง',
+    listErr: 'กรุณาเลือก{label}จากรายการใน dropdown (ดูชีต "{refSheet}" ประกอบ)',
+  },
+  en: {
+    sheetOnline: 'Import Placement - Online',
+    sheetOffline: 'Import Placement - Offline',
+    sheetRef: 'Reference',
+    hdrBrand: 'Brand',
+    hdrShopBranch: 'Store / Branch',
+    hdrTargetDate: 'Target Publication Date',
+    hdrPaymentType: 'Payment Type',
+    hdrFinalPrice: 'Final Price',
+    hdrAdsCost: 'Ads Cost',
+    hdrNotes: 'Notes',
+    hdrCampaignDesc: 'Campaign Description',
+    datePrompt: 'Click the cell and pick a date from the calendar, or type it as YYYY-MM-DD',
+    dateErrTitle: 'Invalid date',
+    dateErr: 'Please pick a valid date (between {y1}-{y2})',
+    listPromptStrict: 'Select {label} from the dropdown only',
+    listPromptSoft: 'Pick from the dropdown if available, or type a new value (e.g. an item not yet in the system)',
+    listErrTitle: 'Invalid value',
+    listErr: 'Please select {label} from the dropdown list (see the "{refSheet}" sheet)',
+  },
+  zh: {
+    sheetOnline: '导入 Placement - Online',
+    sheetOffline: '导入 Placement - Offline',
+    sheetRef: '参考列表',
+    hdrBrand: '品牌',
+    hdrShopBranch: '商场 / 分店',
+    hdrTargetDate: '目标发布日期',
+    hdrPaymentType: '付款类型',
+    hdrFinalPrice: '最终价格',
+    hdrAdsCost: '广告费用',
+    hdrNotes: '备注',
+    hdrCampaignDesc: '活动说明',
+    datePrompt: '点击单元格从日历选择日期，或按 YYYY-MM-DD 格式输入',
+    dateErrTitle: '日期无效',
+    dateErr: '请选择有效日期（{y1}-{y2} 年之间）',
+    listPromptStrict: '仅可从下拉列表选择{label}',
+    listPromptSoft: '如有可从下拉列表选择，或输入新值（例如系统中尚不存在的项目）',
+    listErrTitle: '数值无效',
+    listErr: '请从下拉列表选择{label}（参见 "{refSheet}" 工作表）',
+  },
+};
+
+function tpl(lang: string | undefined): TplStrings {
+  return TEMPLATE_I18N[(lang === 'en' || lang === 'zh') ? lang : 'th'];
+}
+
+function onlineHeaders(T: TplStrings): string[] {
+  return [T.hdrBrand, 'KOL Handle', 'Platform', 'Follower', 'Model', 'Campaign', T.hdrTargetDate, T.hdrPaymentType, T.hdrFinalPrice, T.hdrAdsCost, T.hdrNotes];
+}
+function offlineHeaders(T: TplStrings): string[] {
+  return [T.hdrBrand, 'KOL Handle', 'Platform', 'Follower', T.hdrShopBranch, 'Campaign', T.hdrTargetDate, T.hdrPaymentType, T.hdrFinalPrice, T.hdrAdsCost, T.hdrNotes];
+}
 
 export interface RawRow {
   brand: string; kolHandle: string; platform: string; follower: string;
@@ -309,15 +377,15 @@ function resolveRow(
 }
 
 // ─── Reference sheet — shared builder for both template kinds ─────────
-// Columns: A แบรนด์ | B Platform | C Model-or-ห้าง/สาขา | D Campaign | E คำอธิบาย Campaign | F KOL Handle | G KOL Platform | H KOL Follower
-function buildReferenceSheet(wb: ExcelJS.Workbook, lk: Lookups, kind: PlacementKind) {
-  const ref = wb.addWorksheet(REF_SHEET_NAME);
+// Columns: A Brand | B Platform | C Model-or-Store/Branch | D Campaign | E Campaign Description | F KOL Handle | G KOL Platform | H KOL Follower
+function buildReferenceSheet(wb: ExcelJS.Workbook, lk: Lookups, kind: PlacementKind, T: TplStrings) {
+  const ref = wb.addWorksheet(T.sheetRef);
   ref.columns = [
-    { header: 'แบรนด์', width: 22 },
+    { header: T.hdrBrand, width: 22 },
     { header: 'Platform', width: 18 },
-    { header: kind === 'online' ? 'Model' : 'ห้าง / สาขา', width: kind === 'online' ? 22 : 30 },
+    { header: kind === 'online' ? 'Model' : T.hdrShopBranch, width: kind === 'online' ? 22 : 30 },
     { header: 'Campaign', width: 14 },
-    { header: 'คำอธิบาย Campaign', width: 30 },
+    { header: T.hdrCampaignDesc, width: 30 },
     { header: 'KOL Handle', width: 26 },
     { header: 'KOL Platform', width: 16 },
     { header: 'KOL Follower', width: 14 },
@@ -354,18 +422,20 @@ function buildReferenceSheet(wb: ExcelJS.Workbook, lk: Lookups, kind: PlacementK
   };
 }
 
-function refRange(col: string, endRow: number) {
-  return `'${REF_SHEET_NAME}'!$${col}$2:$${col}$${endRow}`;
+function refRange(col: string, endRow: number, refSheet: string) {
+  return `'${refSheet}'!$${col}$2:$${col}$${endRow}`;
 }
 
 // Real Excel date validation (Allow: Date) — lets Excel show its built-in calendar
 // picker icon on the cell, and rejects typed text that isn't a real date. This
 // stores an actual date value instead of free text, side-stepping the DD/MM vs
 // MM/DD locale ambiguity and bad-year typos seen during the original Excel import.
-function applyDateValidation(ws: ExcelJS.Worksheet, col: number, label: string) {
+function applyDateValidation(ws: ExcelJS.Worksheet, col: number, T: TplStrings) {
   const currentYear = new Date().getFullYear();
-  const min = new Date(currentYear - 1, 0, 1);
-  const max = new Date(currentYear + 1, 11, 31);
+  const y1 = currentYear - 1;
+  const y2 = currentYear + 1;
+  const min = new Date(y1, 0, 1);
+  const max = new Date(y2, 11, 31);
   for (let r = 2; r <= MAX_DATA_ROWS; r++) {
     const cell = ws.getCell(r, col);
     cell.numFmt = 'yyyy-mm-dd';
@@ -375,25 +445,25 @@ function applyDateValidation(ws: ExcelJS.Worksheet, col: number, label: string) 
       allowBlank: true,
       formulae: [min, max],
       showInputMessage: true,
-      promptTitle: label,
-      prompt: 'คลิกเซลล์แล้วเลือกวันที่จากปฎิทิน หรือพิมพ์รูปแบบ YYYY-MM-DD',
+      promptTitle: T.hdrTargetDate,
+      prompt: T.datePrompt,
       showErrorMessage: true,
       errorStyle: 'stop',
-      errorTitle: 'วันที่ไม่ถูกต้อง',
-      error: `กรุณาเลือกวันที่ให้ถูกต้อง (ระหว่างปี ${currentYear - 1}-${currentYear + 1})`,
+      errorTitle: T.dateErrTitle,
+      error: T.dateErr.replace('{y1}', String(y1)).replace('{y2}', String(y2)),
     };
   }
 }
 
 // Thousand-separator display for money/count columns so large numbers don't
-// become a wall of digits ("ตาลาย") — purely cosmetic, doesn't affect the raw value.
+// become a wall of digits — purely cosmetic, doesn't affect the raw value.
 function applyNumberFormat(ws: ExcelJS.Worksheet, col: number, format: string) {
   for (let r = 2; r <= MAX_DATA_ROWS; r++) {
     ws.getCell(r, col).numFmt = format;
   }
 }
 
-function applyListValidation(ws: ExcelJS.Worksheet, col: number, formula: string, label: string, strict: boolean) {
+function applyListValidation(ws: ExcelJS.Worksheet, col: number, formula: string, label: string, strict: boolean, T: TplStrings) {
   for (let r = 2; r <= MAX_DATA_ROWS; r++) {
     ws.getCell(r, col).dataValidation = {
       type: 'list',
@@ -402,13 +472,13 @@ function applyListValidation(ws: ExcelJS.Worksheet, col: number, formula: string
       showInputMessage: true,
       promptTitle: label,
       prompt: strict
-        ? `เลือก${label}จาก dropdown เท่านั้น`
-        : `เลือกจาก dropdown ถ้ามี หรือพิมพ์ค่าใหม่ได้ (เช่นรายการที่ยังไม่มีในระบบ)`,
+        ? T.listPromptStrict.replace('{label}', label)
+        : T.listPromptSoft,
       ...(strict ? {
         showErrorMessage: true,
         errorStyle: 'stop',
-        errorTitle: 'ค่าไม่ถูกต้อง',
-        error: `กรุณาเลือก${label}จากรายการใน dropdown (ดูชีต "${REF_SHEET_NAME}" ประกอบ)`,
+        errorTitle: T.listErrTitle,
+        error: T.listErr.replace('{label}', label).replace('{refSheet}', T.sheetRef),
       } : { showErrorMessage: false }),
     };
   }
@@ -417,8 +487,8 @@ function applyListValidation(ws: ExcelJS.Worksheet, col: number, formula: string
 // Pre-fills Platform/Follower with a VLOOKUP against the KOL reference table
 // (columns F:H), keyed off the KOL Handle cell in the same row (column B).
 // Users can still overwrite the formula result directly if needed.
-function applyKolLookupFormulas(ws: ExcelJS.Worksheet, kolEnd: number) {
-  const lookupRange = `'${REF_SHEET_NAME}'!$F$2:$H$${kolEnd}`;
+function applyKolLookupFormulas(ws: ExcelJS.Worksheet, kolEnd: number, refSheet: string) {
+  const lookupRange = `'${refSheet}'!$F$2:$H$${kolEnd}`;
   for (let r = 2; r <= MAX_DATA_ROWS; r++) {
     ws.getCell(r, 3).value = { formula: `IFERROR(VLOOKUP($B${r},${lookupRange},2,FALSE),"")` };
     ws.getCell(r, 4).value = { formula: `IFERROR(VLOOKUP($B${r},${lookupRange},3,FALSE),"")` };
@@ -516,6 +586,8 @@ app.get('/template/:kind', async c => {
       return c.json({ error: 'กรุณาเลือกแบรนด์ก่อนดาวน์โหลด template' }, 400);
     }
 
+    const T = tpl(c.req.query('lang'));
+
     const templateLk: Lookups = {
       ...lk,
       brands: lk.brands.filter(b => b.id === targetBrandId),
@@ -524,31 +596,32 @@ app.get('/template/:kind', async c => {
 
     const wb = new ExcelJS.Workbook();
 
-    const headers = kind === 'online' ? ONLINE_HEADERS : OFFLINE_HEADERS;
+    const sheetName = kind === 'online' ? T.sheetOnline : T.sheetOffline;
+    const headers = kind === 'online' ? onlineHeaders(T) : offlineHeaders(T);
     const categories = kind === 'online' ? ONLINE_CATEGORIES : OFFLINE_CATEGORIES;
-    const ws = wb.addWorksheet(SHEET_NAME[kind]);
+    const ws = wb.addWorksheet(sheetName);
     ws.addRow([...headers]);
     ws.columns = headers.map(() => ({ width: 24 }));
     ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-    const ranges = buildReferenceSheet(wb, templateLk, kind);
+    const ranges = buildReferenceSheet(wb, templateLk, kind, T);
 
-    // Column order: 1 แบรนด์ | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model/ห้าง-สาขา | 6 Campaign | 7 วันที่ | 8 ประเภทจ่ายเงิน | 9-11 ราคา/หมายเหตุ
-    applyListValidation(ws, 1, refRange('A', ranges.brandEnd), 'แบรนด์', true);
-    applyListValidation(ws, 2, refRange('F', ranges.kolEnd), 'KOL Handle', true);
-    applyListValidation(ws, 3, refRange('B', ranges.platformEnd), 'Platform', true);
-    applyListValidation(ws, 5, refRange('C', ranges.colCEnd), kind === 'online' ? 'Model' : 'ห้าง / สาขา', kind === 'online');
-    applyListValidation(ws, 6, refRange('D', ranges.campaignEnd), 'Campaign', true);
-    applyDateValidation(ws, 7, 'Target Publication Date');
-    applyListValidation(ws, 8, '"จ่ายเงิน,Free,Barter"', 'ประเภทการจ่ายเงิน', true);
-    applyNumberFormat(ws, 4, '#,##0');      // Follower — จำนวนนับ ไม่ใช่เงิน
-    applyNumberFormat(ws, 9, '#,##0.00');   // Final Price — เงิน แสดงทศนิยมตามจริง ไม่ปัด
-    applyNumberFormat(ws, 10, '#,##0.00');  // Ads Cost — เงิน แสดงทศนิยมตามจริง ไม่ปัด
-    applyKolLookupFormulas(ws, ranges.kolEnd);
+    // Column order: 1 Brand | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model/Store-Branch | 6 Campaign | 7 Date | 8 Payment | 9-11 Price/Notes
+    applyListValidation(ws, 1, refRange('A', ranges.brandEnd, T.sheetRef), T.hdrBrand, true, T);
+    applyListValidation(ws, 2, refRange('F', ranges.kolEnd, T.sheetRef), 'KOL Handle', true, T);
+    applyListValidation(ws, 3, refRange('B', ranges.platformEnd, T.sheetRef), 'Platform', true, T);
+    applyListValidation(ws, 5, refRange('C', ranges.colCEnd, T.sheetRef), kind === 'online' ? 'Model' : T.hdrShopBranch, kind === 'online', T);
+    applyListValidation(ws, 6, refRange('D', ranges.campaignEnd, T.sheetRef), 'Campaign', true, T);
+    applyDateValidation(ws, 7, T);
+    applyListValidation(ws, 8, '"Paid,Free,Barter"', T.hdrPaymentType, true, T);
+    applyNumberFormat(ws, 4, '#,##0');
+    applyNumberFormat(ws, 9, '#,##0.00');
+    applyNumberFormat(ws, 10, '#,##0.00');
+    applyKolLookupFormulas(ws, ranges.kolEnd, T.sheetRef);
 
     styleBodyRows(ws, headers.length);
     styleHeaderRow(ws, categories);
-    styleReferenceSheet(wb.getWorksheet(REF_SHEET_NAME)!, 8, ranges.lastRow);
+    styleReferenceSheet(wb.getWorksheet(T.sheetRef)!, 8, ranges.lastRow);
 
     const buf = await wb.xlsx.writeBuffer();
     // Buffer is a view into a possibly-larger pooled ArrayBuffer — passing it straight
@@ -609,7 +682,8 @@ app.post('/validate/:kind', async c => {
     // exceljs's Buffer param type vs @types/node's generic Buffer<ArrayBufferLike> don't unify cleanly — known ecosystem typing clash
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await wb.xlsx.load(buf as any);
-    const ws = wb.getWorksheet(SHEET_NAME[kind]) ?? wb.worksheets[0];
+    // Use positional first sheet — sheet name may be translated (en/zh templates) so name-match is unreliable
+    const ws = wb.worksheets[0];
     if (!ws) return c.json({ error: 'ไม่พบชีตข้อมูลในไฟล์' }, 400);
 
     const lk = await loadLookups(prisma, user);

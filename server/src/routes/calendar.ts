@@ -49,10 +49,20 @@ app.get('/', async c => {
       allowedBrandIds = [bid];
     }
 
+    // Display date = the field the calendar drag edits, chosen by status:
+    //   posted  → publication_date (actual post day; fallback target if null)
+    //   else    → target_pub_date  (planned/cancelled keep the intended day)
+    // so "what you see = what you drag" (see spec §3.2). Kept as a SQL snippet
+    // so WHERE / ORDER BY / SELECT all stay in sync.
+    const EVENT_DATE_SQL = `CASE
+        WHEN p.status = 'posted' THEN COALESCE(p.publication_date, p.target_pub_date)
+        ELSE COALESCE(p.target_pub_date, p.publication_date)
+      END`;
+
     // from/to: regex-validated YYYY-MM-DD; brandIds/kolId: integers from session/parseInt
     // status/placement_type: allowlisted — no user-controlled strings reach the query
     const conds: string[] = [
-      `COALESCE(p.target_pub_date, p.publication_date) BETWEEN '${from}'::date AND '${to}'::date`,
+      `${EVENT_DATE_SQL} BETWEEN '${from}'::date AND '${to}'::date`,
     ];
     if (allowedBrandIds) conds.push(`p.brand_id IN (${allowedBrandIds.join(',')})`);
     if (status && VALID_STATUS.has(status)) conds.push(`p.status = '${status}'`);
@@ -79,8 +89,12 @@ app.get('/', async c => {
     }[]>(`
       SELECT
         p.id::int,
-        TO_CHAR(COALESCE(p.target_pub_date, p.publication_date), 'YYYY-MM-DD') AS event_date,
-        CASE WHEN p.target_pub_date IS NOT NULL THEN 'target' ELSE 'actual' END AS date_source,
+        TO_CHAR(${EVENT_DATE_SQL}, 'YYYY-MM-DD') AS event_date,
+        CASE
+          WHEN p.status = 'posted' AND p.publication_date IS NOT NULL THEN 'actual'
+          WHEN p.target_pub_date IS NOT NULL THEN 'target'
+          ELSE 'actual'
+        END AS date_source,
         p.status,
         p.placement_type,
         k.id::int AS kol_id,
@@ -100,7 +114,7 @@ app.get('/', async c => {
       LEFT JOIN stores s ON p.store_id = s.id
       LEFT JOIN campaigns cam ON p.campaign_id = cam.id
       WHERE ${where}
-      ORDER BY COALESCE(p.target_pub_date, p.publication_date), p.id
+      ORDER BY ${EVENT_DATE_SQL}, p.id
     `);
 
     // Count placements with NO date at all (same filters minus date range)
@@ -158,15 +172,22 @@ app.get('/kol-latest', async c => {
 
     if (allowedBrandIds && allowedBrandIds.length === 0) return c.json({ date: null });
 
+    // Same display-date logic as the main query (spec §3.2 / §9.8) so the
+    // "jump to nearest month" lands on the same day the calendar shows.
+    const EVENT_DATE_SQL = `CASE
+        WHEN p.status = 'posted' THEN COALESCE(p.publication_date, p.target_pub_date)
+        ELSE COALESCE(p.target_pub_date, p.publication_date)
+      END`;
+
     const conds: string[] = [
       `p.kol_id = ${kolId}`,
-      `COALESCE(p.target_pub_date, p.publication_date) IS NOT NULL`,
+      `${EVENT_DATE_SQL} IS NOT NULL`,
     ];
     if (allowedBrandIds) conds.push(`p.brand_id IN (${allowedBrandIds.join(',')})`);
 
     const rows = await prisma.$queryRawUnsafe<{ d: string | null }[]>(`
       SELECT TO_CHAR(d, 'YYYY-MM-DD') AS d FROM (
-        SELECT COALESCE(p.target_pub_date, p.publication_date) AS d
+        SELECT ${EVENT_DATE_SQL} AS d
         FROM placements p
         WHERE ${conds.join(' AND ')}
       ) t

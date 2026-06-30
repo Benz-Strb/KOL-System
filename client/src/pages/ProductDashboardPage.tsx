@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, ShoppingCart, ListChecks, Layers, X, Trophy, Image as ImageIcon, Download } from 'lucide-react';
+import { TrendingUp, ShoppingCart, ListChecks, Layers, X, Trophy, Image as ImageIcon } from 'lucide-react';
 import {
   getProductDashboard, getDropdowns, exportProductDashboard,
   type ProductDashboardOverview, type ProductRankRow, type Campaign, type Brand, type ProductCategory,
@@ -9,6 +9,7 @@ import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
 import ProductTrendModal from '../components/ProductTrendModal.js';
 import KolTrendModal from '../components/KolTrendModal.js';
+import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 
@@ -133,10 +134,10 @@ export default function ProductDashboardPage() {
   const [trendProductId, setTrendProductId] = useState<number | null>(null);
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
 
-  async function handleExport() {
+  async function handleExport(lang: ExportLang) {
     setExporting(true); setExportError('');
     try {
-      await exportProductDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo });
+      await exportProductDashboard({ brand_id: brandId, campaign_id: campaignId, category_id: categoryId, date_from: dateFrom, date_to: dateTo, lang });
     } catch (e: unknown) {
       setExportError(e instanceof Error ? e.message : t('download.failed'));
     } finally {
@@ -186,13 +187,11 @@ export default function ProductDashboardPage() {
             <p className="text-sm text-muted mt-0.5">{t('productDashboard.subtitle')}</p>
           </div>
 
-          <button
-            onClick={handleExport}
+          <ExportLangMenu
+            label="Export Excel"
+            onPick={handleExport}
             disabled={exporting || loading || !data}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#217346] text-white text-xs font-medium rounded-full hover:bg-[#1a5c38] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all whitespace-nowrap shadow-sm"
-          >
-            <Download size={12} /> {exporting ? t('common.loading') : 'Export Excel'}
-          </button>
+          />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

@@ -26,6 +26,7 @@ export const zh = {
     addNew: '添加新项',
     currency: '泰铢',
     allBrands: '所有品牌',
+    undo: '撤销',
   },
   dashboard: {
     subtitle: 'KOL 成效总结',
@@ -404,6 +405,13 @@ export const zh = {
     searchingKol: '搜索中...',
     noKolFound: '未找到 KOL',
     clearKol: '清除 KOL',
+    rescheduled: '已将 @{{handle}} 移至 {{date}}',
+    rescheduleFailed: '改期失败，请重试',
+    moveDate: '更改日期',
+    cannotMoveCancelled: '已取消的排期无法移动',
+    prevMonth: '上个月（拖放到此处可跨月移动）',
+    nextMonth: '下个月（拖放到此处可跨月移动）',
+    showLess: '收起',
   },
   nav: {
     placements: '列表',
@@ -511,7 +519,7 @@ export const zh = {
     productSection: 'Model',
     storeSection: 'Store / Branch',
     selectProduct: '选择产品',
-    noProductsWarning: '该品牌在系统中还没有产品 — 请联系管理员先添加产品,才能创建 Online Placement。',
+    noProductsWarning: '该品牌暂无产品 — 请点击下方按钮添加产品后再创建 Online Placement。',
     shop: '商场',
     selectShop: '选择商场',
     branch: '分店',
@@ -569,6 +577,10 @@ export const zh = {
     cancel: '取消',
     duplicateError: '该 model code 已存在',
     addModelSuccess: '已添加 model',
+  },
+  export: {
+    totalRow: '合计',
+    sheetName: '数据',
   },
   changePassword: {
     title: '设置新密码',

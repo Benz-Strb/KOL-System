@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, ChevronRight, CalendarDays, List, X, ExternalLink, AlertCircle } from 'lucide-react';
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors, MeasuringStrategy, pointerWithin,
+  useDraggable, useDroppable, type DragStartEvent, type DragEndEvent, type DragOverEvent,
+} from '@dnd-kit/core';
+import { ChevronLeft, ChevronRight, CalendarDays, List, X, ExternalLink, AlertCircle, CalendarClock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
-import { getCalendar, getCalendarKolLatest, getDropdowns, searchKols, type CalendarEvent, type CalendarResponse, type Brand, type KolResult } from '../api/index.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCalendar, getCalendarKolLatest, getDropdowns, searchKols, reschedulePlacement, type CalendarEvent, type CalendarResponse, type Brand, type KolResult } from '../api/index.js';
+import { getCached, setCached, invalidateCachePrefix } from '../lib/swrCache.js';
 import KolAvatar from '../components/KolAvatar.js';
 import PlatformLogo from '../components/PlatformLogo.js';
+import Toast from '../components/Toast.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
 
 // ─── date helpers ────────────────────────────────────────────────────────────
@@ -18,11 +23,10 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// Returns the Monday that starts the 6-week grid for the given year/month (0-indexed)
+// Returns the Sunday that starts the 6-week grid for the given year/month (0-indexed)
 function gridStart(year: number, month: number): Date {
   const first = new Date(year, month, 1);
-  const dow = first.getDay(); // 0=Sun
-  const daysBack = (dow + 6) % 7; // Mon-based: Mon=0
+  const daysBack = first.getDay(); // Sun-based: Sun=0
   const d = new Date(first);
   d.setDate(d.getDate() - daysBack);
   return d;
@@ -57,13 +61,33 @@ const STATUS_DOT: Record<string, string> = {
   cancelled: 'bg-gray-300 dark:bg-[#86868b]',
 };
 
+// Thai weekday colours (สีประจำวัน), Sun→Sat. Kept gentle, not loud —
+// applied only to the small day-of-week header labels.
+const DOW_COLOR: string[] = [
+  'text-red-400',       // อาทิตย์ — แดง
+  'text-amber-500',     // จันทร์ — เหลือง
+  'text-pink-400',      // อังคาร — ชมพู
+  'text-emerald-500',   // พุธ — เขียว
+  'text-orange-400',    // พฤหัสบดี — ส้ม
+  'text-sky-500',       // ศุกร์ — ฟ้า
+  'text-purple-400',    // เสาร์ — ม่วง
+];
+
 // ─── EventDetailModal ────────────────────────────────────────────────────────
 
-function EventDetailModal({ event, onClose }: { event: CalendarEvent; onClose: () => void }) {
+function EventDetailModal({
+  event, onClose, canReschedule, onReschedule,
+}: {
+  event: CalendarEvent;
+  onClose: () => void;
+  canReschedule: boolean;
+  onReschedule: (date: string) => void;
+}) {
   const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
   const chipCls = STATUS_CHIP[event.status] ?? STATUS_CHIP.planned;
   const isCancelled = event.status === 'cancelled';
+  const [picking, setPicking] = useState(false);
 
   return (
     <div
@@ -125,6 +149,29 @@ function EventDetailModal({ event, onClose }: { event: CalendarEvent; onClose: (
           )}
         </div>
 
+        {/* Move date (mobile-friendly fallback to drag — also handy on desktop) */}
+        {canReschedule && (
+          <div className="mt-4">
+            {picking ? (
+              <input
+                type="date"
+                autoFocus
+                defaultValue={event.date}
+                onChange={e => { if (e.target.value) { onReschedule(e.target.value); requestClose(); } }}
+                className="w-full px-3 py-2 bg-canvas border border-hairline rounded-xl text-sm text-ink outline-none focus:border-accent transition-colors"
+              />
+            ) : (
+              <button
+                onClick={() => setPicking(true)}
+                className="flex items-center justify-center gap-2 w-full py-2 bg-canvas hover:bg-hairline rounded-xl text-sm font-medium text-ink transition-colors"
+              >
+                <CalendarClock size={14} />
+                {t('calendar.moveDate')}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Link to placements */}
         <div className="mt-4 pt-4 border-t border-hairline">
           <Link
@@ -152,25 +199,106 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 
 // ─── EventChip ───────────────────────────────────────────────────────────────
 
-function EventChip({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
+// Presentational chip contents — shared by the in-grid button and the DragOverlay.
+// Left bar = platform colour (scannable), avatar + handle, status dot on the right.
+function EventChipContent({ event }: { event: CalendarEvent }) {
   const isCancelled = event.status === 'cancelled';
-  const chipCls = STATUS_CHIP[event.status] ?? STATUS_CHIP.planned;
+  return (
+    <>
+      {/* Status = the colour stripe (planned/posted/cancelled); platform = the logo. */}
+      <span className={`w-[3px] self-stretch shrink-0 ${STATUS_DOT[event.status] ?? STATUS_DOT.planned}`} />
+      <span className="flex-1 min-w-0 flex items-center gap-1.5 pl-1.5 pr-2 py-[3px]">
+        <KolAvatar handle={event.handle} avatarUrl={event.avatar_url} size="sm" />
+        <span className={`flex-1 min-w-0 truncate text-left text-[11.5px] leading-tight text-ink ${isCancelled ? 'line-through opacity-60' : ''}`}>
+          {event.handle}
+        </span>
+        {event.platform && <PlatformLogo name={event.platform} size={12} />}
+      </span>
+    </>
+  );
+}
+
+function DraggableEventChip({
+  event, draggable, onClick,
+}: {
+  event: CalendarEvent;
+  draggable: boolean;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: String(event.id),
+    disabled: !draggable,
+  });
+  const isCancelled = event.status === 'cancelled';
 
   return (
     <button
+      ref={setNodeRef}
       onClick={onClick}
-      className={`w-full flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-opacity hover:opacity-80 ${chipCls} ${
-        isCancelled ? 'opacity-50' : ''
-      }`}
+      {...attributes}
+      {...listeners}
+      style={{ opacity: isDragging ? 0.4 : undefined }}
+      className={`group w-full flex items-stretch overflow-hidden rounded-lg bg-surface ring-1 ring-hairline hover:ring-accent/30 hover:shadow-sm transition-all ${
+        draggable ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${isCancelled ? 'opacity-50' : ''}`}
       title={`${event.kol_name} · ${event.status}`}
     >
-      <KolAvatar handle={event.handle} avatarUrl={event.avatar_url} size="sm" />
-      <span className={`truncate min-w-0 ${isCancelled ? 'line-through' : ''}`}>
-        {event.handle}
+      <EventChipContent event={event} />
+    </button>
+  );
+}
+
+// Droppable day cell wrapper — highlights when an event hovers over it.
+// baseBg is kept separate so the drag-over highlight cleanly replaces it
+// (no competing bg-* utilities in one class string).
+function DroppableDay({
+  dateStr, baseBg, className, children,
+}: {
+  dateStr: string;
+  baseBg: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dateStr });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${className} transition-colors ${isOver ? 'bg-accent/10 ring-1 ring-inset ring-accent/40' : baseBg}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Month-nav arrow flanking the grid. Click = change month. During a drag,
+// it's a drop zone: hovering it auto-advances the month (handled by the
+// parent's onDragOver timer) so events can be dragged across months.
+function MonthNavEdge({
+  dir, label, onNav, droppable,
+}: {
+  dir: 'prev' | 'next';
+  label: string;
+  onNav: () => void;
+  droppable: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `nav-${dir}`, disabled: !droppable });
+  return (
+    <button
+      ref={setNodeRef}
+      onClick={onNav}
+      aria-label={label}
+      title={label}
+      className={`group shrink-0 self-stretch w-8 sm:w-10 flex items-center justify-center rounded-2xl transition-colors ${
+        isOver ? 'bg-accent/10 text-accent' : 'text-muted/40 hover:text-ink'
+      }`}
+    >
+      <span
+        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
+          isOver ? 'bg-accent/15 scale-110' : 'group-hover:bg-surface group-hover:shadow-sm'
+        }`}
+      >
+        {dir === 'prev' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
       </span>
-      {event.platform && (
-        <PlatformLogo name={event.platform} size={12} />
-      )}
     </button>
   );
 }
@@ -279,6 +407,27 @@ function KolSearchInput({
   );
 }
 
+// ─── Legend ──────────────────────────────────────────────────────────────────
+
+function Legend() {
+  const { t } = useTranslation();
+  const items: { status: string; label: string }[] = [
+    { status: 'planned', label: t('calendar.statusPlanned') },
+    { status: 'posted', label: t('calendar.statusPosted') },
+    { status: 'cancelled', label: t('calendar.statusCancelled') },
+  ];
+  return (
+    <div className="flex items-center gap-3">
+      {items.map(it => (
+        <div key={it.status} className="flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[it.status]}`} />
+          <span className="text-[11px] text-muted">{it.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── CalendarPage ─────────────────────────────────────────────────────────────
 
 const TODAY = new Date();
@@ -289,10 +438,19 @@ function isMobile() {
   return typeof window !== 'undefined' && window.innerWidth < 768;
 }
 
+type ToastState = {
+  id: number;
+  message: string;
+  variant?: 'success' | 'error';
+  duration?: number;
+  action?: { label: string; onClick: () => void };
+};
+
 export default function CalendarPage() {
   const { t } = useTranslation();
   const { appUser } = useAuth();
   const isAdmin = appUser?.role === 'admin';
+  const canDrag = appUser?.role === 'admin' || appUser?.role === 'marketing';
 
   const [viewMode, setViewMode] = useState<'month' | 'agenda'>(() => isMobile() ? 'agenda' : 'month');
   const [year, setYear] = useState(TODAY.getFullYear());
@@ -310,11 +468,27 @@ export default function CalendarPage() {
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
 
   const [brands, setBrands] = useState<Brand[]>([]);
 
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastIdRef = useRef(0);
+  const closeToast = useCallback(() => setToast(null), []);
+  const showToast = useCallback((s: Omit<ToastState, 'id'>) => {
+    setToast({ ...s, id: ++toastIdRef.current });
+  }, []);
+
   const seqRef = useRef(0);
   const jumpSeqRef = useRef(0);
+  const rescheduleSeqRef = useRef(0);
+  // Auto month-navigation while dragging over an edge arrow (cross-month drag).
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navDirRef = useRef<'prev' | 'next' | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(year);
@@ -348,6 +522,8 @@ export default function CalendarPage() {
   const from = formatDate(grid[0]);
   const to = formatDate(grid[grid.length - 1]);
 
+  const locale = document.documentElement.lang || 'th';
+
   const load = useCallback(async () => {
     const mySeq = ++seqRef.current;
     const cacheKey = `calendar:${JSON.stringify({ from, to, brandId, kolId, statusFilter, typeFilter })}`;
@@ -380,8 +556,111 @@ export default function CalendarPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Latest load() kept in a ref so reschedule can resync the visible month
+  // (needed for cross-month drops) without depending on load's identity.
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
+
   // Reset expanded cell when month changes
   useEffect(() => { setExpandedDate(null); }, [year, month]);
+
+  // ── Reschedule (drag-to-move / modal "move date") ──────────────────────────
+  const fmtShort = useCallback(
+    (dateStr: string) => new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+    [locale]
+  );
+
+  const applyEventDate = useCallback((id: number, date: string) => {
+    setEvents(prev => prev.map(e => (e.id === id ? { ...e, date } : e)));
+  }, []);
+
+  // Core move: optimistic update + API call + rollback on failure (no toast).
+  // Returns whether it succeeded and whether a newer move superseded it (race guard).
+  const sendReschedule = useCallback(async (
+    ev: CalendarEvent, targetDate: string, fromDate: string,
+  ): Promise<{ ok: boolean; superseded: boolean }> => {
+    // Optimistic: move chip immediately (may leave the visible month — that's fine).
+    applyEventDate(ev.id, targetDate);
+    invalidateCachePrefix('calendar:');
+    const mySeq = ++rescheduleSeqRef.current;
+    try {
+      await reschedulePlacement(ev.id, targetDate);
+      // Resync the visible month so a cross-month move shows up in the
+      // destination (the optimistic update can't add it to another month).
+      loadRef.current();
+      return { ok: true, superseded: rescheduleSeqRef.current !== mySeq };
+    } catch {
+      if (rescheduleSeqRef.current === mySeq) {
+        applyEventDate(ev.id, fromDate); // rollback
+        invalidateCachePrefix('calendar:');
+      }
+      return { ok: false, superseded: false };
+    }
+  }, [applyEventDate]);
+
+  const performReschedule = useCallback(async (
+    ev: CalendarEvent, newDate: string, oldDate: string,
+  ) => {
+    if (newDate === oldDate) return;
+    const r = await sendReschedule(ev, newDate, oldDate);
+    if (!r.ok) {
+      showToast({ message: t('calendar.rescheduleFailed'), variant: 'error', duration: 4000 });
+      return;
+    }
+    if (r.superseded) return; // a newer drag won — don't show a stale toast
+    showToast({
+      message: t('calendar.rescheduled', { handle: ev.handle, date: fmtShort(newDate) }),
+      variant: 'success',
+      duration: 6000,
+      action: {
+        label: t('common.undo'),
+        onClick: async () => {
+          const u = await sendReschedule(ev, oldDate, newDate);
+          if (!u.ok) showToast({ message: t('calendar.rescheduleFailed'), variant: 'error', duration: 4000 });
+        },
+      },
+    });
+  }, [sendReschedule, fmtShort, showToast, t]);
+
+  function clearNavTimer() {
+    if (navTimerRef.current) { clearTimeout(navTimerRef.current); navTimerRef.current = null; }
+    navDirRef.current = null;
+  }
+
+  function onDragStart(e: DragStartEvent) {
+    const ev = events.find(x => String(x.id) === e.active.id);
+    setActiveEvent(ev ?? null);
+  }
+
+  // Hovering an edge arrow during a drag auto-advances the month (after a
+  // brief intentional hold) and keeps advancing while held, so an event can
+  // be carried across months and dropped on a day in the destination.
+  function onDragOver(e: DragOverEvent) {
+    const overId = e.over?.id;
+    const dir = overId === 'nav-prev' ? 'prev' : overId === 'nav-next' ? 'next' : null;
+    if (dir === navDirRef.current) return; // unchanged — let the running timer continue
+    clearNavTimer();
+    navDirRef.current = dir;
+    if (!dir) return;
+    const step = dir === 'prev' ? prevMonth : nextMonth;
+    const tick = () => { step(); navTimerRef.current = setTimeout(tick, 700); };
+    navTimerRef.current = setTimeout(tick, 450);
+  }
+
+  function onDragEnd(e: DragEndEvent) {
+    clearNavTimer();
+    const ev = activeEvent;
+    setActiveEvent(null);
+    if (!ev || !e.over) return;
+    const overId = String(e.over.id);
+    if (overId === 'nav-prev' || overId === 'nav-next') return; // dropped on an arrow, not a day
+    performReschedule(ev, overId, ev.date);
+  }
+
+  function onDragCancel() {
+    clearNavTimer();
+    setActiveEvent(null);
+  }
 
   // Group events by date
   const eventsByDate = events.reduce<Record<string, CalendarEvent[]>>((acc, e) => {
@@ -402,22 +681,25 @@ export default function CalendarPage() {
     setMonth(TODAY.getMonth());
   }
 
-  const locale = document.documentElement.lang || 'th';
   const monthTitle = monthLabel(year, month, locale);
   const monthNames = Array.from({ length: 12 }, (_, i) =>
     new Date(2000, i, 1).toLocaleString(locale, { month: 'short' })
   );
 
   // Day-of-week headers Mon–Sun
-  const DOW_LABELS_TH = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-  const DOW_LABELS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const DOW_LABELS_ZH = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const DOW_LABELS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+  const DOW_LABELS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const DOW_LABELS_ZH = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const dowLabels = locale.startsWith('zh') ? DOW_LABELS_ZH : locale.startsWith('th') ? DOW_LABELS_TH : DOW_LABELS_EN;
 
   // Agenda: events sorted by date, grouped
   const agendaDates = Object.keys(eventsByDate).sort();
 
   const CHIP_MAX = 3;
+
+  // Drag is desktop-only (month grid too small to aim on touch); mobile uses the
+  // "move date" button inside the modal instead.
+  const dndEnabled = canDrag && !isMobile();
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -591,6 +873,11 @@ export default function CalendarPage() {
           {loading && (
             <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin ml-1" />
           )}
+
+          {/* Legend */}
+          <div className="ml-auto hidden sm:block">
+            <Legend />
+          </div>
         </div>
       </div>
 
@@ -617,74 +904,112 @@ export default function CalendarPage() {
       <div className="p-4 lg:p-6">
         {viewMode === 'month' ? (
           // ── Month grid ──────────────────────────────────────────────────────
-          <div className="bg-surface border border-hairline rounded-2xl overflow-hidden">
-            {/* Day-of-week header */}
-            <div className="grid grid-cols-7 border-b border-hairline">
-              {dowLabels.map(d => (
-                <div key={d} className="py-2 text-center text-[11px] font-medium text-muted">{d}</div>
-              ))}
-            </div>
-
-            {/* Cells */}
-            <div className="grid grid-cols-7 divide-x divide-hairline">
-              {grid.map((date, i) => {
-                const dateStr = formatDate(date);
-                const isCurrentMonth = date.getMonth() === month;
-                const isToday = dateStr === TODAY_STR;
-                const dayEvents = eventsByDate[dateStr] ?? [];
-                const isExpanded = expandedDate === dateStr;
-                const shown = isExpanded ? dayEvents : dayEvents.slice(0, CHIP_MAX);
-                const overflow = dayEvents.length - CHIP_MAX;
-
-                return (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={pointerWithin}
+            measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={onDragCancel}
+          >
+            <div className="flex items-stretch gap-0.5 sm:gap-1">
+            {/* Prev-month arrow — click to navigate, or hover while dragging to carry an event back a month */}
+            <MonthNavEdge dir="prev" label={t('calendar.prevMonth')} onNav={prevMonth} droppable={dndEnabled} />
+            {/* Single gap-px grid: the hairline shows through 1px gaps as clean,
+                uniform cell lines (no doubled borders); ring adds the outer edge. */}
+            <div className="flex-1 min-w-0 rounded-2xl overflow-hidden bg-hairline ring-1 ring-hairline">
+              <div className="grid grid-cols-7 gap-px">
+                {/* Day-of-week header row (same grid so lines stay aligned) */}
+                {dowLabels.map((d, i) => (
                   <div
-                    key={i}
-                    className={`min-h-[90px] p-1.5 border-b border-hairline flex flex-col gap-0.5 ${
-                      !isCurrentMonth ? 'bg-canvas/60' : ''
-                    }`}
+                    key={d}
+                    className={`bg-canvas py-2 text-center text-[11px] font-semibold tracking-wide ${DOW_COLOR[i]}`}
                   >
-                    {/* Day number */}
-                    <div className={`self-start w-6 h-6 flex items-center justify-center text-xs font-medium rounded-full mb-0.5 ${
-                      isToday
-                        ? 'bg-accent text-white'
-                        : isCurrentMonth
-                          ? 'text-ink'
-                          : 'text-muted/50'
-                    }`}>
-                      {date.getDate()}
-                    </div>
-
-                    {/* Event chips */}
-                    {shown.map(ev => (
-                      <EventChip
-                        key={ev.id}
-                        event={ev}
-                        onClick={() => { setSelectedEvent(ev); setExpandedDate(null); }}
-                      />
-                    ))}
-
-                    {/* "อีก N" / collapse */}
-                    {!isExpanded && overflow > 0 && (
-                      <button
-                        onClick={() => setExpandedDate(dateStr)}
-                        className="w-full text-left text-[10px] text-accent font-medium pl-1 hover:underline"
-                      >
-                        {t('calendar.moreItems', { n: overflow })}
-                      </button>
-                    )}
-                    {isExpanded && dayEvents.length > CHIP_MAX && (
-                      <button
-                        onClick={() => setExpandedDate(null)}
-                        className="w-full text-left text-[10px] text-muted font-medium pl-1 hover:underline"
-                      >
-                        ▲
-                      </button>
-                    )}
+                    {d}
                   </div>
-                );
-              })}
+                ))}
+
+                {grid.map((date, i) => {
+                  const dateStr = formatDate(date);
+                  const isCurrentMonth = date.getMonth() === month;
+                  const isToday = dateStr === TODAY_STR;
+                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                  const dayEvents = eventsByDate[dateStr] ?? [];
+                  const isExpanded = expandedDate === dateStr;
+                  const shown = isExpanded ? dayEvents : dayEvents.slice(0, CHIP_MAX);
+                  const overflow = dayEvents.length - CHIP_MAX;
+
+                  const cellBg = !isCurrentMonth
+                    ? 'bg-canvas/70'
+                    : isToday
+                      ? 'bg-accent/[0.05]'
+                      : isWeekend
+                        ? 'bg-canvas/40'
+                        : 'bg-surface';
+
+                  return (
+                    <DroppableDay
+                      key={i}
+                      dateStr={dateStr}
+                      baseBg={cellBg}
+                      className={`min-h-[94px] p-1.5 flex flex-col gap-0.5 ${!isCurrentMonth ? 'opacity-45' : ''}`}
+                    >
+                      {/* Day number */}
+                      <div className={`self-start min-w-6 h-6 px-1.5 flex items-center justify-center text-xs rounded-full mb-0.5 ${
+                        isToday
+                          ? 'bg-accent text-white font-semibold'
+                          : isCurrentMonth
+                            ? `text-ink font-medium ${isWeekend ? 'text-muted' : ''}`
+                            : 'text-muted'
+                      }`}>
+                        {date.getDate()}
+                      </div>
+
+                      {/* Event chips */}
+                      {shown.map(ev => (
+                        <DraggableEventChip
+                          key={ev.id}
+                          event={ev}
+                          draggable={dndEnabled && ev.status !== 'cancelled'}
+                          onClick={() => { setSelectedEvent(ev); setExpandedDate(null); }}
+                        />
+                      ))}
+
+                      {/* "+N more" / collapse */}
+                      {!isExpanded && overflow > 0 && (
+                        <button
+                          onClick={() => setExpandedDate(dateStr)}
+                          className="self-start mt-px px-2 py-0.5 rounded-full text-[10.5px] text-muted font-medium hover:bg-hairline/60 hover:text-ink transition-colors"
+                        >
+                          {t('calendar.moreItems', { n: overflow })}
+                        </button>
+                      )}
+                      {isExpanded && dayEvents.length > CHIP_MAX && (
+                        <button
+                          onClick={() => setExpandedDate(null)}
+                          className="self-start mt-px px-2 py-0.5 rounded-full text-[10.5px] text-muted font-medium hover:bg-hairline/60 hover:text-ink transition-colors"
+                        >
+                          {t('calendar.showLess')}
+                        </button>
+                      )}
+                    </DroppableDay>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+            {/* Next-month arrow — hover while dragging to carry an event forward a month */}
+            <MonthNavEdge dir="next" label={t('calendar.nextMonth')} onNav={nextMonth} droppable={dndEnabled} />
+            </div>
+
+            <DragOverlay dropAnimation={null}>
+              {activeEvent && (
+                <div className="flex items-stretch overflow-hidden rounded-lg bg-surface ring-1 ring-hairline shadow-xl scale-[1.03] min-w-[150px] max-w-[230px] cursor-grabbing">
+                  <EventChipContent event={activeEvent} />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
         ) : (
           // ── Agenda / list view ───────────────────────────────────────────────
           <div className="space-y-4 max-w-2xl">
@@ -697,11 +1022,11 @@ export default function CalendarPage() {
               const isToday = dateStr === TODAY_STR;
               return (
                 <div key={dateStr}>
-                  <div className={`flex items-center gap-2 mb-2 ${isToday ? 'text-accent' : 'text-muted'}`}>
-                    <span className={`text-xs font-semibold ${isToday ? 'text-accent' : 'text-muted'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`text-xs font-semibold ${isToday ? 'text-accent' : 'text-ink'}`}>
                       {d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
-                    <div className="flex-1 h-px bg-hairline" />
+                    <div className="flex-1 h-px bg-hairline/60" />
                     <span className="text-[10px] text-muted">{t('calendar.allDayEvents', { n: dayEvents.length })}</span>
                   </div>
                   <div className="space-y-1">
@@ -712,31 +1037,34 @@ export default function CalendarPage() {
                         <button
                           key={ev.id}
                           onClick={() => setSelectedEvent(ev)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 bg-surface border border-hairline rounded-xl hover:border-accent/30 transition-all text-left ${
+                          className={`w-full flex items-stretch overflow-hidden bg-surface ring-1 ring-hairline rounded-xl hover:ring-accent/30 hover:shadow-sm transition-all text-left ${
                             isCancelled ? 'opacity-60' : ''
                           }`}
                         >
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[ev.status] ?? STATUS_DOT.planned}`} />
-                          <KolAvatar handle={ev.handle} avatarUrl={ev.avatar_url} size="sm" />
-                          <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-medium text-ink truncate ${isCancelled ? 'line-through' : ''}`}>
-                              {ev.kol_name}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              {ev.platform && <PlatformLogo name={ev.platform} size={12} />}
-                              <span className="text-[11px] text-muted truncate">@{ev.handle}</span>
-                              {ev.campaign_code && (
-                                <span className="text-[10px] text-muted/70">· {ev.campaign_code}</span>
-                              )}
-                            </div>
-                          </div>
-                          {(ev.product_name || ev.store_name) && (
-                            <span className="text-[11px] text-muted truncate max-w-[100px] shrink-0 hidden sm:block">
-                              {ev.product_name ?? ev.store_name}
+                          {/* Status stripe — same language as the month chips */}
+                          <span className={`w-1 self-stretch shrink-0 ${STATUS_DOT[ev.status] ?? STATUS_DOT.planned}`} />
+                          <span className="flex-1 min-w-0 flex items-center gap-3 pl-3 pr-3 py-2.5">
+                            <KolAvatar handle={ev.handle} avatarUrl={ev.avatar_url} size="sm" />
+                            <span className="flex-1 min-w-0">
+                              <span className={`block text-sm font-medium text-ink truncate ${isCancelled ? 'line-through' : ''}`}>
+                                {ev.kol_name}
+                              </span>
+                              <span className="flex items-center gap-1.5 mt-0.5">
+                                {ev.platform && <PlatformLogo name={ev.platform} size={12} />}
+                                <span className="text-[11px] text-muted truncate">@{ev.handle}</span>
+                                {ev.campaign_code && (
+                                  <span className="text-[10px] text-muted/70">· {ev.campaign_code}</span>
+                                )}
+                              </span>
                             </span>
-                          )}
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${chipCls}`}>
-                            {ev.status}
+                            {(ev.product_name || ev.store_name) && (
+                              <span className="text-[11px] text-muted truncate max-w-[100px] shrink-0 hidden sm:block">
+                                {ev.product_name ?? ev.store_name}
+                              </span>
+                            )}
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${chipCls}`}>
+                              {ev.status}
+                            </span>
                           </span>
                         </button>
                       );
@@ -751,7 +1079,24 @@ export default function CalendarPage() {
 
       {/* Event detail modal */}
       {selectedEvent && (
-        <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        <EventDetailModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          canReschedule={canDrag && selectedEvent.status !== 'cancelled'}
+          onReschedule={date => performReschedule(selectedEvent, date, selectedEvent.date)}
+        />
+      )}
+
+      {/* Toast (reschedule confirmation / undo / error) */}
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          variant={toast.variant}
+          duration={toast.duration}
+          action={toast.action}
+          onClose={closeToast}
+        />
       )}
     </div>
   );

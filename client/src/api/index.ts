@@ -581,13 +581,14 @@ async function downloadFile(path: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export const exportDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
+export const exportDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string; lang?: string }) => {
   const p = new URLSearchParams();
   if (params.brand_id) p.set('brand_id', params.brand_id);
   if (params.campaign_id) p.set('campaign_id', params.campaign_id);
   if (params.category_id) p.set('category_id', params.category_id);
   if (params.date_from) p.set('date_from', params.date_from);
   if (params.date_to) p.set('date_to', params.date_to);
+  if (params.lang) p.set('lang', params.lang);
   return downloadFile(`/api/dashboard/export?${p}`, `dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
@@ -653,13 +654,14 @@ export const getProductDashboard = (params: { brand_id?: string; campaign_id?: s
   return api<ProductDashboardOverview>(`/api/dashboard/products?${p}`);
 };
 
-export const exportProductDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string }) => {
+export const exportProductDashboard = (params: { brand_id?: string; campaign_id?: string; category_id?: string; date_from?: string; date_to?: string; lang?: string }) => {
   const p = new URLSearchParams();
   if (params.brand_id) p.set('brand_id', params.brand_id);
   if (params.campaign_id) p.set('campaign_id', params.campaign_id);
   if (params.category_id) p.set('category_id', params.category_id);
   if (params.date_from) p.set('date_from', params.date_from);
   if (params.date_to) p.set('date_to', params.date_to);
+  if (params.lang) p.set('lang', params.lang);
   return downloadFile(`/api/dashboard/products/export?${p}`, `product_dashboard_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
@@ -745,6 +747,14 @@ export const getCalendarKolLatest = (params: { kol_id: string; brand_id?: string
   return api<{ date: string | null }>(`/api/calendar/kol-latest?${p}`);
 };
 
+// Reschedule a placement's date (drag-to-move on the calendar).
+// Server writes target_pub_date (planned) or publication_date (posted) based on status.
+export const reschedulePlacement = (id: number, date: string) =>
+  api<{ ok: true; id: number; date: string; status: string; field: string }>(
+    `/api/placements/${id}/schedule`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date }) }
+  );
+
 // Bulk import placements from Excel
 export type ImportKind = 'online' | 'offline';
 
@@ -757,9 +767,12 @@ export type ImportRowResult = { rowNumber: number; raw: ImportRawRow; errors: st
 export type ImportValidateResponse = { summary: { total: number; valid: number; withErrors: number }; rows: ImportRowResult[] };
 export type ImportCommitResponse = { created: number; branchesCreated: number; failed: { rowNumber: number; error: string }[] };
 
-export async function downloadImportTemplate(kind: ImportKind, brandId?: number) {
+export async function downloadImportTemplate(kind: ImportKind, brandId?: number, lang?: string) {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
-  const qs = brandId != null ? `?brand_id=${brandId}` : '';
+  const params = new URLSearchParams();
+  if (brandId != null) params.set('brand_id', String(brandId));
+  if (lang) params.set('lang', lang);
+  const qs = params.size > 0 ? `?${params.toString()}` : '';
   const res = await fetch(`${API_BASE_URL}/api/placements/import/template/${kind}${qs}`, { headers: authHeader });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: i18n.t('download.templateFailed') }));

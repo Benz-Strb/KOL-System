@@ -3,7 +3,7 @@ import { X, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useModalTransition } from '../hooks/useModalTransition.js';
 import Select from './Select.js';
-import { createProduct } from '../api/index.js';
+import { createProduct, clearDropdownCache } from '../api/index.js';
 import type { ProductCategory } from '../api/index.js';
 
 interface Props {
@@ -37,6 +37,7 @@ export default function AddModelModal({ onClose, brandId, productCategories, onC
         product_category_id: categoryId ? Number(categoryId) : null,
         image_url: imageUrl.trim() || null,
       });
+      clearDropdownCache(); // bust cache so next page load fetches fresh products
       onCreated(product);
       requestClose();
     } catch (err: unknown) {
