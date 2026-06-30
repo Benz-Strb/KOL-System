@@ -6,6 +6,7 @@ import {
   getDropdowns, getProducts, getShops, getShopBranches, createPlacement, createStoreBranch,
   type Dropdowns, type Product, type Shop, type StoreBranch, type KolResult,
 } from '../api/index.js';
+import { useAuth } from '../context/AuthContext.js';
 import KolPicker from '../components/KolPicker.js';
 import Select from '../components/Select.js';
 import PlatformLogo from '../components/PlatformLogo.js';
@@ -56,6 +57,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 
 export default function NewPlacementPage() {
   const { t } = useTranslation();
+  const { appUser } = useAuth();
   const [dropdowns, setDropdowns] = useState<Dropdowns | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -69,6 +71,7 @@ export default function NewPlacementPage() {
   const [showAddBranch, setShowAddBranch] = useState(false);
   const [newBranch, setNewBranch] = useState('');
   const [branchError, setBranchError] = useState('');
+  const [branchLoading, setBranchLoading] = useState(false);
   const [showAddModel, setShowAddModel] = useState(false);
 
   useEffect(() => {
@@ -107,7 +110,7 @@ export default function NewPlacementPage() {
 
   async function handleAddBranch() {
     if (!newBranch.trim()) { setBranchError(t('newPlacement.branchNameRequired')); return; }
-    setBranchError('');
+    setBranchError(''); setBranchLoading(true);
     try {
       const created = await createStoreBranch({ shop_name: form.shop_name, branch: newBranch.trim() });
       setBranches(prev => [...prev, created]);
@@ -116,6 +119,8 @@ export default function NewPlacementPage() {
       setToast(t('newPlacement.branchAdded', { branch: created.branch }));
     } catch (err: unknown) {
       setBranchError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setBranchLoading(false);
     }
   }
 
@@ -189,6 +194,7 @@ export default function NewPlacementPage() {
           onClose={() => setShowAddModel(false)}
           brandId={Number(form.brand_id)}
           productCategories={dropdowns.productCategories}
+          isAdmin={appUser?.role === 'admin'}
           onCreated={product => {
             setProducts(prev => [...prev, product]);
             set('product_id', String(product.id));
@@ -369,8 +375,10 @@ export default function NewPlacementPage() {
                       </div>
                       {branchError && <p className="text-red-500 text-sm">{branchError}</p>}
                       <div className="flex gap-2 pt-1">
-                        <button type="button" onClick={handleAddBranch}
-                          className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">{t('common.save')}</button>
+                        <button type="button" onClick={handleAddBranch} disabled={branchLoading}
+                          className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 disabled:opacity-50 transition-all">
+                          {branchLoading ? t('common.saving') : t('common.save')}
+                        </button>
                         <button type="button" onClick={() => { setShowAddBranch(false); setBranchError(''); setNewBranch(''); }}
                           className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">{t('common.cancel')}</button>
                       </div>

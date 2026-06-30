@@ -824,3 +824,21 @@ export const resetUserPassword = (id: number, password: string) =>
   api<{ ok: boolean }>(`/api/admin/users/${id}/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
 export const createProduct = (body: { model_code: string; brand_id: number; product_category_id?: number | null; image_url?: string | null }) =>
   api<{ id: number; model_code: string }>('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+// อัปโหลดรูปสินค้า — อย่าตั้ง Content-Type เอง (ปล่อย browser ใส่ boundary)
+export const uploadProductImage = (file: File) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api<{ url: string }>('/api/products/image', { method: 'POST', body: fd });
+};
+
+export const createProductCategory = (name: string) =>
+  api<ProductCategory>('/api/product-categories', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  });
+export const updateProductCategory = (id: number, name: string) =>
+  api<ProductCategory>(`/api/product-categories/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  });
+export const deleteProductCategory = (id: number) =>
+  api<{ ok: boolean }>(`/api/product-categories/${id}`, { method: 'DELETE' });

@@ -148,11 +148,11 @@ export default function AdminUsersPage() {
     if (selectedBrandIds.length === 0) { setCreateError(t('adminUsers.brandRequired')); return; }
     setCreateLoading(true);
     try {
-      await createAdminUser({ ...form, brand_ids: selectedBrandIds });
+      const created = await createAdminUser({ ...form, brand_ids: selectedBrandIds });
       setCreatedInfo({ name: form.full_name, email: form.email, password: form.password });
       setForm({ email: '', full_name: '', role: 'marketing', password: generatePassword() });
       setSelectedBrandIds([]);
-      await load();
+      setUsers(prev => sortUsers([...prev, created]));
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -173,7 +173,7 @@ export default function AdminUsersPage() {
       setToast(`${user.full_name}: ${next ? t('adminUsers.activated') : t('adminUsers.deactivated')}`);
     } catch (err: unknown) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: user.is_active } : u));
-      alert(err instanceof Error ? err.message : t('common.error'));
+      setToast(err instanceof Error ? err.message : t('common.saveFailed'));
     }
   }
 
@@ -187,7 +187,7 @@ export default function AdminUsersPage() {
       setResetTarget(null);
       setResetPwd('');
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : t('common.error'));
+      setToast(err instanceof Error ? err.message : t('common.saveFailed'));
     } finally {
       setResetLoading(false);
     }
@@ -203,6 +203,7 @@ export default function AdminUsersPage() {
   }
 
   async function handleSaveUserBrands(userId: number) {
+    const prevUsers = users;
     setSavingUserBrands(true);
     try {
       const updated = await updateAdminUser(userId, { brand_ids: editingUserBrandIds });
@@ -210,7 +211,8 @@ export default function AdminUsersPage() {
       setToast(t('adminUsers.brandsUpdated'));
       setEditingUserBrandsId(null);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : t('common.error'));
+      setUsers(prevUsers);
+      setToast(err instanceof Error ? err.message : t('common.saveFailed'));
     } finally {
       setSavingUserBrands(false);
     }
@@ -219,14 +221,18 @@ export default function AdminUsersPage() {
   async function handleSaveEmail(userId: number) {
     const trimmed = editingEmail.trim().toLowerCase();
     if (!trimmed) return;
+    const prevUsers = users;
+    // optimistic apply
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, email: trimmed } : u));
+    setEditingEmailId(null);
     setSavingEmail(true);
     try {
       await updateAdminUser(userId, { email: trimmed });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, email: trimmed } : u));
       setToast(t('adminUsers.emailUpdated'));
-      setEditingEmailId(null);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : t('common.error'));
+      setUsers(prevUsers);
+      setEditingEmailId(userId);
+      setToast(err instanceof Error ? err.message : t('common.saveFailed'));
     } finally {
       setSavingEmail(false);
     }
@@ -262,6 +268,11 @@ export default function AdminUsersPage() {
       setEditingBrandId(null);
       return;
     }
+    const prevBrands = brands;
+    // optimistic apply
+    const optimisticBrand = { ...brand, ...(nameChanged ? { name: trimmedName } : {}), ...(logoChanged ? { logo_url: trimmedLogo || null } : {}) };
+    setBrands(prev => prev.map(b => b.id === brand.id ? optimisticBrand : b).sort((a, b) => a.name.localeCompare(b.name)));
+    setEditingBrandId(null);
     setEditBrandLoading(true);
     try {
       const updated = await updateAdminBrand(brand.id, {
@@ -270,9 +281,9 @@ export default function AdminUsersPage() {
       });
       setBrands(prev => prev.map(b => b.id === updated.id ? updated : b).sort((a, b) => a.name.localeCompare(b.name)));
       setToast(t('adminUsers.brandSaved', { name: updated.name }));
-      setEditingBrandId(null);
     } catch (err: unknown) {
-      setToast(err instanceof Error ? err.message : t('common.error'));
+      setBrands(prevBrands);
+      setToast(err instanceof Error ? err.message : t('common.saveFailed'));
     } finally {
       setEditBrandLoading(false);
     }
@@ -287,7 +298,7 @@ export default function AdminUsersPage() {
       setToast(`${brand.name}: ${next ? t('adminUsers.activated') : t('adminUsers.deactivated')}`);
     } catch (err: unknown) {
       setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, active: brand.active } : b));
-      alert(err instanceof Error ? err.message : t('common.error'));
+      setToast(err instanceof Error ? err.message : t('common.saveFailed'));
     }
   }
 

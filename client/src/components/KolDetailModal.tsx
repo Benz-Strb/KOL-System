@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Plus, Trash2, ExternalLink, Tag } from 'lucide-react';
 import type { KolDirectoryRow, CommercialTerm, ContactInfo, KolPlatformAccount, KolPlatformsBundle, Platform, KolPost, KolHireHistoryItem } from '../api/index.js';
@@ -52,12 +52,19 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
 
   async function handleSave() {
     setSaving(true); setError(''); setSuccess(false);
+    const prevUpdate = {
+      custom_tags: kol.custom_tags,
+      main_selling_points: kol.main_selling_points,
+      contact_info: kol.contact_info,
+    };
+    const optimisticUpdate = {
+      custom_tags: tags,
+      main_selling_points: selling || null,
+      contact_info: (contact.email || contact.whatsapp || contact.line || contact.other) ? contact : null,
+    };
+    onUpdated(optimisticUpdate);
     try {
-      const res = await updateKol(kol.id, {
-        custom_tags: tags,
-        main_selling_points: selling || null,
-        contact_info: (contact.email || contact.whatsapp || contact.line || contact.other) ? contact : null,
-      });
+      const res = await updateKol(kol.id, optimisticUpdate);
       onUpdated({
         custom_tags: res.custom_tags,
         main_selling_points: res.main_selling_points,
@@ -66,6 +73,7 @@ function ProfileTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: P
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (e: unknown) {
+      onUpdated(prevUpdate);
       setError(e instanceof Error ? e.message : t('common.error'));
     } finally {
       setSaving(false);
@@ -250,21 +258,44 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
   async function handleCreate() {
     if (!form.pricing_type) return;
     setSaving(true); setError('');
+    const tempId = -Date.now();
+    const now = new Date().toISOString();
+    const payload = {
+      brand_id: form.brand_id ? Number(form.brand_id) : null,
+      pricing_type: form.pricing_type,
+      single_post_price: form.single_post_price || undefined,
+      package_price: form.package_price || undefined,
+      multi_platform_price: form.multi_platform_price || undefined,
+      is_barter: form.is_barter,
+      notes: form.notes || undefined,
+    };
+    // optimistic insert with temp id (negative = not yet committed)
+    const brandRow = payload.brand_id ? (brands.find(b => b.id === payload.brand_id) ?? null) : null;
+    const optimisticTerm: CommercialTerm & { __pending?: boolean } = {
+      id: tempId,
+      kol_id: kol.id,
+      brand_id: payload.brand_id ?? null,
+      pricing_type: payload.pricing_type,
+      is_barter: payload.is_barter ?? false,
+      single_post_price: payload.single_post_price ?? null,
+      package_price: payload.package_price ?? null,
+      multi_platform_price: payload.multi_platform_price ?? null,
+      notes: payload.notes ?? null,
+      created_at: now,
+      updated_at: now,
+      brands: brandRow,
+      __pending: true,
+    };
+    setTerms(prev => [optimisticTerm, ...prev]);
+    setShowForm(false);
+    setForm({ pricing_type: 'single_cooperation', brand_id: '', single_post_price: '', package_price: '', multi_platform_price: '', is_barter: false, notes: '' });
     try {
-      const term = await createKolTerm(kol.id, {
-        brand_id: form.brand_id ? Number(form.brand_id) : null,
-        pricing_type: form.pricing_type,
-        single_post_price: form.single_post_price || undefined,
-        package_price: form.package_price || undefined,
-        multi_platform_price: form.multi_platform_price || undefined,
-        is_barter: form.is_barter,
-        notes: form.notes || undefined,
-      });
-      setTerms(prev => [term, ...prev]);
-      setShowForm(false);
-      setForm({ pricing_type: 'single_cooperation', brand_id: '', single_post_price: '', package_price: '', multi_platform_price: '', is_barter: false, notes: '' });
+      const real = await createKolTerm(kol.id, payload);
+      setTerms(prev => prev.map(t => t.id === tempId ? real : t));
     } catch (e: unknown) {
+      setTerms(prev => prev.filter(t => t.id !== tempId));
       setError(e instanceof Error ? e.message : t('common.error'));
+      setShowForm(true);
     } finally {
       setSaving(false);
     }
@@ -272,8 +303,13 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
 
   async function handleDelete(termId: number) {
     if (!confirm(t('kolDetail.confirmDeleteTerm'))) return;
-    await deleteKolTerm(termId);
-    setTerms(prev => prev.filter(term => term.id !== termId));
+    const prev = terms;
+    setTerms(p => p.filter(term => term.id !== termId));
+    try {
+      await deleteKolTerm(termId);
+    } catch {
+      setTerms(prev);
+    }
   }
 
   if (loading) return (
@@ -288,39 +324,42 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
         <p className="text-sm text-muted text-center py-6">{t('kolDetail.noTermsYet')}</p>
       )}
 
-      {terms.map(term => (
-        <div key={term.id} className="bg-canvas border border-hairline rounded-xl px-4 py-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-ink">{t(`pricingType.${term.pricing_type}`, { defaultValue: term.pricing_type })}</span>
-                {term.is_barter && (
-                  <span className="text-[10px] px-1.5 py-px bg-orange-500/10 text-orange-600 rounded-full font-medium">Barter</span>
-                )}
-                {term.brands && (
-                  <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full">{term.brands.name}</span>
-                )}
+      {terms.map(term => {
+        const isPending = (term as { __pending?: boolean }).__pending;
+        return (
+          <div key={term.id} className={`bg-canvas border border-hairline rounded-xl px-4 py-3 transition-opacity ${isPending ? 'opacity-60' : ''}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-ink">{t(`pricingType.${term.pricing_type}`, { defaultValue: term.pricing_type })}</span>
+                  {term.is_barter && (
+                    <span className="text-[10px] px-1.5 py-px bg-orange-500/10 text-orange-600 rounded-full font-medium">Barter</span>
+                  )}
+                  {term.brands && (
+                    <span className="text-[10px] px-1.5 py-px bg-accent/10 text-accent rounded-full">{term.brands.name}</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                  {term.single_post_price && (
+                    <span className="text-xs text-muted">{t('kolDetail.perPost')} <span className="text-ink font-medium font-mono">{formatPrice(term.single_post_price)}</span></span>
+                  )}
+                  {term.package_price && (
+                    <span className="text-xs text-muted">{t('kolDetail.packageLabel')} <span className="text-ink font-medium font-mono">{formatPrice(term.package_price)}</span></span>
+                  )}
+                  {term.multi_platform_price && (
+                    <span className="text-xs text-muted">Multi-plat <span className="text-ink font-medium font-mono">{formatPrice(term.multi_platform_price)}</span></span>
+                  )}
+                </div>
+                {term.notes && <p className="text-xs text-muted mt-1">{term.notes}</p>}
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
-                {term.single_post_price && (
-                  <span className="text-xs text-muted">{t('kolDetail.perPost')} <span className="text-ink font-medium font-mono">{formatPrice(term.single_post_price)}</span></span>
-                )}
-                {term.package_price && (
-                  <span className="text-xs text-muted">{t('kolDetail.packageLabel')} <span className="text-ink font-medium font-mono">{formatPrice(term.package_price)}</span></span>
-                )}
-                {term.multi_platform_price && (
-                  <span className="text-xs text-muted">Multi-plat <span className="text-ink font-medium font-mono">{formatPrice(term.multi_platform_price)}</span></span>
-                )}
-              </div>
-              {term.notes && <p className="text-xs text-muted mt-1">{term.notes}</p>}
+              <button onClick={() => !isPending && handleDelete(term.id)} disabled={isPending}
+                className="text-muted hover:text-red-500 disabled:opacity-30 transition-colors p-1 shrink-0">
+                <Trash2 size={13} />
+              </button>
             </div>
-            <button onClick={() => handleDelete(term.id)}
-              className="text-muted hover:text-red-500 transition-colors p-1 shrink-0">
-              <Trash2 size={13} />
-            </button>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {showForm && (
         <div className="bg-canvas border border-accent/30 rounded-xl px-4 py-4 space-y-3">
@@ -398,7 +437,13 @@ function TermsTab({ kol }: { kol: KolDirectoryRow }) {
 // One card per platform account this kol has, each independently editable —
 // follower_count especially, since that's the field that genuinely changes
 // often (the tier trigger fires automatically on the DB side either way).
-function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canDelete: boolean; onChanged: (b: KolPlatformsBundle) => void }) {
+function PlatformCard({ p, canDelete, onChanged, onOptimisticDelete, onDeleteFailed }: {
+  p: KolPlatformAccount;
+  canDelete: boolean;
+  onChanged: (b: KolPlatformsBundle) => void;
+  onOptimisticDelete: () => void;
+  onDeleteFailed: (msg: string) => void;
+}) {
   const { t } = useTranslation();
   const [handle, setHandle] = useState(p.handle);
   const [follower, setFollower] = useState(p.follower_count != null ? String(p.follower_count) : '');
@@ -423,12 +468,11 @@ function PlatformCard({ p, canDelete, onChanged }: { p: KolPlatformAccount; canD
 
   async function handleDelete() {
     if (!confirm(t('kolDetail.confirmDeletePlatform', { platform: p.platform_name, handle: p.handle }))) return;
-    setSaving(true); setError('');
+    onOptimisticDelete();
     try {
       onChanged(await deleteKolPlatform(p.id));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t('common.error'));
-      setSaving(false);
+      onDeleteFailed(e instanceof Error ? e.message : t('common.error'));
     }
   }
 
@@ -497,6 +541,8 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
   const [form, setForm] = useState({ platform_id: '', handle: '', follower_count: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const savedPlatformsRef = useRef<KolPlatformAccount[]>([]);
 
   useEffect(() => { getDropdowns().then(d => setAllPlatforms(d.platforms)); }, []);
 
@@ -533,8 +579,23 @@ function PlatformTab({ kol, onUpdated }: { kol: KolDirectoryRow; onUpdated: (u: 
 
   return (
     <div className="space-y-3">
+      {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
       {platforms.map(p => (
-        <PlatformCard key={p.id} p={p} canDelete={platforms.length > 1} onChanged={applyBundle} />
+        <PlatformCard
+          key={p.id}
+          p={p}
+          canDelete={platforms.length > 1}
+          onChanged={applyBundle}
+          onOptimisticDelete={() => {
+            savedPlatformsRef.current = [...platforms];
+            setDeleteError('');
+            setPlatforms(prev => prev.filter(x => x.id !== p.id));
+          }}
+          onDeleteFailed={(msg) => {
+            setPlatforms(savedPlatformsRef.current);
+            setDeleteError(msg);
+          }}
+        />
       ))}
 
       {showForm && (

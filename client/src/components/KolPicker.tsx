@@ -40,6 +40,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
   const [loading, setLoading] = useState(false);
   const [newKol, setNewKol] = useState({ handle: '', gen_name: '', platform_id: '', follower_count: '' });
   const [addError, setAddError] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchSeq = useRef(0);
 
@@ -76,7 +77,7 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
 
   async function handleAddKol() {
     if (!newKol.handle.trim()) { setAddError(t('kolPicker.handleRequired')); return; }
-    setAddError('');
+    setAddError(''); setAddLoading(true);
     try {
       const created = await createKol({
         handle: newKol.handle.trim(),
@@ -90,6 +91,8 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
       setNewKol({ handle: '', gen_name: '', platform_id: '', follower_count: '' });
     } catch (err: unknown) {
       setAddError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setAddLoading(false);
     }
   }
 
@@ -204,9 +207,9 @@ export default function KolPicker({ value, onChange, platforms, onAdded }: Props
             </div>
             {addError && <p className="text-red-500 text-sm">{addError}</p>}
             <div className="flex gap-2 pt-1">
-              <button type="button" onClick={handleAddKol}
-                className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 transition-all">
-                {t('common.save')}
+              <button type="button" onClick={handleAddKol} disabled={addLoading}
+                className="flex-1 py-2 bg-accent text-white text-sm font-medium rounded-full hover:bg-accent-hover active:scale-95 disabled:opacity-50 transition-all">
+                {addLoading ? t('common.saving') : t('common.save')}
               </button>
               <button type="button" onClick={() => { setShowAddForm(false); setAddError(''); setNewKol({ handle: '', gen_name: '', platform_id: '', follower_count: '' }); }}
                 className="flex-1 py-2 border border-hairline text-ink text-sm rounded-full hover:bg-canvas active:scale-95 transition-all">

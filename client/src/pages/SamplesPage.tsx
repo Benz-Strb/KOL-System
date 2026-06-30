@@ -6,11 +6,13 @@ import {
   getDropdowns, getProducts, searchKols,
   type KolSample, type Brand, type Product, type KolResult,
 } from '../api/index.js';
+import { optimistic } from '../lib/optimistic.js';
 import { useAuth } from '../context/AuthContext.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
 import { getCached, setCached } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
+import Toast from '../components/Toast.js';
 import { numberLocale } from '../i18n/locale.js';
 
 const LIMIT = 25;
@@ -262,6 +264,7 @@ export default function SamplesPage() {
 
   const [brands, setBrands] = useState<Brand[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     getDropdowns().then(d => setBrands(d.brands));
@@ -306,25 +309,40 @@ export default function SamplesPage() {
     const next = STATUS_NEXT[sample.sample_status];
     if (!next) return;
     const now = new Date().toISOString().slice(0, 10);
-    const updated = await updateSample(sample.id, {
+    const optimisticSample: KolSample = {
+      ...sample,
       sample_status: next,
       ...(next === 'shipped' ? { shipped_at: now } : {}),
       ...(next === 'signed_for' ? { signed_at: now } : {}),
+    };
+    await optimistic({
+      apply: () => setRows(prev => prev.map(r => r.id === sample.id ? optimisticSample : r)),
+      rollback: () => setRows(prev => prev.map(r => r.id === sample.id ? sample : r)),
+      request: () => updateSample(sample.id, {
+        sample_status: next,
+        ...(next === 'shipped' ? { shipped_at: now } : {}),
+        ...(next === 'signed_for' ? { signed_at: now } : {}),
+      }).then(updated => setRows(prev => prev.map(r => r.id === sample.id ? updated : r))),
+      onError: () => setSaveErrorMsg(t('common.saveFailed')),
     });
-    setRows(prev => prev.map(r => r.id === sample.id ? updated : r));
   }
 
   async function handleDelete(id: number) {
     if (!confirm(t('samples.confirmDelete'))) return;
-    await deleteSample(id);
-    setRows(prev => prev.filter(r => r.id !== id));
-    setTotal(n => n - 1);
+    const prev = rows;
+    await optimistic({
+      apply: () => { setRows(r => r.filter(x => x.id !== id)); setTotal(n => n - 1); },
+      rollback: () => { setRows(prev); setTotal(n => n + 1); },
+      request: () => deleteSample(id),
+      onError: () => setSaveErrorMsg(t('common.saveFailed')),
+    });
   }
 
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
     <div className="px-4 sm:px-6 py-4 sm:py-6 max-w-screen-xl mx-auto">
+      {saveErrorMsg && <Toast message={saveErrorMsg} onClose={() => setSaveErrorMsg(null)} />}
       {/* Header + Filters */}
       <div className="mb-5 flex items-center justify-between gap-3 flex-wrap">
         <div>

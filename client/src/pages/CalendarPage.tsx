@@ -561,6 +561,11 @@ export default function CalendarPage() {
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; }, [load]);
 
+  // Latest events kept in a ref so reschedule can tell, without a stale closure,
+  // whether the dragged chip currently lives in the visible month.
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
+
   // Reset expanded cell when month changes
   useEffect(() => { setExpandedDate(null); }, [year, month]);
 
@@ -580,14 +585,19 @@ export default function CalendarPage() {
     ev: CalendarEvent, targetDate: string, fromDate: string,
   ): Promise<{ ok: boolean; superseded: boolean }> => {
     // Optimistic: move chip immediately (may leave the visible month — that's fine).
+    // Capture whether the chip is in the currently-loaded month BEFORE moving it:
+    // a same-month move is fully handled on screen, but a cross-month move can't
+    // be (the destination month isn't loaded), so only the latter needs a reload.
+    const wasVisible = eventsRef.current.some(e => e.id === ev.id);
     applyEventDate(ev.id, targetDate);
     invalidateCachePrefix('calendar:');
     const mySeq = ++rescheduleSeqRef.current;
     try {
       await reschedulePlacement(ev.id, targetDate);
-      // Resync the visible month so a cross-month move shows up in the
-      // destination (the optimistic update can't add it to another month).
-      loadRef.current();
+      // Only resync on a cross-month move so the chip appears in the destination.
+      // Skipping it for same-month moves removes the full-grid reload flicker that
+      // made every drag feel laggy even though the optimistic update was instant.
+      if (!wasVisible) loadRef.current();
       return { ok: true, superseded: rescheduleSeqRef.current !== mySeq };
     } catch {
       if (rescheduleSeqRef.current === mySeq) {
