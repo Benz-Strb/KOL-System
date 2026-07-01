@@ -9,6 +9,11 @@ import { createKol, clearDropdownCache, ApiError } from '../api/index.js';
 // server/src/routes/kols.ts around line 605): `{ error, kol: { id, handle, follower_count } }`.
 export type ExistingKol = { id: number; handle: string; follower_count: number | null };
 
+// What onCreated actually receives — ExistingKol plus platform_id, which is only reliably
+// known on the fresh-create path (the platform picked in this form). The 409 body doesn't
+// carry it, so the "use existing" path always passes null — see handleUseExisting() below.
+export type CreatedKol = ExistingKol & { platform_id: number | null };
+
 interface Props {
   onClose: () => void;
   prefillHandle: string;
@@ -16,7 +21,7 @@ interface Props {
   // Fires both on a fresh create AND when the user picks "use existing" after a
   // duplicate-handle conflict — either way the caller gets back a kol to merge
   // into its own lookups, so it only needs to handle one success path.
-  onCreated: (kol: ExistingKol) => void;
+  onCreated: (kol: CreatedKol) => void;
 }
 
 // Structurally mirrors AddModelModal.tsx's modal chrome (backdrop/panel transition,
@@ -52,7 +57,12 @@ export default function AddKolModal({ onClose, prefillHandle, platforms, onCreat
         follower_count: followerCount ? Number(followerCount) : undefined,
       });
       clearDropdownCache();
-      onCreated({ id: created.id, handle: created.handle, follower_count: created.follower_count });
+      onCreated({
+        id: created.id,
+        handle: created.handle,
+        follower_count: created.follower_count,
+        platform_id: platformId ? Number(platformId) : null,
+      });
       requestClose();
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 409) {
@@ -70,7 +80,11 @@ export default function AddKolModal({ onClose, prefillHandle, platforms, onCreat
   function handleUseExisting() {
     if (!duplicateKol) return;
     clearDropdownCache();
-    onCreated(duplicateKol);
+    // platform_id: null — the 409 body doesn't include it (see ExistingKol above), but this
+    // KOL already existed before this import session started, so it's already present in
+    // ImportEditGrid's lookups.kols (fetched at file-validate time) with its real platform_id;
+    // this null entry is a harmless duplicate that lookups there never resolve to first.
+    onCreated({ ...duplicateKol, platform_id: null });
     requestClose();
   }
 

@@ -7,7 +7,7 @@ import {
 } from '../api/index.js';
 import Select, { DropdownPanel } from './Select.js';
 import AddModelModal from './AddModelModal.js';
-import AddKolModal, { type ExistingKol } from './AddKolModal.js';
+import AddKolModal, { type CreatedKol } from './AddKolModal.js';
 import Toast from './Toast.js';
 
 // Phase 5 — exact error-string prefixes resolveRow() (server/src/routes/placementsImport.ts)
@@ -630,14 +630,14 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
           prefillHandle={addKolState.handleText}
           platforms={lookups.platforms}
           onClose={() => setAddKolState(null)}
-          onCreated={(kol: ExistingKol) => {
+          onCreated={(kol: CreatedKol) => {
             setLookups(prev => ({
               ...prev,
               kols: [...prev.kols, {
                 id: kol.id,
                 handle: kol.handle,
                 handle_normalized: normalizeHandle(kol.handle),
-                platform_id: null,
+                platform_id: kol.platform_id,
                 follower_count: kol.follower_count,
               }],
             }));
