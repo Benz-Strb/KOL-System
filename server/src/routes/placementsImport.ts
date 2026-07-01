@@ -1311,6 +1311,20 @@ app.get('/files', async c => {
   }
 });
 
+// Builds a Content-Disposition header value that is safe for arbitrary
+// Unicode filenames (e.g. Thai original_filename values). Header values must
+// be ByteStrings (Latin1) — a raw non-ASCII filename interpolated straight
+// into the header throws a TypeError when the Response is constructed. Per
+// RFC 6266/5987 we provide an ASCII-only `filename="..."` fallback plus a
+// `filename*=UTF-8''...` percent-encoded param that modern browsers prefer.
+function buildContentDisposition(rawFilename: string, asciiFallback: string): string {
+  const cleaned = rawFilename.replace(/["\r\n]/g, '');
+  const isAsciiSafe = /^[\x20-\x7e]+$/.test(cleaned);
+  const asciiName = isAsciiSafe ? cleaned : asciiFallback;
+  const encoded = encodeURIComponent(cleaned);
+  return `attachment; filename="${asciiName}"; filename*=UTF-8''${encoded}`;
+}
+
 // ─── GET /files/:id/download — private-bucket proxy (Phase 6) ──────────
 // Bucket `import-files` is private (D2/D6 of the import-upgrade plan) — the
 // browser never gets a direct Supabase Storage URL. Only the owner or an
@@ -1349,7 +1363,7 @@ app.get('/files/:id/download', async c => {
     return new Response(bytes, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
+        'Content-Disposition': buildContentDisposition(filename, `import_${id}.xlsx`),
       },
     });
   } catch (err) {
