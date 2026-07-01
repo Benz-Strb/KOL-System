@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
@@ -6,12 +6,16 @@ import {
   FileSpreadsheet, Loader2, AlertCircle, X, Globe, Store,
 } from 'lucide-react';
 import {
-  downloadImportTemplate, validateImportFile, commitImport,
+  downloadImportTemplate, validateImportFile, commitImport, listImportFiles, downloadImportFile, getAdminUsers,
   type ImportKind, type ImportRowResult, type ImportValidateResponse, type ImportCommitResponse,
+  type ImportFileRow, type AdminUser,
 } from '../api/index.js';
+import { useAuth } from '../context/AuthContext.js';
+import { numberLocale } from '../i18n/locale.js';
 import Toast from '../components/Toast.js';
 import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
 import ImportEditGrid from '../components/ImportEditGrid.js';
+import Select from '../components/Select.js';
 
 const cardCls = 'bg-surface border border-hairline rounded-xl p-5';
 
@@ -26,6 +30,8 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
 
 export default function ImportPlacementsPage() {
   const { t } = useTranslation();
+  const { appUser } = useAuth();
+  const isAdmin = appUser?.role === 'admin';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
   const [kind, setKind] = useState<ImportKind>('online');
@@ -44,6 +50,58 @@ export default function ImportPlacementsPage() {
   const [commitResult, setCommitResult] = useState<ImportCommitResponse | null>(null);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
+
+  // ─── "ประวัติไฟล์" (history) tab — Phase 6 ──────────────────────────
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyRows, setHistoryRows] = useState<ImportFileRow[]>([]);
+  const [historyUserFilter, setHistoryUserFilter] = useState(''); // '' = everyone (admin only)
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const historySeq = useRef(0);
+
+  // Lazy-load the file list only once the user actually opens the history tab, and
+  // re-fetch whenever the admin's "ผู้ใช้" filter changes — race guard (§9 CLAUDE.md)
+  // since switching the filter quickly could otherwise let a stale response win.
+  useEffect(() => {
+    if (activeTab !== 'history') return;
+    const mySeq = ++historySeq.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHistoryLoading(true);
+    listImportFiles(isAdmin && historyUserFilter ? { userId: Number(historyUserFilter) } : {})
+      .then(rows => {
+        if (historySeq.current !== mySeq) return;
+        setHistoryRows(rows);
+        setHistoryLoaded(true);
+      })
+      .catch((err: unknown) => {
+        if (historySeq.current !== mySeq) return;
+        setError(err instanceof Error ? err.message : t('importPlacements.files.loadFailed'));
+      })
+      .finally(() => {
+        if (historySeq.current !== mySeq) return;
+        setHistoryLoading(false);
+      });
+  }, [activeTab, historyUserFilter, isAdmin, t]);
+
+  // Admin-only user list for the filter dropdown — loaded lazily alongside the file
+  // list itself (only ever needed once, so guard on the array already being filled).
+  useEffect(() => {
+    if (!isAdmin || activeTab !== 'history' || adminUsers.length > 0) return;
+    getAdminUsers().then(setAdminUsers).catch(() => {});
+  }, [isAdmin, activeTab, adminUsers.length]);
+
+  async function handleDownloadFile(row: ImportFileRow) {
+    setError('');
+    setDownloadingId(row.id);
+    try {
+      await downloadImportFile(row.id, row.original_filename ?? undefined);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('download.failed'));
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   function handleReset() {
     setFileName('');
@@ -263,9 +321,77 @@ export default function ImportPlacementsPage() {
 
       {activeTab === 'history' && (
         <div className={cardCls}>
-          <div className="text-center py-16">
-            <p className="text-sm font-medium text-ink">{t('importPlacements.historyEmptyTitle')}</p>
-          </div>
+          {isAdmin && (
+            <div className="mb-4 flex items-center gap-2">
+              <span className="text-sm text-muted shrink-0">{t('importPlacements.files.userFilterLabel')}</span>
+              <Select
+                size="sm"
+                className="w-60"
+                value={historyUserFilter}
+                onChange={setHistoryUserFilter}
+                placeholder={t('importPlacements.files.userFilterAll')}
+                options={[
+                  { id: '', label: t('importPlacements.files.userFilterAll') },
+                  ...adminUsers.map(u => ({ id: u.id, label: u.full_name })),
+                ]}
+              />
+            </div>
+          )}
+
+          {historyLoading && (
+            <div className="py-16 text-center">
+              <Loader2 size={20} className="animate-spin text-accent inline-block" />
+            </div>
+          )}
+
+          {!historyLoading && historyLoaded && historyRows.length === 0 && (
+            <div className="text-center py-16">
+              <p className="text-sm font-medium text-ink">
+                {historyUserFilter ? t('importPlacements.files.noResultsFiltered') : t('importPlacements.historyEmptyTitle')}
+              </p>
+            </div>
+          )}
+
+          {!historyLoading && historyRows.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-hairline">
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colFilename')}</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colType')}</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colCount')}</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colBrand')}</th>
+                    <th className="px-3 py-2.5 text-left text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colDate')}</th>
+                    {isAdmin && <th className="px-3 py-2.5 text-left text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colCreator')}</th>}
+                    <th className="px-3 py-2.5 text-right text-xs font-medium text-muted uppercase tracking-wider">{t('importPlacements.files.colDownload')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hairline">
+                  {historyRows.map(row => (
+                    <tr key={row.id} className="hover:bg-canvas transition-colors">
+                      <td className="px-3 py-3 text-ink text-sm truncate max-w-xs">{row.original_filename ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-muted">{row.kind === 'online' ? 'Online' : t('importPlacements.offlineLabel')}</td>
+                      <td className="px-3 py-3 text-right text-sm tabular-nums font-mono text-muted">{row.placement_count}</td>
+                      <td className="px-3 py-3 text-sm text-muted">{row.brand_summary ?? '—'}</td>
+                      <td className="px-3 py-3 text-sm text-muted whitespace-nowrap">{new Date(row.created_at).toLocaleDateString(numberLocale())}</td>
+                      {isAdmin && <td className="px-3 py-3 text-sm text-muted">{row.user.name}</td>}
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadFile(row)}
+                          disabled={downloadingId === row.id}
+                          aria-label={t('importPlacements.files.downloadAria', { filename: row.original_filename ?? '' })}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-hairline text-ink hover:bg-canvas active:scale-95 disabled:opacity-50 transition-all"
+                        >
+                          {downloadingId === row.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import ExcelJS from 'exceljs';
 import { requireAuth } from '../middleware/auth.js';
@@ -1256,6 +1257,104 @@ app.post('/commit', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to commit import' }, 500);
+  }
+});
+
+// ─── GET /files — history tab list (Phase 6) ───────────────────────────
+// non-admin: always scoped to the caller's own files (?userId is ignored,
+// not honored/403'd — see phase-6-brief.md §9.1). admin: sees everything by
+// default, ?userId= narrows to one user. import_files.kind is already stored
+// as the URL-facing 'online'/'offline' pair (see POST /commit above), so no
+// extra mapping via parseKindParam() is needed here — just validate it.
+app.get('/files', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const isAdmin = user.role === 'admin';
+
+    const where: Prisma.import_filesWhereInput = {};
+    if (isAdmin) {
+      const userIdParam = c.req.query('userId');
+      if (userIdParam) {
+        const uid = Number(userIdParam);
+        if (Number.isFinite(uid)) where.user_id = uid;
+      }
+    } else {
+      where.user_id = user.id;
+    }
+
+    const kindParam = c.req.query('kind');
+    if (kindParam === 'online' || kindParam === 'offline') where.kind = kindParam;
+
+    const rows = await prisma.import_files.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true, kind: true, original_filename: true, placement_count: true,
+        brand_summary: true, created_at: true,
+        users: { select: { id: true, full_name: true, email: true } },
+      },
+    });
+
+    return c.json(rows.map(r => ({
+      id: r.id,
+      kind: r.kind,
+      original_filename: r.original_filename,
+      placement_count: r.placement_count,
+      brand_summary: r.brand_summary,
+      created_at: r.created_at,
+      user: { id: r.users.id, name: r.users.full_name, email: r.users.email },
+    })));
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to list import files' }, 500);
+  }
+});
+
+// ─── GET /files/:id/download — private-bucket proxy (Phase 6) ──────────
+// Bucket `import-files` is private (D2/D6 of the import-upgrade plan) — the
+// browser never gets a direct Supabase Storage URL. Only the owner or an
+// admin may pull the bytes through here; anyone else gets an explicit 403
+// (not a 404) per the brief's acceptance criteria.
+app.get('/files/:id/download', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400);
+
+    const file = await prisma.import_files.findUnique({
+      where: { id },
+      select: { user_id: true, storage_path: true, original_filename: true },
+    });
+    if (!file) return c.json({ error: 'not found' }, 404);
+
+    const isAdmin = user.role === 'admin';
+    if (!isAdmin && file.user_id !== user.id) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+
+    const env = c.env;
+    const objRes = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/import-files/${file.storage_path}`,
+      { headers: { Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } },
+    );
+    if (!objRes.ok) {
+      console.error('[import/files/download] storage fetch failed', objRes.status, await objRes.text().catch(() => ''));
+      return c.json({ error: 'ไม่พบไฟล์ในที่เก็บ — อาจถูกลบไปแล้ว' }, 502);
+    }
+
+    const bytes = new Uint8Array(await objRes.arrayBuffer());
+    const filename = file.original_filename || `import_${id}.xlsx`;
+    return new Response(bytes, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to download import file' }, 500);
   }
 });
 

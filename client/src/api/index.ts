@@ -866,6 +866,49 @@ export const validateImportRows = (kind: ImportKind, rows: { rowNumber: number; 
     body: JSON.stringify({ rows: rows.map(r => ({ rowNumber: r.rowNumber, ...r.raw })) }),
   });
 
+// Phase 6 — "ประวัติไฟล์" (file history) tab
+export type ImportFileRow = {
+  id: number;
+  kind: ImportKind;
+  original_filename: string | null;
+  placement_count: number;
+  brand_summary: string | null;
+  created_at: string;
+  user: { id: number; name: string; email: string | null };
+};
+
+export const listImportFiles = (params: { userId?: number; kind?: ImportKind } = {}) => {
+  const p = new URLSearchParams();
+  if (params.userId) p.set('userId', String(params.userId));
+  if (params.kind) p.set('kind', params.kind);
+  const qs = p.size > 0 ? `?${p.toString()}` : '';
+  return api<ImportFileRow[]>(`/api/placements/import/files${qs}`);
+};
+
+// Mirrors downloadImportTemplate()'s blob-fetch-and-trigger-download pattern — the
+// bucket behind this is private, so the filename always comes from the proxy
+// endpoint's own Content-Disposition header rather than being guessed client-side.
+export async function downloadImportFile(id: number, fallbackFilename = `import_${id}.xlsx`) {
+  const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
+  const res = await fetch(`${API_BASE_URL}/api/placements/import/files/${id}/download`, { headers: authHeader });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: i18n.t('download.failed') }));
+    throw new Error(err.error ?? i18n.t('download.failed'));
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename="?([^"]+)"?/.exec(disposition);
+  const filename = match?.[1] || fallbackFilename;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Auth
 export const getMe = () => api<AppUser>('/api/auth/me');
 
