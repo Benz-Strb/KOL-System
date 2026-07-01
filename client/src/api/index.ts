@@ -771,16 +771,17 @@ export type ImportKind = 'online' | 'offline';
 export type ImportRawRow = {
   brand: string; kolHandle: string; platform: string; follower: string;
   model: string; shopBranch: string; campaign: string; targetPubDate: string;
-  paymentType: string; finalPrice: string; adsCost: string; notes: string;
+  paymentType: string; finalPrice: string; adsCost: string;
+  adContentName: string; utmCampaignName: string; shopeeUtm: string; lazadaUtm: string; websiteUtm: string;
+  notes: string;
 };
 export type ImportRowResult = { rowNumber: number; raw: ImportRawRow; errors: string[]; warnings: string[] };
 export type ImportValidateResponse = { summary: { total: number; valid: number; withErrors: number }; rows: ImportRowResult[] };
 export type ImportCommitResponse = { created: number; branchesCreated: number; failed: { rowNumber: number; error: string }[] };
 
-export async function downloadImportTemplate(kind: ImportKind, brandId?: number, lang?: string) {
+export async function downloadImportTemplate(kind: ImportKind, lang?: string) {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
   const params = new URLSearchParams();
-  if (brandId != null) params.set('brand_id', String(brandId));
   if (lang) params.set('lang', lang);
   const qs = params.size > 0 ? `?${params.toString()}` : '';
   const res = await fetch(`${API_BASE_URL}/api/placements/import/template/${kind}${qs}`, { headers: authHeader });

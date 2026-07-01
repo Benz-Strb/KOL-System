@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { requireAuth } from '../middleware/auth.js';
 import type { AuthUser } from '../middleware/auth.js';
 import type { AppEnv } from '../types.js';
+import { isSafeUrl } from '../lib/isSafeUrl.js';
 
 const app = new Hono<AppEnv>();
 app.use('*', requireAuth);
@@ -24,6 +25,7 @@ type TplStrings = {
   hdrCampaignDesc: string;
   datePrompt: string; dateErrTitle: string; dateErr: string;
   listPromptStrict: string; listPromptSoft: string; listErrTitle: string; listErr: string;
+  requiredLegend: string;
 };
 
 const TEMPLATE_I18N: Record<TplLang, TplStrings> = {
@@ -46,6 +48,7 @@ const TEMPLATE_I18N: Record<TplLang, TplStrings> = {
     listPromptSoft: 'เลือกจาก dropdown ถ้ามี หรือพิมพ์ค่าใหม่ได้ (เช่นรายการที่ยังไม่มีในระบบ)',
     listErrTitle: 'ค่าไม่ถูกต้อง',
     listErr: 'กรุณาเลือก{label}จากรายการใน dropdown (ดูชีต "{refSheet}" ประกอบ)',
+    requiredLegend: '* = คอลัมน์ที่ต้องกรอกข้อมูล (Final Price ต้องกรอกเมื่อประเภทการจ่ายเงิน = Paid เท่านั้น)',
   },
   en: {
     sheetOnline: 'Import Placement - Online',
@@ -66,6 +69,7 @@ const TEMPLATE_I18N: Record<TplLang, TplStrings> = {
     listPromptSoft: 'Pick from the dropdown if available, or type a new value (e.g. an item not yet in the system)',
     listErrTitle: 'Invalid value',
     listErr: 'Please select {label} from the dropdown list (see the "{refSheet}" sheet)',
+    requiredLegend: '* = required column (Final Price is required only when Payment Type = Paid)',
   },
   zh: {
     sheetOnline: '导入 Placement - Online',
@@ -86,6 +90,7 @@ const TEMPLATE_I18N: Record<TplLang, TplStrings> = {
     listPromptSoft: '如有可从下拉列表选择，或输入新值（例如系统中尚不存在的项目）',
     listErrTitle: '数值无效',
     listErr: '请从下拉列表选择{label}（参见 "{refSheet}" 工作表）',
+    requiredLegend: '* = 必填列（Final Price 仅在付款类型 = Paid 时才需要填写）',
   },
 };
 
@@ -93,22 +98,38 @@ function tpl(lang: string | undefined): TplStrings {
   return TEMPLATE_I18N[(lang === 'en' || lang === 'zh') ? lang : 'th'];
 }
 
+// Required columns get a trailing " *" — see T.requiredLegend (Reference sheet)
+// for what "*" means; Final Price is only conditionally required (payment=paid)
+// but still marked, matching the plan's table.
 function onlineHeaders(T: TplStrings): string[] {
-  return [T.hdrBrand, 'KOL Handle', 'Platform', 'Follower', 'Model', 'Campaign', T.hdrTargetDate, T.hdrPaymentType, T.hdrFinalPrice, T.hdrAdsCost, T.hdrNotes];
+  return [
+    `${T.hdrBrand} *`, 'KOL Handle *', 'Platform *', 'Follower *', 'Model *', 'Campaign *',
+    `${T.hdrTargetDate} *`, `${T.hdrPaymentType} *`, `${T.hdrFinalPrice} *`, T.hdrAdsCost,
+    'Ad Content Name', 'UTM Campaign Name', 'Shopee UTM', 'Lazada UTM', 'Website UTM', T.hdrNotes,
+  ];
 }
 function offlineHeaders(T: TplStrings): string[] {
-  return [T.hdrBrand, 'KOL Handle', 'Platform', 'Follower', T.hdrShopBranch, 'Campaign', T.hdrTargetDate, T.hdrPaymentType, T.hdrFinalPrice, T.hdrAdsCost, T.hdrNotes];
+  return [
+    `${T.hdrBrand} *`, 'KOL Handle *', 'Platform *', 'Follower *', `${T.hdrShopBranch} *`, 'Campaign *',
+    `${T.hdrTargetDate} *`, `${T.hdrPaymentType} *`, `${T.hdrFinalPrice} *`, T.hdrAdsCost, T.hdrNotes,
+  ];
 }
 
 export interface RawRow {
   brand: string; kolHandle: string; platform: string; follower: string;
   model: string; shopBranch: string; campaign: string; targetPubDate: string;
-  paymentType: string; finalPrice: string; adsCost: string; notes: string;
+  paymentType: string; finalPrice: string; adsCost: string;
+  adContentName: string; utmCampaignName: string; shopeeUtm: string; lazadaUtm: string; websiteUtm: string;
+  notes: string;
 }
 
+// Order matches onlineHeaders()/offlineHeaders() column order exactly — parsing
+// in rowToRaw() is positional (column i+1 -> keys[i]).
 const ONLINE_RAW_KEYS: (keyof RawRow)[] = [
   'brand', 'kolHandle', 'platform', 'follower', 'model', 'campaign',
-  'targetPubDate', 'paymentType', 'finalPrice', 'adsCost', 'notes',
+  'targetPubDate', 'paymentType', 'finalPrice', 'adsCost',
+  'adContentName', 'utmCampaignName', 'shopeeUtm', 'lazadaUtm', 'websiteUtm',
+  'notes',
 ];
 const OFFLINE_RAW_KEYS: (keyof RawRow)[] = [
   'brand', 'kolHandle', 'platform', 'follower', 'shopBranch', 'campaign',
@@ -217,9 +238,14 @@ interface ResolvedData {
   store_new_branch: string | null;
   campaign_id: number | null;
   target_pub_date: string | null;
-  payment_type: 'paid' | 'free' | 'barter';
+  payment_type: 'paid' | 'free' | 'barter' | null;
   final_price: string | null;
   ads_cost: string | null;
+  ad_content_name: string | null;
+  utm_campaign_name: string | null;
+  shopee_utm: string | null;
+  lazada_utm: string | null;
+  website_utm: string | null;
   notes: string | null;
 }
 
@@ -257,8 +283,13 @@ function resolveRow(
     const p = findByName(lk.platforms, raw.platform);
     if (!p) errors.push(`ไม่พบ Platform "${raw.platform}"`);
     else platform_id = p.id;
-  } else if (existingKol) {
+  } else if (existingKol?.platform_id != null) {
+    // blank cell but the KOL Handle column resolved to a known KOL — the template's
+    // VLOOKUP formula would normally have auto-filled this already; fall back the
+    // same way in case the user cleared/overwrote the formula.
     platform_id = existingKol.platform_id;
+  } else {
+    errors.push('ต้องระบุ Platform');
   }
 
   let follower_at_time: number | null = null;
@@ -266,19 +297,25 @@ function resolveRow(
     const n = Number(raw.follower.replace(/,/g, ''));
     if (!Number.isFinite(n) || n < 0) errors.push(`Follower "${raw.follower}" ไม่ใช่ตัวเลขที่ถูกต้อง`);
     else follower_at_time = Math.round(n);
-  } else if (existingKol) {
+  } else if (existingKol?.follower_count != null) {
     follower_at_time = existingKol.follower_count;
+  } else {
+    errors.push('ต้องระบุ Follower');
   }
 
   let product_id: number | null = null;
-  if (placementType === 'online' && raw.model.trim()) {
-    const prod = lk.products.find(p => p.model_code.trim().toLowerCase() === raw.model.trim().toLowerCase());
-    if (!prod) {
-      errors.push(`ไม่พบ Model "${raw.model}"`);
-    } else if (brand_id != null && !lk.productBrandIds.get(prod.id)?.has(brand_id)) {
-      errors.push(`Model "${raw.model}" ไม่ได้อยู่ในแบรนด์ "${raw.brand.trim()}" — ตรวจสอบว่าเลือก Model ถูกแบรนด์`);
+  if (placementType === 'online') {
+    if (!raw.model.trim()) {
+      errors.push('ต้องระบุ Model');
     } else {
-      product_id = prod.id;
+      const prod = lk.products.find(p => p.model_code.trim().toLowerCase() === raw.model.trim().toLowerCase());
+      if (!prod) {
+        errors.push(`ไม่พบ Model "${raw.model}"`);
+      } else if (brand_id != null && !lk.productBrandIds.get(prod.id)?.has(brand_id)) {
+        errors.push(`Model "${raw.model}" ไม่ได้อยู่ในแบรนด์ "${raw.brand.trim()}" — ตรวจสอบว่าเลือก Model ถูกแบรนด์`);
+      } else {
+        product_id = prod.id;
+      }
     }
   }
 
@@ -320,7 +357,9 @@ function resolveRow(
   }
 
   let campaign_id: number | null = null;
-  if (raw.campaign.trim()) {
+  if (!raw.campaign.trim()) {
+    errors.push('ต้องระบุ Campaign');
+  } else {
     const cInput = raw.campaign.trim().toLowerCase();
     const c = lk.campaigns.find(c => c.code.trim().toLowerCase() === cInput || (c.label?.trim().toLowerCase() ?? '') === cInput);
     if (!c) errors.push(`ไม่พบ Campaign "${raw.campaign}" (ปี ${new Date().getFullYear()})`);
@@ -328,7 +367,9 @@ function resolveRow(
   }
 
   let target_pub_date: string | null = null;
-  if (raw.targetPubDate.trim()) {
+  if (!raw.targetPubDate.trim()) {
+    errors.push('ต้องระบุวันลงโพสต์ (เป้าหมาย)');
+  } else {
     const s = raw.targetPubDate.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       target_pub_date = s;
@@ -339,8 +380,10 @@ function resolveRow(
     }
   }
 
-  let payment_type: 'paid' | 'free' | 'barter' = 'paid';
-  if (raw.paymentType.trim()) {
+  let payment_type: 'paid' | 'free' | 'barter' | null = null;
+  if (!raw.paymentType.trim()) {
+    errors.push('ต้องระบุประเภทการจ่ายเงิน');
+  } else {
     const mapped = PAYMENT_MAP[raw.paymentType.trim().toLowerCase()];
     if (!mapped) errors.push(`ประเภทการจ่ายเงิน "${raw.paymentType}" ไม่ถูกต้อง (ต้องเป็น จ่ายเงิน/Free/Barter)`);
     else payment_type = mapped;
@@ -364,20 +407,74 @@ function resolveRow(
     else ads_cost = String(n);
   }
 
+  // UTM / ad-content fields — online only, all optional; the 3 URL fields are
+  // scheme-validated (http/https only) to keep obviously-bad links out of the DB.
+  let ad_content_name: string | null = null;
+  let utm_campaign_name: string | null = null;
+  let shopee_utm: string | null = null;
+  let lazada_utm: string | null = null;
+  let website_utm: string | null = null;
+  if (placementType === 'online') {
+    ad_content_name = raw.adContentName.trim() || null;
+    utm_campaign_name = raw.utmCampaignName.trim() || null;
+    if (raw.shopeeUtm.trim()) {
+      const v = raw.shopeeUtm.trim();
+      if (!isSafeUrl(v)) errors.push(`Shopee UTM "${v}" ต้องเป็น URL ที่ขึ้นต้นด้วย http:// หรือ https://`);
+      else shopee_utm = v;
+    }
+    if (raw.lazadaUtm.trim()) {
+      const v = raw.lazadaUtm.trim();
+      if (!isSafeUrl(v)) errors.push(`Lazada UTM "${v}" ต้องเป็น URL ที่ขึ้นต้นด้วย http:// หรือ https://`);
+      else lazada_utm = v;
+    }
+    if (raw.websiteUtm.trim()) {
+      const v = raw.websiteUtm.trim();
+      if (!isSafeUrl(v)) errors.push(`Website UTM "${v}" ต้องเป็น URL ที่ขึ้นต้นด้วย http:// หรือ https://`);
+      else website_utm = v;
+    }
+  }
+
   const notes = raw.notes.trim() || null;
 
   return {
     data: {
       brand_id, placement_type: placementType, kol_id, platform_id, follower_at_time,
       product_id, store_id, store_new_shop, store_new_branch, campaign_id,
-      target_pub_date, payment_type, final_price, ads_cost, notes,
+      target_pub_date, payment_type, final_price, ads_cost,
+      ad_content_name, utm_campaign_name, shopee_utm, lazada_utm, website_utm,
+      notes,
     },
     errors, warnings,
   };
 }
 
+// Converts a 1-based column index to its Excel letter (1 -> A, 26 -> Z, 27 -> AA, ...).
+function colLetter(n: number): string {
+  let s = '';
+  let x = n;
+  while (x > 0) {
+    const rem = (x - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    x = Math.floor((x - 1) / 26);
+  }
+  return s;
+}
+
 // ─── Reference sheet — shared builder for both template kinds ─────────
-// Columns: A Brand | B Platform | C Model-or-Store/Branch | D Campaign | E Campaign Description | F KOL Handle | G KOL Platform | H KOL Follower
+// Columns A-H (both kinds): A Brand | B Platform | C Model-or-Store/Branch | D Campaign
+// | E Campaign Description | F KOL Handle | G KOL Platform | H KOL Follower
+//
+// Online only, starting at column I — powers the dependent Model dropdown (see
+// applyDependentListValidation / the plan's §4.3 "helper-column" method):
+//   I .. I+N-1        one column per accessible brand, header = brand name, values =
+//                      that brand's model codes (N = lk.brands.length, so this degrades
+//                      correctly to a single column when the user only has 1 brand)
+//   I+N               brand→rangeName lookup table col 1: brand name
+//   I+N+1             brand→rangeName lookup table col 2: `modelsBrand<brand id>`
+// A workbook-level defined name `modelsBrand<id>` is created per brand pointing at its
+// column I..I+N-1 range — the data sheet's hidden helper column VLOOKUPs the row's Brand
+// against the lookup table to get the range *name* (as text), then the Model cell's
+// validation formula is `INDIRECT(<that name>)`.
 function buildReferenceSheet(wb: ExcelJS.Workbook, lk: Lookups, kind: PlacementKind, T: TplStrings) {
   const ref = wb.addWorksheet(T.sheetRef);
   ref.columns = [
@@ -412,13 +509,56 @@ function buildReferenceSheet(wb: ExcelJS.Workbook, lk: Lookups, kind: PlacementK
   for (let r = 2; r <= 1 + maxLen; r++) ref.getCell(r, 8).numFmt = '#,##0'; // KOL Follower — เลขเยอะ ใส่ , กันตาลาย
 
   const endRow = (len: number) => Math.max(2, 1 + len);
+  let overallLastRow = 1 + maxLen;
+  let dependentModel: { lookupRangeAddr: string; numExtraCols: number } | undefined;
+
+  if (kind === 'online') {
+    const startCol = 9; // I — right after the shared A-H columns
+    let maxModelRows = 0;
+    lk.brands.forEach((b, i) => {
+      const col = startCol + i;
+      const colL = colLetter(col);
+      const models = lk.products
+        .filter(p => lk.productBrandIds.get(p.id)?.has(b.id))
+        .map(p => p.model_code);
+      ref.getCell(1, col).value = b.name;
+      models.forEach((m, r) => { ref.getCell(r + 2, col).value = m; });
+      maxModelRows = Math.max(maxModelRows, models.length);
+      const modelsEndRow = endRow(models.length);
+      wb.definedNames.add(`'${T.sheetRef}'!$${colL}$2:$${colL}$${modelsEndRow}`, `modelsBrand${b.id}`);
+    });
+
+    // Brand -> rangeName lookup table, right after the N per-brand model columns.
+    const lookupCol1 = startCol + lk.brands.length;
+    const lookupCol2 = lookupCol1 + 1;
+    const lookupCol1L = colLetter(lookupCol1);
+    const lookupCol2L = colLetter(lookupCol2);
+    ref.getCell(1, lookupCol1).value = T.hdrBrand;
+    ref.getCell(1, lookupCol2).value = 'ModelRangeName';
+    lk.brands.forEach((b, i) => {
+      ref.getCell(i + 2, lookupCol1).value = b.name;
+      ref.getCell(i + 2, lookupCol2).value = `modelsBrand${b.id}`;
+    });
+    const lookupEndRow = endRow(lk.brands.length);
+
+    dependentModel = {
+      lookupRangeAddr: `'${T.sheetRef}'!$${lookupCol1L}$2:$${lookupCol2L}$${lookupEndRow}`,
+      numExtraCols: lk.brands.length + 2,
+    };
+    overallLastRow = Math.max(overallLastRow, 1 + maxModelRows, lookupEndRow);
+  }
+
+  // Legend explaining the " *" required-column marker used in onlineHeaders()/offlineHeaders()
+  ref.getCell(overallLastRow + 2, 1).value = T.requiredLegend;
+
   return {
     brandEnd: endRow(brandList.length),
     platformEnd: endRow(platformList.length),
     colCEnd: endRow(colCList.length),
     campaignEnd: endRow(campaignCodeList.length),
     kolEnd: endRow(kolHandleList.length),
-    lastRow: 1 + maxLen,
+    lastRow: overallLastRow,
+    dependentModel,
   };
 }
 
@@ -484,6 +624,30 @@ function applyListValidation(ws: ExcelJS.Worksheet, col: number, formula: string
   }
 }
 
+// Dependent Model dropdown (online only, §4.3 of the import-upgrade plan): each row's
+// validation formula points at that row's own hidden helper cell (helperCol), which holds
+// the resolved `modelsBrand<id>` range name (as text) for whatever brand is in column A of
+// that row — INDIRECT() then turns that name into the actual list. Note: no leading "="
+// in `formulae` — desktop Excel expects the bare function call here, same as the other
+// list validations in this file (e.g. applyListValidation, the "Paid,Free,Barter" list).
+function applyDependentListValidation(ws: ExcelJS.Worksheet, col: number, helperCol: number, label: string, T: TplStrings) {
+  const helperColL = colLetter(helperCol);
+  for (let r = 2; r <= MAX_DATA_ROWS; r++) {
+    ws.getCell(r, col).dataValidation = {
+      type: 'list',
+      allowBlank: true,
+      formulae: [`INDIRECT($${helperColL}${r})`],
+      showInputMessage: true,
+      promptTitle: label,
+      prompt: T.listPromptStrict.replace('{label}', label),
+      showErrorMessage: true,
+      errorStyle: 'stop',
+      errorTitle: T.listErrTitle,
+      error: T.listErr.replace('{label}', label).replace('{refSheet}', T.sheetRef),
+    };
+  }
+}
+
 // Pre-fills Platform/Follower with a VLOOKUP against the KOL reference table
 // (columns F:H), keyed off the KOL Handle cell in the same row (column B).
 // Users can still overwrite the formula result directly if needed.
@@ -495,11 +659,29 @@ function applyKolLookupFormulas(ws: ExcelJS.Worksheet, kolEnd: number, refSheet:
   }
 }
 
+// Hidden helper column feeding the dependent Model dropdown (see applyDependentListValidation
+// and buildReferenceSheet's doc-comment). Per row: look up the row's own Brand cell (column A)
+// in the Reference sheet's brand->rangeName table to get back the `modelsBrand<id>` range name
+// as text — that text is what INDIRECT() on the Model cell resolves into an actual list.
+function applyModelHelperColumn(ws: ExcelJS.Worksheet, helperCol: number, lookupRangeAddr: string) {
+  for (let r = 2; r <= MAX_DATA_ROWS; r++) {
+    ws.getCell(r, helperCol).value = { formula: `IFERROR(VLOOKUP($A${r},${lookupRangeAddr},2,FALSE),"")` };
+  }
+  ws.getColumn(helperCol).hidden = true;
+}
+
 // ─── Visual styling — color-coded by how the column behaves ───────────
 type ColCategory = 'strict' | 'soft' | 'auto' | 'free' | 'date';
 
-// 1 แบรนด์ | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model/ห้าง-สาขา | 6 Campaign | 7 วันที่ | 8 จ่ายเงิน | 9 Final Price | 10 Ads Cost | 11 หมายเหตุ
-const ONLINE_CATEGORIES: ColCategory[] = ['strict', 'strict', 'auto', 'auto', 'strict', 'strict', 'date', 'strict', 'free', 'free', 'free'];
+// Online, 16 cols: 1 แบรนด์ | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model (dependent) | 6 Campaign
+// | 7 วันที่ | 8 จ่ายเงิน | 9 Final Price | 10 Ads Cost | 11 Ad Content Name | 12 UTM Campaign Name
+// | 13 Shopee UTM | 14 Lazada UTM | 15 Website UTM | 16 หมายเหตุ
+const ONLINE_CATEGORIES: ColCategory[] = [
+  'strict', 'strict', 'auto', 'auto', 'strict', 'strict', 'date', 'strict', 'free', 'free',
+  'free', 'free', 'free', 'free', 'free', 'free',
+];
+// Offline, 11 cols: 1 แบรนด์ | 2 KOL Handle | 3 Platform | 4 Follower | 5 ห้าง/สาขา | 6 Campaign
+// | 7 วันที่ | 8 จ่ายเงิน | 9 Final Price | 10 Ads Cost | 11 หมายเหตุ
 const OFFLINE_CATEGORIES: ColCategory[] = ['strict', 'strict', 'auto', 'auto', 'soft', 'strict', 'date', 'strict', 'free', 'free', 'free'];
 
 const CATEGORY_COLOR: Record<ColCategory, string> = {
@@ -568,31 +750,7 @@ app.get('/template/:kind', async c => {
     if (!kind) return c.json({ error: 'kind ต้องเป็น online หรือ offline' }, 400);
 
     const lk = await loadLookups(prisma, user);
-
-    // Resolve which single brand this template is for — required up front so the
-    // Model dropdown (online) only ever offers that brand's products. Users with
-    // exactly one accessible brand don't need to choose; users with several must
-    // pick one in the UI before downloading.
-    let targetBrandId: number;
-    const rawBrandId = c.req.query('brand_id');
-    if (rawBrandId != null) {
-      const parsed = Number(rawBrandId);
-      const match = lk.brands.find(b => b.id === parsed);
-      if (!match) return c.json({ error: 'แบรนด์ที่เลือกไม่ถูกต้องหรือไม่มีสิทธิ์เข้าถึง' }, 400);
-      targetBrandId = match.id;
-    } else if (lk.brands.length === 1) {
-      targetBrandId = lk.brands[0].id;
-    } else {
-      return c.json({ error: 'กรุณาเลือกแบรนด์ก่อนดาวน์โหลด template' }, 400);
-    }
-
     const T = tpl(c.req.query('lang'));
-
-    const templateLk: Lookups = {
-      ...lk,
-      brands: lk.brands.filter(b => b.id === targetBrandId),
-      products: lk.products.filter(p => lk.productBrandIds.get(p.id)?.has(targetBrandId)),
-    };
 
     const wb = new ExcelJS.Workbook();
 
@@ -604,13 +762,27 @@ app.get('/template/:kind', async c => {
     ws.columns = headers.map(() => ({ width: 24 }));
     ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-    const ranges = buildReferenceSheet(wb, templateLk, kind, T);
+    // Template now covers every brand the user can access (loadLookups already scopes
+    // `lk.brands`/`lk.products` to the user's permissions) — there's no more single-brand
+    // selection up front. The Model dropdown (online) instead filters per-brand *inside*
+    // Excel via the dependent-list mechanism built by buildReferenceSheet() below.
+    const ranges = buildReferenceSheet(wb, lk, kind, T);
 
-    // Column order: 1 Brand | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model/Store-Branch | 6 Campaign | 7 Date | 8 Payment | 9-11 Price/Notes
+    // Column order online (16): 1 Brand | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model
+    // (dependent on Brand) | 6 Campaign | 7 Date | 8 Payment | 9 Final Price | 10 Ads Cost
+    // | 11 Ad Content Name | 12 UTM Campaign Name | 13 Shopee UTM | 14 Lazada UTM | 15 Website UTM | 16 Notes
+    // Column order offline (11): same through col 8, then 9 Final Price | 10 Ads Cost | 11 Notes
+    // — column 5 is ห้าง/สาขา (soft, non-dependent) instead of Model; no UTM columns offline.
     applyListValidation(ws, 1, refRange('A', ranges.brandEnd, T.sheetRef), T.hdrBrand, true, T);
     applyListValidation(ws, 2, refRange('F', ranges.kolEnd, T.sheetRef), 'KOL Handle', true, T);
     applyListValidation(ws, 3, refRange('B', ranges.platformEnd, T.sheetRef), 'Platform', true, T);
-    applyListValidation(ws, 5, refRange('C', ranges.colCEnd, T.sheetRef), kind === 'online' ? 'Model' : T.hdrShopBranch, kind === 'online', T);
+    if (kind === 'online' && ranges.dependentModel) {
+      const helperCol = 30; // well past all 16 real columns; hidden, excluded from ONLINE_RAW_KEYS
+      applyModelHelperColumn(ws, helperCol, ranges.dependentModel.lookupRangeAddr);
+      applyDependentListValidation(ws, 5, helperCol, 'Model', T);
+    } else {
+      applyListValidation(ws, 5, refRange('C', ranges.colCEnd, T.sheetRef), T.hdrShopBranch, false, T);
+    }
     applyListValidation(ws, 6, refRange('D', ranges.campaignEnd, T.sheetRef), 'Campaign', true, T);
     applyDateValidation(ws, 7, T);
     applyListValidation(ws, 8, '"Paid,Free,Barter"', T.hdrPaymentType, true, T);
@@ -621,7 +793,10 @@ app.get('/template/:kind', async c => {
 
     styleBodyRows(ws, headers.length);
     styleHeaderRow(ws, categories);
-    styleReferenceSheet(wb.getWorksheet(T.sheetRef)!, 8, ranges.lastRow);
+    const refNumCols = kind === 'online' && ranges.dependentModel
+      ? 8 + ranges.dependentModel.numExtraCols
+      : 8;
+    styleReferenceSheet(wb.getWorksheet(T.sheetRef)!, refNumCols, ranges.lastRow);
 
     const buf = await wb.xlsx.writeBuffer();
     // Buffer is a view into a possibly-larger pooled ArrayBuffer — passing it straight
@@ -659,7 +834,9 @@ function cellText(row: ExcelJS.Row, idx: number): string {
 function rowToRaw(row: ExcelJS.Row, keys: (keyof RawRow)[]): RawRow {
   const out: RawRow = {
     brand: '', kolHandle: '', platform: '', follower: '', model: '', shopBranch: '',
-    campaign: '', targetPubDate: '', paymentType: '', finalPrice: '', adsCost: '', notes: '',
+    campaign: '', targetPubDate: '', paymentType: '', finalPrice: '', adsCost: '',
+    adContentName: '', utmCampaignName: '', shopeeUtm: '', lazadaUtm: '', websiteUtm: '',
+    notes: '',
   };
   keys.forEach((key, i) => { out[key] = cellText(row, i + 1); });
   return out;
@@ -762,12 +939,19 @@ app.post('/commit', async c => {
             campaign_id: data.campaign_id,
             person_in_charge_id: user.id,
             created_by_id: user.id,
-            payment_type: data.payment_type,
+            payment_type: data.payment_type!,
             ...priceFields,
             ads_cost: data.ads_cost,
             follower_at_time: data.follower_at_time,
             target_pub_date: data.target_pub_date ? new Date(data.target_pub_date) : null,
             notes: data.notes,
+            ...(data.placement_type === 'online' ? {
+              ad_content_name: data.ad_content_name,
+              utm_campaign_name: data.utm_campaign_name,
+              shopee_utm: data.shopee_utm,
+              lazada_utm: data.lazada_utm,
+              website_utm: data.website_utm,
+            } : {}),
             status: 'planned',
           },
         });

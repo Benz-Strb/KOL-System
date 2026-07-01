@@ -79,7 +79,7 @@ export default function ImportPlacementsPage() {
 
   async function handleDownloadTemplate(lang: ExportLang) {
     try {
-      await downloadImportTemplate(kind, brandId ? Number(brandId) : undefined, lang);
+      await downloadImportTemplate(kind, lang);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('download.templateFailed'));
     }
