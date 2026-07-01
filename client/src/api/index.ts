@@ -119,6 +119,11 @@ export type PlacementRow = {
   target_pub_date: string | null;
   publication_date: string | null;
   post_url: string | null;
+  ad_content_name: string | null;
+  utm_campaign_name: string | null;
+  shopee_utm: string | null;
+  lazada_utm: string | null;
+  website_utm: string | null;
   notes: string | null;
   created_at: string;
   kols: { id: number; handle: string; gen_name: string | null; profile_url: string | null; follower_count: number | null; avatar_url: string | null; content_categories: { name: string } | null } | null;

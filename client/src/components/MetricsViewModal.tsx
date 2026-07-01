@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { X, Copy, Check } from 'lucide-react';
 import type { PlacementRow, PlacementMetric } from '../api/index.js';
 import { getPlacementMetrics } from '../api/index.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
@@ -30,6 +30,51 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between items-center py-1.5 border-b border-hairline last:border-0">
       <span className="text-xs text-muted">{label}</span>
       <span className="text-xs font-medium text-ink tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function isSafeHttpUrl(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function UtmRow({ label, value }: { label: string; value: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const isLink = !!value && isSafeHttpUrl(value);
+
+  async function handleCopy() {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className="text-xs col-span-2 flex items-center gap-2">
+      <span className="text-muted flex-shrink-0">{label} </span>
+      {value ? (
+        <>
+          {isLink ? (
+            <a href={value} target="_blank" rel="noopener noreferrer"
+              className="text-accent hover:text-accent-hover truncate min-w-0 flex-1">
+              {value}
+            </a>
+          ) : (
+            <span className="text-ink truncate min-w-0 flex-1">{value}</span>
+          )}
+          <button type="button" onClick={handleCopy}
+            className="text-muted hover:text-accent transition-colors flex-shrink-0">
+            {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+          </button>
+        </>
+      ) : (
+        <span className="text-ink">—</span>
+      )}
     </div>
   );
 }
@@ -129,6 +174,13 @@ export default function MetricsViewModal({ placement, onClose }: Props) {
             <div className="text-xs"><span className="text-muted">KOL </span><span className="text-ink font-medium">{kolName}</span></div>
             <div className="text-xs"><span className="text-muted">Platform </span><span className="text-ink">{platformLabel}</span></div>
             <div className="text-xs col-span-2"><span className="text-muted">Campaign </span><span className="text-ink">{campaignLabel}</span></div>
+            <div className="text-xs col-span-2 border-t border-hairline pt-2 mt-1">
+              <span className="text-muted">Ad Content </span><span className="text-ink">{placement.ad_content_name || '—'}</span>
+            </div>
+            <div className="text-xs col-span-2"><span className="text-muted">UTM Campaign </span><span className="text-ink">{placement.utm_campaign_name || '—'}</span></div>
+            <UtmRow label="Shopee UTM" value={placement.shopee_utm} />
+            <UtmRow label="Lazada UTM" value={placement.lazada_utm} />
+            <UtmRow label="Website UTM" value={placement.website_utm} />
           </div>
 
           {loading ? (
