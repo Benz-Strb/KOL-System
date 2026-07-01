@@ -227,14 +227,15 @@ model user_brands {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model users {
-  id                                               Int           @id @default(autoincrement())
-  full_name                                        String        @unique
-  email                                            String?       @unique
-  role                                             String        @default("marketing")
-  is_active                                        Boolean       @default(true)
-  created_at                                       DateTime      @default(now()) @db.Timestamptz(6)
-  placements_placements_created_by_idTousers       placements[]  @relation("placements_created_by_idTousers")
-  placements_placements_person_in_charge_idTousers placements[]  @relation("placements_person_in_charge_idTousers")
+  id                                               Int            @id @default(autoincrement())
+  full_name                                        String         @unique
+  email                                            String?        @unique
+  role                                             String         @default("marketing")
+  is_active                                        Boolean        @default(true)
+  created_at                                       DateTime       @default(now()) @db.Timestamptz(6)
+  import_files                                     import_files[]
+  placements_placements_created_by_idTousers       placements[]   @relation("placements_created_by_idTousers")
+  placements_placements_person_in_charge_idTousers placements[]   @relation("placements_person_in_charge_idTousers")
   user_brands                                      user_brands[]
 }
 
@@ -346,4 +347,19 @@ model placement_reposts {
 
   @@unique([placement_id, round_number])
   @@index([placement_id], map: "idx_placement_reposts_placement_id")
+}
+
+model import_files {
+  id                Int      @id @default(autoincrement())
+  user_id           Int
+  kind              String
+  file_type         String   @default("plan")
+  storage_path      String
+  original_filename String?
+  placement_count   Int      @default(0)
+  brand_summary     String?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  users             users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_import_files_user")
 }
