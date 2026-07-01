@@ -223,6 +223,28 @@ async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookup
   };
 }
 
+// Shape returned to the client under `lookups` in /validate/:kind and
+// /validate-rows/:kind responses — lets the Phase 4 editable grid build its
+// dropdowns without a separate fetch. `products[].brandIds` is derived from
+// the `productBrandIds` Map (product_id -> Set<brand_id>) already computed above.
+function buildLookupsResponse(lk: Lookups) {
+  return {
+    brands: lk.brands,
+    platforms: lk.platforms,
+    campaigns: lk.campaigns,
+    products: lk.products.map(p => ({
+      id: p.id,
+      model_code: p.model_code,
+      brandIds: Array.from(lk.productBrandIds.get(p.id) ?? []),
+    })),
+    stores: lk.stores,
+    kols: lk.kolsList.map(k => ({
+      id: k.id, handle: k.handle, handle_normalized: k.handle_normalized,
+      platform_id: k.platform_id, follower_count: k.follower_count,
+    })),
+  };
+}
+
 // ─── Row resolution (pure — used identically by validate + commit) ────
 interface ResolveCtx { newStoreKeys: Set<string> }
 
@@ -671,7 +693,9 @@ function applyModelHelperColumn(ws: ExcelJS.Worksheet, helperCol: number, lookup
 }
 
 // ─── Visual styling — color-coded by how the column behaves ───────────
-type ColCategory = 'strict' | 'soft' | 'auto' | 'free' | 'date';
+// 'locked'/'performance' are used only by buildStoredWorkbook() (post-commit
+// reference file) — not by the editable GET /template/:kind sheets.
+type ColCategory = 'strict' | 'soft' | 'auto' | 'free' | 'date' | 'locked' | 'performance';
 
 // Online, 16 cols: 1 แบรนด์ | 2 KOL Handle | 3 Platform | 4 Follower | 5 Model (dependent) | 6 Campaign
 // | 7 วันที่ | 8 จ่ายเงิน | 9 Final Price | 10 Ads Cost | 11 Ad Content Name | 12 UTM Campaign Name
@@ -690,6 +714,8 @@ const CATEGORY_COLOR: Record<ColCategory, string> = {
   auto: 'FF059669',   // เขียว — คำนวณอัตโนมัติจาก KOL ที่เลือก (แก้ไขเองได้)
   free: 'FF6B7280',   // เทา — กรอกข้อมูลอิสระ
   date: 'FF7C3AED',   // ม่วง — เลือกวันที่จากปฎิทิน (Excel date picker)
+  locked: 'FF4B5563',    // เทาเข้ม — placement_id ห้ามแก้ (buildStoredWorkbook)
+  performance: 'FF0D9488', // เขียวอมฟ้า — คอลัมน์ performance ว่าง ให้กรอกทีหลัง (buildStoredWorkbook)
 };
 
 const BORDER_SIDE = { style: 'thin' as const, color: { argb: 'FFD1D5DB' } };
@@ -842,6 +868,39 @@ function rowToRaw(row: ExcelJS.Row, keys: (keyof RawRow)[]): RawRow {
   return out;
 }
 
+// Fills in any RawRow fields missing from a JSON body (client is expected to send
+// the full shape, but this guards against partial payloads crashing resolveRow's
+// `.trim()` calls on undefined).
+function normalizeRawRow(r: Partial<RawRow>): RawRow {
+  return {
+    brand: r.brand ?? '', kolHandle: r.kolHandle ?? '', platform: r.platform ?? '', follower: r.follower ?? '',
+    model: r.model ?? '', shopBranch: r.shopBranch ?? '', campaign: r.campaign ?? '', targetPubDate: r.targetPubDate ?? '',
+    paymentType: r.paymentType ?? '', finalPrice: r.finalPrice ?? '', adsCost: r.adsCost ?? '',
+    adContentName: r.adContentName ?? '', utmCampaignName: r.utmCampaignName ?? '', shopeeUtm: r.shopeeUtm ?? '',
+    lazadaUtm: r.lazadaUtm ?? '', websiteUtm: r.websiteUtm ?? '', notes: r.notes ?? '',
+  };
+}
+
+// Shared per-row resolution loop — single source of truth for both
+// POST /validate/:kind (file upload) and POST /validate-rows/:kind (JSON body),
+// so resolveRow's logic never has to be duplicated client-side.
+function resolveRows(
+  items: { rowNumber: number; raw: RawRow }[],
+  lk: Lookups,
+  kind: PlacementKind,
+): {
+  summary: { total: number; valid: number; withErrors: number };
+  rows: { rowNumber: number; raw: RawRow; errors: string[]; warnings: string[] }[];
+} {
+  const ctx: ResolveCtx = { newStoreKeys: new Set() };
+  const rows = items.map(item => {
+    const { errors, warnings } = resolveRow(item.raw, lk, ctx, kind);
+    return { rowNumber: item.rowNumber, raw: item.raw, errors, warnings };
+  });
+  const valid = rows.filter(r => r.errors.length === 0).length;
+  return { summary: { total: rows.length, valid, withErrors: rows.length - valid }, rows };
+}
+
 app.post('/validate/:kind', async c => {
   try {
     const prisma = c.get('prisma');
@@ -864,33 +923,195 @@ app.post('/validate/:kind', async c => {
     if (!ws) return c.json({ error: 'ไม่พบชีตข้อมูลในไฟล์' }, 400);
 
     const lk = await loadLookups(prisma, user);
-    const ctx: ResolveCtx = { newStoreKeys: new Set() };
     const keys = kind === 'online' ? ONLINE_RAW_KEYS : OFFLINE_RAW_KEYS;
 
-    const rows: { rowNumber: number; raw: RawRow; errors: string[]; warnings: string[] }[] = [];
+    const items: { rowNumber: number; raw: RawRow }[] = [];
     ws.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return; // header
       const raw = rowToRaw(row, keys);
       const isBlank = keys.every(k => !raw[k].trim());
       if (isBlank) return;
-      const { errors, warnings } = resolveRow(raw, lk, ctx, kind);
-      rows.push({ rowNumber, raw, errors, warnings });
+      items.push({ rowNumber, raw });
     });
 
-    const valid = rows.filter(r => r.errors.length === 0).length;
-    return c.json({ summary: { total: rows.length, valid, withErrors: rows.length - valid }, rows });
+    const { summary, rows } = resolveRows(items, lk, kind);
+    return c.json({ summary, rows, lookups: buildLookupsResponse(lk) });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'ไม่สามารถอ่านไฟล์ได้ — ตรวจสอบว่าเป็นไฟล์ template ที่ถูกต้อง (.xlsx)' }, 400);
   }
 });
 
+// ─── POST /validate-rows/:kind — JSON-body re-validate (no file) ───────
+// Single source of truth for re-validating after inline edits / bulk edit /
+// adding a KOL-Model in the Phase 4 editable grid — the client must never
+// re-implement resolveRow's logic itself, only call this endpoint.
+app.post('/validate-rows/:kind', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const kind = parseKindParam(c.req.param('kind'));
+    if (!kind) return c.json({ error: 'kind ต้องเป็น online หรือ offline' }, 400);
+
+    const body = await c.req.json() as { rows?: (Partial<RawRow> & { rowNumber?: number })[] };
+    const inputRows = Array.isArray(body.rows) ? body.rows : [];
+
+    const lk = await loadLookups(prisma, user);
+    // rowNumber: use what the client sent, or fall back to array position (1-based) —
+    // there's no Excel header row to offset against here, so index+1 is simplest.
+    const items = inputRows.map((r, i) => ({
+      rowNumber: typeof r.rowNumber === 'number' ? r.rowNumber : i + 1,
+      raw: normalizeRawRow(r),
+    }));
+
+    const { summary, rows } = resolveRows(items, lk, kind);
+    return c.json({ summary, rows, lookups: buildLookupsResponse(lk) });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to validate rows' }, 500);
+  }
+});
+
+// ─── Stored/committed workbook — regenerated "as-committed" reference file ──
+// Built once per successful POST /commit from the resolved values actually
+// written to the DB (not the raw upload) + uploaded to the private `import-files`
+// bucket so the user can later download it, fill in performance offline, and
+// (Phase 7) upload it back to auto-match placements by the placement_id column.
+interface CommittedRow { placementId: number; raw: RawRow; data: ResolvedData }
+
+const PAYMENT_DISPLAY: Record<'paid' | 'free' | 'barter', string> = { paid: 'Paid', free: 'Free', barter: 'Barter' };
+
+// Field names double as the header text — Phase 7's performance-import parser
+// reads these back by exact key, so keep them snake_case and stable.
+const PERFORMANCE_HEADERS_COMMON = ['publication_date', 'post_url', 'pay_amount'];
+// atc_value only exists for shopee (see PATCH /:id/performance in placements.ts /
+// applyPerformance() — lazada/website never write atc_value).
+const PERFORMANCE_HEADERS_ONLINE_MARKETPLACE = [
+  'shopee_visits', 'shopee_atc', 'shopee_atc_value', 'shopee_orders', 'shopee_gmv',
+  'lazada_visits', 'lazada_atc', 'lazada_orders', 'lazada_gmv',
+  'website_visits', 'website_atc', 'website_orders', 'website_gmv',
+];
+// Manual engagement fields (youtube/lemon8) — entered regardless of the online/offline
+// marketplace gating, so present on both kinds.
+const PERFORMANCE_HEADERS_MANUAL = ['vdo_view', 'likes', 'comments', 'saves', 'shares'];
+
+function performanceHeaders(kind: PlacementKind): string[] {
+  return [
+    ...PERFORMANCE_HEADERS_COMMON,
+    ...(kind === 'online' ? PERFORMANCE_HEADERS_ONLINE_MARKETPLACE : []),
+    ...PERFORMANCE_HEADERS_MANUAL,
+  ];
+}
+
+function buildStoredWorkbook(committedRows: CommittedRow[], kind: PlacementKind, lk: Lookups): ExcelJS.Workbook {
+  const T = tpl(undefined); // Thai — this is a generated reference/output file, not the editable template
+  const wb = new ExcelJS.Workbook();
+  const sheetName = kind === 'online' ? T.sheetOnline : T.sheetOffline;
+  const ws = wb.addWorksheet(sheetName);
+
+  // Same column set/order as the input template (reuse the same header/category
+  // arrays so the two never drift apart) — just prefixed with a locked placement_id
+  // column and suffixed with an empty performance block.
+  const planHeaders = kind === 'online' ? onlineHeaders(T) : offlineHeaders(T);
+  const planCategories = kind === 'online' ? ONLINE_CATEGORIES : OFFLINE_CATEGORIES;
+  const perfHeaders = performanceHeaders(kind);
+
+  const headers = ['placement_id', ...planHeaders, ...perfHeaders];
+  const categories: ColCategory[] = ['locked', ...planCategories, ...perfHeaders.map((): ColCategory => 'performance')];
+
+  ws.addRow(headers);
+  ws.columns = headers.map(() => ({ width: 22 }));
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+  const brandById = new Map(lk.brands.map(b => [b.id, b.name]));
+  const platformById = new Map(lk.platforms.map(p => [p.id, p.name]));
+  const productById = new Map(lk.products.map(p => [p.id, p.model_code]));
+  const campaignById = new Map(lk.campaigns.map(c => [c.id, c.code]));
+  const storeById = new Map(lk.stores.map(s => [s.id, formatShopBranch(s)]));
+
+  committedRows.forEach((row, i) => {
+    const r = i + 2;
+    const d = row.data;
+    // Match by BOTH kol_id and platform_id — a person can have more than one
+    // platform account, so kol_id alone could recover the wrong handle.
+    const kol = lk.kolsList.find(k => k.id === d.kol_id && k.platform_id === d.platform_id);
+
+    const planValues: (string | number | Date | null)[] = kind === 'online'
+      ? [
+          d.brand_id != null ? brandById.get(d.brand_id) ?? '' : '',
+          kol?.handle ?? '',
+          d.platform_id != null ? platformById.get(d.platform_id) ?? '' : '',
+          d.follower_at_time,
+          d.product_id != null ? productById.get(d.product_id) ?? '' : '',
+          d.campaign_id != null ? campaignById.get(d.campaign_id) ?? '' : '',
+          d.target_pub_date ? new Date(d.target_pub_date) : null,
+          d.payment_type ? PAYMENT_DISPLAY[d.payment_type] : '',
+          d.final_price != null ? Number(d.final_price) : null,
+          d.ads_cost != null ? Number(d.ads_cost) : null,
+          d.ad_content_name,
+          d.utm_campaign_name,
+          d.shopee_utm,
+          d.lazada_utm,
+          d.website_utm,
+          d.notes,
+        ]
+      : [
+          d.brand_id != null ? brandById.get(d.brand_id) ?? '' : '',
+          kol?.handle ?? '',
+          d.platform_id != null ? platformById.get(d.platform_id) ?? '' : '',
+          d.follower_at_time,
+          d.store_id != null ? storeById.get(d.store_id) ?? '' : '',
+          d.campaign_id != null ? campaignById.get(d.campaign_id) ?? '' : '',
+          d.target_pub_date ? new Date(d.target_pub_date) : null,
+          d.payment_type ? PAYMENT_DISPLAY[d.payment_type] : '',
+          d.final_price != null ? Number(d.final_price) : null,
+          d.ads_cost != null ? Number(d.ads_cost) : null,
+          d.notes,
+        ];
+
+    ws.getCell(r, 1).value = row.placementId;
+    planValues.forEach((v, idx) => { ws.getCell(r, 2 + idx).value = v; });
+    // Performance columns (2 + planValues.length .. end) are left blank on purpose.
+  });
+
+  const numDataRows = committedRows.length;
+  // Cosmetic number/date formats — target date & follower/price columns are at
+  // fixed positions regardless of kind (col 1 is placement_id, so +1 vs the
+  // template's own column numbers).
+  for (let r = 2; r <= numDataRows + 1; r++) {
+    ws.getCell(r, 5).numFmt = '#,##0';       // Follower
+    ws.getCell(r, 8).numFmt = 'yyyy-mm-dd';  // Target publication date
+    ws.getCell(r, 10).numFmt = '#,##0.00';   // Final price
+    ws.getCell(r, 11).numFmt = '#,##0.00';   // Ads cost
+  }
+
+  styleHeaderRow(ws, categories);
+  for (let r = 2; r <= numDataRows + 1; r++) {
+    const isEven = r % 2 === 0;
+    for (let c = 1; c <= headers.length; c++) {
+      const cell = ws.getCell(r, c);
+      cell.border = THIN_BORDER;
+      if (isEven) cell.fill = ZEBRA_FILL;
+    }
+  }
+
+  // Visually lock the placement_id column (body rows only — header keeps its
+  // category color from styleHeaderRow above) + explain it via a cell note.
+  const lockedFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+  for (let r = 2; r <= numDataRows + 1; r++) ws.getCell(r, 1).fill = lockedFill;
+  ws.getCell(1, 1).note = 'ห้ามแก้ — ใช้ match ตอนกรอก performance';
+
+  return wb;
+}
+
 // ─── POST /commit — re-validate + create only error-free rows ─────────
 app.post('/commit', async c => {
   try {
     const prisma = c.get('prisma');
     const user = c.get('user');
-    const body = await c.req.json() as { kind?: string; rows?: { rowNumber: number; raw: RawRow }[] };
+    const body = await c.req.json() as {
+      kind?: string; rows?: { rowNumber: number; raw: RawRow }[]; originalFilename?: string;
+    };
     const kind: PlacementKind = body.kind === 'offline' || body.kind === 'offline_shop' ? 'offline_shop' : 'online';
     const inputRows = Array.isArray(body.rows) ? body.rows : [];
     if (inputRows.length === 0) return c.json({ error: 'ไม่มีแถวที่จะบันทึก' }, 400);
@@ -900,6 +1121,7 @@ app.post('/commit', async c => {
 
     let created = 0, branchesCreated = 0;
     const failed: { rowNumber: number; error: string }[] = [];
+    const committedRows: CommittedRow[] = [];
 
     for (const item of inputRows) {
       try {
@@ -928,7 +1150,7 @@ app.post('/commit', async c => {
           ? { final_price: data.final_price, pay_amount: null }
           : { final_price: null, pay_amount: null };
 
-        await prisma.placements.create({
+        const placement = await prisma.placements.create({
           data: {
             brand_id: data.brand_id!,
             placement_type: data.placement_type,
@@ -954,15 +1176,75 @@ app.post('/commit', async c => {
             } : {}),
             status: 'planned',
           },
+          select: { id: true },
         });
         created++;
+        // store_id may have just been resolved above (new branch) — data.store_id
+        // itself is still null in that case, so record the actual id used.
+        committedRows.push({ placementId: placement.id, raw: item.raw, data: { ...data, store_id: storeId } });
       } catch (err) {
         console.error('[import/commit] row failed', item.rowNumber, err);
         failed.push({ rowNumber: item.rowNumber, error: 'เกิดข้อผิดพลาดขณะบันทึก' });
       }
     }
 
-    return c.json({ created, branchesCreated, failed });
+    // Regenerate + store the "as-committed" reference workbook. This is a
+    // best-effort side effect: placements above are already created, so a
+    // failure here must NOT fail the whole commit response — just log it and
+    // return fileId: null so the frontend can show a "saved, but file not kept" note.
+    let fileId: number | null = null;
+    if (committedRows.length > 0) {
+      try {
+        const wb = buildStoredWorkbook(committedRows, kind, lk);
+        const buf = await wb.xlsx.writeBuffer();
+        // Same buffer-copy trick as GET /template/:kind — an ExcelJS buffer can
+        // point into a larger pooled ArrayBuffer; copy before sending it anywhere.
+        const bytes = Uint8Array.from(buf as unknown as Uint8Array);
+
+        const storagePath = `${user.id}/${crypto.randomUUID()}.xlsx`;
+        const env = c.env;
+        const upRes = await fetch(
+          `${env.SUPABASE_URL}/storage/v1/object/import-files/${storagePath}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              'x-upsert': 'false',
+            },
+            body: bytes,
+          },
+        );
+        if (!upRes.ok) {
+          throw new Error(`storage upload failed: ${upRes.status} ${await upRes.text()}`);
+        }
+
+        const brandNames = Array.from(new Set(
+          committedRows
+            .map(r => (r.data.brand_id != null ? lk.brands.find(b => b.id === r.data.brand_id)?.name : undefined))
+            .filter((n): n is string => !!n),
+        ));
+
+        const fileRow = await prisma.import_files.create({
+          data: {
+            user_id: user.id,
+            kind: kind === 'offline_shop' ? 'offline' : 'online',
+            file_type: 'plan',
+            storage_path: storagePath,
+            original_filename: typeof body.originalFilename === 'string' ? body.originalFilename : null,
+            placement_count: created,
+            brand_summary: brandNames.length > 0 ? brandNames.join(', ') : null,
+          },
+          select: { id: true },
+        });
+        fileId = fileRow.id;
+      } catch (err) {
+        console.error('[import/commit] failed to store reference workbook — placements already committed, continuing', err);
+        fileId = null;
+      }
+    }
+
+    return c.json({ created, branchesCreated, failed, fileId });
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to commit import' }, 500);
