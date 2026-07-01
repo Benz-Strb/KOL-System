@@ -776,8 +776,25 @@ export type ImportRawRow = {
   notes: string;
 };
 export type ImportRowResult = { rowNumber: number; raw: ImportRawRow; errors: string[]; warnings: string[] };
-export type ImportValidateResponse = { summary: { total: number; valid: number; withErrors: number }; rows: ImportRowResult[] };
-export type ImportCommitResponse = { created: number; branchesCreated: number; failed: { rowNumber: number; error: string }[] };
+
+// Matches buildLookupsResponse() in server/src/routes/placementsImport.ts — returned
+// under `lookups` by both /validate/:kind (file upload) and /validate-rows/:kind (JSON
+// re-validate) so the Phase 4 editable grid can build its dropdowns without a separate fetch.
+export type ImportLookups = {
+  brands: { id: number; name: string }[];
+  platforms: { id: number; name: string }[];
+  campaigns: { id: number; code: string; label: string | null }[];
+  products: { id: number; model_code: string; brandIds: number[] }[];
+  stores: { id: number; name: string; branch: string | null }[];
+  kols: { id: number; handle: string; handle_normalized: string; platform_id: number | null; follower_count: number | null }[];
+};
+
+export type ImportValidateResponse = {
+  summary: { total: number; valid: number; withErrors: number };
+  rows: ImportRowResult[];
+  lookups: ImportLookups;
+};
+export type ImportCommitResponse = { created: number; branchesCreated: number; failed: { rowNumber: number; error: string }[]; fileId?: number | null };
 
 export async function downloadImportTemplate(kind: ImportKind, lang?: string) {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
@@ -815,6 +832,22 @@ export async function validateImportFile(file: File, kind: ImportKind) {
 export const commitImport = (kind: ImportKind, rows: { rowNumber: number; raw: ImportRawRow }[]) =>
   api<ImportCommitResponse>('/api/placements/import/commit', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, rows }),
+  });
+
+// Phase 4 — JSON-body re-validate (no file upload) used by the ImportEditGrid's debounced
+// re-validate after an inline/bulk edit. Single source of truth is resolveRow() server-side;
+// this never re-implements that logic client-side.
+//
+// NOTE: unlike commitImport (which POSTs a nested `{ rowNumber, raw }[]`), the server's
+// POST /validate-rows/:kind expects a FLAT array — `{ rowNumber, ...RawRow fields }[]`,
+// i.e. RawRow's fields spread directly onto each row object alongside rowNumber (see
+// server/src/routes/placementsImport.ts, body typed as `(Partial<RawRow> & { rowNumber?:
+// number })[]`). Keep this function's own parameter shape matching commitImport's for call-
+// site consistency, and flatten internally before sending.
+export const validateImportRows = (kind: ImportKind, rows: { rowNumber: number; raw: ImportRawRow }[]) =>
+  api<ImportValidateResponse>(`/api/placements/import/validate-rows/${kind}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows: rows.map(r => ({ rowNumber: r.rowNumber, ...r.raw })) }),
   });
 
 // Auth

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
-  ChevronLeft, Download, Upload, CheckCircle2, AlertTriangle, XCircle,
+  ChevronLeft, Download, Upload, CheckCircle2,
   FileSpreadsheet, Loader2, AlertCircle, X, Globe, Store,
 } from 'lucide-react';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../api/index.js';
 import Toast from '../components/Toast.js';
 import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
+import ImportEditGrid from '../components/ImportEditGrid.js';
 
 const cardCls = 'bg-surface border border-hairline rounded-xl p-5';
 
@@ -23,17 +24,6 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
   );
 }
 
-function rowDetail(r: ImportRowResult, kind: ImportKind) {
-  const parts: string[] = [];
-  if (r.raw.platform) parts.push(r.raw.platform);
-  if (kind === 'online') {
-    if (r.raw.model) parts.push(r.raw.model);
-  } else if (r.raw.shopBranch) {
-    parts.push(r.raw.shopBranch);
-  }
-  return parts.join(' · ');
-}
-
 export default function ImportPlacementsPage() {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +33,14 @@ export default function ImportPlacementsPage() {
   const [validating, setValidating] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [result, setResult] = useState<ImportValidateResponse | null>(null);
+  // The grid owns the live, user-edited row state (raw + errors/warnings) once a file
+  // has been validated — this is the source of truth for the summary counts and for
+  // what gets sent to commitImport(), NOT the original result.rows snapshot.
+  const [gridRows, setGridRows] = useState<ImportRowResult[]>([]);
+  // Bumped once per successful validate — forces ImportEditGrid to remount (and reset
+  // its internal edit state) when a brand new file is uploaded, instead of trying to
+  // reconcile the previous file's edits with the newly uploaded rows.
+  const [importGeneration, setImportGeneration] = useState(0);
   const [commitResult, setCommitResult] = useState<ImportCommitResponse | null>(null);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
@@ -50,6 +48,7 @@ export default function ImportPlacementsPage() {
   function handleReset() {
     setFileName('');
     setResult(null);
+    setGridRows([]);
     setCommitResult(null);
     setError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -75,11 +74,14 @@ export default function ImportPlacementsPage() {
     setFileName(file.name);
     setError('');
     setResult(null);
+    setGridRows([]);
     setCommitResult(null);
     setValidating(true);
     try {
       const res = await validateImportFile(file, kind);
       setResult(res);
+      setGridRows(res.rows);
+      setImportGeneration(g => g + 1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('importPlacements.validateFailed'));
     } finally {
@@ -88,8 +90,8 @@ export default function ImportPlacementsPage() {
   }
 
   async function handleCommit() {
-    if (!result) return;
-    const validRows = result.rows.filter(r => r.errors.length === 0).map(r => ({ rowNumber: r.rowNumber, raw: r.raw }));
+    if (gridRows.length === 0) return;
+    const validRows = gridRows.filter(r => r.errors.length === 0).map(r => ({ rowNumber: r.rowNumber, raw: r.raw }));
     if (validRows.length === 0) return;
     setError('');
     setCommitting(true);
@@ -104,8 +106,10 @@ export default function ImportPlacementsPage() {
     }
   }
 
-  const validRows = result?.rows.filter(r => r.errors.length === 0) ?? [];
-  const errorRows = result?.rows.filter(r => r.errors.length > 0) ?? [];
+  // Live counts driven by the grid's current (possibly-edited) row state, not the
+  // original upload snapshot — so fixing an error in the grid updates these too.
+  const validRows = gridRows.filter(r => r.errors.length === 0);
+  const errorRows = gridRows.filter(r => r.errors.length > 0);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -191,62 +195,26 @@ export default function ImportPlacementsPage() {
           </div>
         </div>
 
-        {/* Step 3 — preview */}
+        {/* Step 3 — preview + inline edit (Phase 4) */}
         {result && !commitResult && (
           <div className={cardCls}>
             <SectionHeader icon={<CheckCircle2 size={15} />} title={t('importPlacements.step3Title')} />
 
             <div className="mb-4 p-3 bg-canvas rounded-xl text-sm text-ink flex flex-wrap gap-x-4 gap-y-1">
-              <span>{t('importPlacements.foundRows', { count: result.summary.total })}</span>
-              <span className="text-green-600">{t('importPlacements.readyRows', { count: result.summary.valid })}</span>
-              {result.summary.withErrors > 0 && (
-                <span className="text-red-500">{t('importPlacements.errorRows', { count: result.summary.withErrors })}</span>
+              <span>{t('importPlacements.foundRows', { count: gridRows.length })}</span>
+              <span className="text-green-600">{t('importPlacements.readyRows', { count: validRows.length })}</span>
+              {errorRows.length > 0 && (
+                <span className="text-red-500">{t('importPlacements.errorRows', { count: errorRows.length })}</span>
               )}
             </div>
 
-            <div className="overflow-x-auto -mx-5 px-5">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted uppercase tracking-wide border-b border-hairline">
-                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colRow')}</th>
-                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colStatus')}</th>
-                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colBrand')}</th>
-                    <th className="py-2 pr-3 font-medium">KOL Handle</th>
-                    <th className="py-2 pr-3 font-medium">{t('importPlacements.colDetail')}</th>
-                    <th className="py-2 pr-3 font-medium">Campaign</th>
-                    <th className="py-2 font-medium">{t('importPlacements.colNotes')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.rows.map(r => {
-                    const hasError = r.errors.length > 0;
-                    const hasWarning = r.warnings.length > 0;
-                    return (
-                      <tr key={r.rowNumber} className={`border-b border-hairline/50 ${hasError ? 'bg-red-500/5' : hasWarning ? 'bg-yellow-500/5' : ''}`}>
-                        <td className="py-2 pr-3 text-muted">{r.rowNumber}</td>
-                        <td className="py-2 pr-3">
-                          {hasError ? (
-                            <span className="inline-flex items-center gap-1 text-red-500"><XCircle size={13} /> {t('importPlacements.skip')}</span>
-                          ) : hasWarning ? (
-                            <span className="inline-flex items-center gap-1 text-yellow-600"><AlertTriangle size={13} /> {t('importPlacements.warning')}</span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-green-600"><CheckCircle2 size={13} /> {t('importPlacements.ready')}</span>
-                          )}
-                        </td>
-                        <td className="py-2 pr-3 text-ink">{r.raw.brand || '—'}</td>
-                        <td className="py-2 pr-3 text-ink">{r.raw.kolHandle || '—'}</td>
-                        <td className="py-2 pr-3 text-muted">{rowDetail(r, kind) || '—'}</td>
-                        <td className="py-2 pr-3 text-muted">{r.raw.campaign || '—'}</td>
-                        <td className="py-2 text-xs">
-                          {r.errors.map((e, i) => <div key={`e${i}`} className="text-red-500">{e}</div>)}
-                          {r.warnings.map((w, i) => <div key={`w${i}`} className="text-yellow-600">{w}</div>)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ImportEditGrid
+              key={importGeneration}
+              rows={gridRows}
+              lookups={result.lookups}
+              kind={kind}
+              onRowsChange={setGridRows}
+            />
 
             <div className="flex gap-2 pt-4">
               <button type="button" onClick={handleCommit} disabled={committing || validRows.length === 0}
