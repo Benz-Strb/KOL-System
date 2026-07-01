@@ -6,6 +6,8 @@ import { requireAuth } from '../middleware/auth.js';
 import type { AuthUser } from '../middleware/auth.js';
 import type { AppEnv } from '../types.js';
 import { isSafeUrl } from '../lib/isSafeUrl.js';
+import { applyPerformance } from '../lib/performance.js';
+import type { ApplyPerformancePayload, PerformanceMetricInput } from '../lib/performance.js';
 
 const app = new Hono<AppEnv>();
 app.use('*', requireAuth);
@@ -1087,11 +1089,21 @@ function buildStoredWorkbook(committedRows: CommittedRow[], kind: PlacementKind,
   // Cosmetic number/date formats — target date & follower/price columns are at
   // fixed positions regardless of kind (col 1 is placement_id, so +1 vs the
   // template's own column numbers).
+  //
+  // The performance block's own `publication_date` column (first column of
+  // performanceHeaders(), currently blank) ALSO gets a date numFmt pre-applied —
+  // without it, a date value written into that cell round-trips through
+  // ExcelJS as a bare serial number (not a JS Date) once the file is saved and
+  // reloaded, which Phase 7's cellText()-based parser can't distinguish from
+  // garbage input. Pre-formatting the column the same way applyDateValidation()
+  // does for the plan template's date column avoids that ambiguity.
+  const pubDateCol = 2 + planHeaders.length;
   for (let r = 2; r <= numDataRows + 1; r++) {
     ws.getCell(r, 5).numFmt = '#,##0';       // Follower
     ws.getCell(r, 8).numFmt = 'yyyy-mm-dd';  // Target publication date
     ws.getCell(r, 10).numFmt = '#,##0.00';   // Final price
     ws.getCell(r, 11).numFmt = '#,##0.00';   // Ads cost
+    ws.getCell(r, pubDateCol).numFmt = 'yyyy-mm-dd'; // Performance: publication_date
   }
 
   styleHeaderRow(ws, categories);
@@ -1369,6 +1381,386 @@ app.get('/files/:id/download', async c => {
   } catch (err) {
     console.error(err);
     return c.json({ error: 'failed to download import file' }, 500);
+  }
+});
+
+// ─── Phase 7 — Performance round-trip import ───────────────────────────
+// Reads a previously-stored "as-committed" workbook (see buildStoredWorkbook
+// above) back in: column 1 = placement_id (locked), columns 2..(1+planKeys.length)
+// = the same plan columns as the original template, and the performance block
+// (performanceHeaders(kind)) immediately after that.
+//
+// Design decision: a stored file is always single-kind — buildStoredWorkbook()
+// takes one `kind` for the WHOLE file (its column layout is fixed at generation
+// time), so mixing online/offline rows in one file was never possible in the
+// first place. That means we don't need to auto-detect the layout per row (e.g.
+// by counting populated header cells) — it's simplest and most robust to just
+// require `:kind` as a URL param, mirroring the existing `/validate/:kind`
+// convention exactly. The frontend already has a `kind` toggle state for the
+// plan-import flow (Task 4 reuses it) so this adds no new UI surface.
+function planKeysFor(kind: PlacementKind): (keyof RawRow)[] {
+  return kind === 'online' ? ONLINE_RAW_KEYS : OFFLINE_RAW_KEYS;
+}
+
+// Column of a given plan field within the STORED workbook layout (offset by +1
+// for the leading placement_id column vs the plain input template).
+function planColFor(key: keyof RawRow, kind: PlacementKind): number | null {
+  const idx = planKeysFor(kind).indexOf(key);
+  return idx === -1 ? null : 2 + idx;
+}
+
+// Reads the performance block for a row, keyed by the exact header strings from
+// performanceHeaders() (see the comment at PERFORMANCE_HEADERS_COMMON above —
+// "field names double as the header text ... read these back by exact key").
+function readPerformanceCells(row: ExcelJS.Row, kind: PlacementKind): Record<string, string> {
+  const perfHeaders = performanceHeaders(kind);
+  const startCol = 2 + planKeysFor(kind).length;
+  const out: Record<string, string> = {};
+  perfHeaders.forEach((h, i) => { out[h] = cellText(row, startCol + i); });
+  return out;
+}
+
+// UTM/ad-content fields live in the PLAN section (online only, cols 11-15 of
+// onlineHeaders) rather than the performance block — they're often only known
+// once the post is actually live, so the round-trip lets the user fill them in
+// here too. applyPerformance() already gates these on `isOnline` internally, so
+// it's safe to always attempt reading them for an online-kind file.
+const ONLINE_UTM_KEYS: (keyof RawRow)[] = ['adContentName', 'utmCampaignName', 'shopeeUtm', 'lazadaUtm', 'websiteUtm'];
+
+function readOnlineUtmCells(row: ExcelJS.Row): Record<string, string> {
+  const out: Record<string, string> = {};
+  ONLINE_UTM_KEYS.forEach(key => {
+    const col = planColFor(key, 'online');
+    out[key] = col != null ? cellText(row, col) : '';
+  });
+  return out;
+}
+
+function parseOptionalInt(raw: string, label: string, errors: string[]): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const n = Number(t.replace(/,/g, ''));
+  if (!Number.isFinite(n)) { errors.push(`${label} "${raw}" ไม่ใช่ตัวเลขที่ถูกต้อง`); return null; }
+  return Math.round(n);
+}
+
+function parseOptionalDecimal(raw: string, label: string, errors: string[]): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const n = Number(t.replace(/,/g, ''));
+  if (!Number.isFinite(n)) { errors.push(`${label} "${raw}" ไม่ใช่ตัวเลขที่ถูกต้อง`); return null; }
+  return String(n);
+}
+
+interface PerformancePreviewRow {
+  rowNumber: number;
+  placement_id: number | null;
+  brand: string | null;
+  kolHandle: string | null;
+  model: string | null;
+  currentStatus: string | null;
+  errors: string[];
+  warnings: string[];
+  willWrite: ApplyPerformancePayload | null;
+}
+
+app.post('/performance/validate/:kind', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const kind = parseKindParam(c.req.param('kind'));
+    if (!kind) return c.json({ error: 'kind ต้องเป็น online หรือ offline' }, 400);
+
+    const formData = await c.req.formData();
+    const file = formData.get('file');
+    if (!(file instanceof File)) return c.json({ error: 'กรุณาอัปโหลดไฟล์' }, 400);
+    if (file.size > MAX_FILE_SIZE) return c.json({ error: 'ไฟล์มีขนาดใหญ่เกินไป (จำกัด 5MB)' }, 400);
+
+    const wb = new ExcelJS.Workbook();
+    const buf = Buffer.from(await file.arrayBuffer());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await wb.xlsx.load(buf as any);
+    const ws = wb.worksheets[0];
+    if (!ws) return c.json({ error: 'ไม่พบชีตข้อมูลในไฟล์' }, 400);
+
+    const lk = await loadLookups(prisma, user);
+
+    type ParsedRow = { rowNumber: number; placementIdRaw: string; perf: Record<string, string>; utm: Record<string, string> | null };
+    const parsed: ParsedRow[] = [];
+    ws.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // header
+      const placementIdRaw = cellText(row, 1);
+      const perf = readPerformanceCells(row, kind);
+      const utm = kind === 'online' ? readOnlineUtmCells(row) : null;
+      const isBlank = !placementIdRaw.trim()
+        && Object.values(perf).every(v => !v.trim())
+        && (!utm || Object.values(utm).every(v => !v.trim()));
+      if (isBlank) return;
+      parsed.push({ rowNumber, placementIdRaw, perf, utm });
+    });
+
+    if (parsed.length === 0) {
+      return c.json({ summary: { total: 0, willUpdate: 0, skipped: 0, errors: 0 }, rows: [] });
+    }
+
+    const ids = Array.from(new Set(
+      parsed.map(p => Number(p.placementIdRaw)).filter(n => Number.isFinite(n)),
+    ));
+    const placementRows = ids.length > 0 ? await prisma.placements.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true, brand_id: true, placement_type: true, status: true,
+        kol_id: true, platform_id: true, product_id: true, store_id: true,
+      },
+    }) : [];
+    const placementById = new Map(placementRows.map(p => [p.id, p]));
+    const platformById = new Map(lk.platforms.map(p => [p.id, p.name]));
+    const productById = new Map(lk.products.map(p => [p.id, p.model_code]));
+    const storeById = new Map(lk.stores.map(s => [s.id, formatShopBranch(s)]));
+    const brandById = new Map(lk.brands.map(b => [b.id, b.name]));
+
+    const rows: PerformancePreviewRow[] = parsed.map(p => {
+      const errors: string[] = [];
+      const warnings: string[] = [];
+
+      let placementId: number | null = null;
+      if (!p.placementIdRaw.trim()) {
+        errors.push('ไม่มี placement_id ในแถวนี้ — ห้ามลบ/แก้คอลัมน์นี้');
+      } else {
+        const n = Number(p.placementIdRaw);
+        if (!Number.isFinite(n)) errors.push(`placement_id "${p.placementIdRaw}" ไม่ใช่ตัวเลข`);
+        else placementId = Math.trunc(n);
+      }
+
+      let brand: string | null = null;
+      let kolHandle: string | null = null;
+      let model: string | null = null;
+      let currentStatus: string | null = null;
+      let placement: (typeof placementRows)[number] | undefined;
+
+      if (placementId != null) {
+        placement = placementById.get(placementId);
+        if (!placement) {
+          errors.push(`ไม่พบ placement_id ${placementId} ในระบบ — อาจถูกลบไปแล้ว`);
+        } else {
+          currentStatus = placement.status;
+          brand = brandById.get(placement.brand_id) ?? null;
+          if (!lk.isAdmin && !lk.userBrandIds.includes(placement.brand_id)) {
+            errors.push('ไม่มีสิทธิ์เข้าถึงแบรนด์ของ placement นี้');
+          }
+          const expectedKind: PlacementKind = placement.placement_type === 'online' ? 'online' : 'offline_shop';
+          if (expectedKind !== kind) {
+            errors.push(`ไฟล์นี้เลือกโหมด "${kind === 'online' ? 'Online' : 'Offline'}" แต่ placement นี้เป็น "${expectedKind === 'online' ? 'Online' : 'Offline'}" — ตรวจสอบว่าเลือกโหมดถูกต้องก่อนอัปโหลด`);
+          }
+          const kol = lk.kolsList.find(k => k.id === placement!.kol_id && k.platform_id === placement!.platform_id);
+          kolHandle = kol?.handle ?? null;
+          model = placement.placement_type === 'online'
+            ? (placement.product_id != null ? productById.get(placement.product_id) ?? null : null)
+            : (placement.store_id != null ? storeById.get(placement.store_id) ?? null : null);
+        }
+      }
+
+      let willWrite: ApplyPerformancePayload | null = null;
+
+      if (placement && errors.length === 0) {
+        const isOnline = placement.placement_type === 'online';
+        const perf = p.perf;
+
+        if (isOnline && p.utm) {
+          (['shopeeUtm', 'lazadaUtm', 'websiteUtm'] as const).forEach(key => {
+            const v = p.utm![key];
+            if (v.trim() && !isSafeUrl(v.trim())) {
+              errors.push(`${key} "${v.trim()}" ต้องเป็น URL ที่ขึ้นต้นด้วย http:// หรือ https://`);
+            }
+          });
+        }
+
+        const metrics: PerformanceMetricInput[] = [];
+        const measured_at = new Date().toISOString().slice(0, 10);
+        if (isOnline) {
+          (['shopee', 'lazada', 'website'] as const).forEach(ch => {
+            const visitsRaw = perf[`${ch}_visits`] ?? '';
+            const atcRaw = perf[`${ch}_atc`] ?? '';
+            const ordersRaw = perf[`${ch}_orders`] ?? '';
+            const gmvRaw = perf[`${ch}_gmv`] ?? '';
+            const atcValueRaw = ch === 'shopee' ? (perf.shopee_atc_value ?? '') : '';
+            const hasAny = [visitsRaw, atcRaw, ordersRaw, gmvRaw, atcValueRaw].some(v => v.trim() !== '');
+            if (!hasAny) return;
+            metrics.push({
+              channel: ch,
+              measured_at,
+              visits: parseOptionalInt(visitsRaw, `${ch}_visits`, errors),
+              atc: parseOptionalInt(atcRaw, `${ch}_atc`, errors),
+              orders: parseOptionalInt(ordersRaw, `${ch}_orders`, errors),
+              gmv: parseOptionalDecimal(gmvRaw, `${ch}_gmv`, errors),
+              ...(ch === 'shopee' ? { atc_value: parseOptionalDecimal(atcValueRaw, 'shopee_atc_value', errors) } : {}),
+            });
+          });
+        }
+
+        // Manual engagement channel depends on the placement's ACTUAL platform
+        // (not anything from the file) — same logic as PerformanceModal.tsx.
+        const platformName = (placement.platform_id != null ? platformById.get(placement.platform_id) : undefined)?.toLowerCase() ?? '';
+        const isYoutube = platformName === 'youtube';
+        const isLamon8 = /lemon8|lamon8/i.test(platformName);
+        if (isYoutube || isLamon8) {
+          const vdoRaw = perf.vdo_view ?? '';
+          const likesRaw = perf.likes ?? '';
+          const commentsRaw = perf.comments ?? '';
+          const savesRaw = perf.saves ?? '';
+          const sharesRaw = perf.shares ?? '';
+          const hasAny = [vdoRaw, likesRaw, commentsRaw, savesRaw, sharesRaw].some(v => v.trim() !== '');
+          if (hasAny) {
+            metrics.push({
+              channel: isYoutube ? 'youtube' : 'lamon8',
+              measured_at,
+              ...(isYoutube
+                ? {
+                    vdo_view: parseOptionalInt(vdoRaw, 'vdo_view', errors),
+                    likes: parseOptionalInt(likesRaw, 'likes', errors),
+                    comments: parseOptionalInt(commentsRaw, 'comments', errors),
+                    shares: parseOptionalInt(sharesRaw, 'shares', errors),
+                  }
+                : {
+                    likes: parseOptionalInt(likesRaw, 'likes', errors),
+                    comments: parseOptionalInt(commentsRaw, 'comments', errors),
+                    saves: parseOptionalInt(savesRaw, 'saves', errors),
+                  }),
+            });
+          }
+        }
+
+        const payAmountRaw = (perf.pay_amount ?? '').trim();
+        const publicationDateRaw = (perf.publication_date ?? '').trim();
+        const postUrlRaw = (perf.post_url ?? '').trim();
+        const hasAnyPerf = metrics.length > 0 || payAmountRaw !== '' || publicationDateRaw !== '' || postUrlRaw !== ''
+          || (isOnline && p.utm != null && Object.values(p.utm).some(v => v.trim() !== ''));
+
+        // Normalize + validate the date the same way resolveRow() validates
+        // target_pub_date — a defensive net in case a cell round-trips through
+        // Excel/ExcelJS as a bare number instead of a real Date (see the numFmt
+        // fix in buildStoredWorkbook's publication_date column above): reject
+        // obviously-bad values with a clear error instead of silently handing
+        // `new Date("46205")` (Invalid Date) to applyPerformance().
+        let publicationDateNormalized: string | null = null;
+        if (publicationDateRaw) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(publicationDateRaw)) {
+            publicationDateNormalized = publicationDateRaw;
+          } else {
+            const d = new Date(publicationDateRaw);
+            if (Number.isNaN(d.getTime())) {
+              errors.push(`publication_date "${publicationDateRaw}" ไม่ถูกต้อง (ใช้รูปแบบ YYYY-MM-DD)`);
+            } else {
+              publicationDateNormalized = d.toISOString().slice(0, 10);
+            }
+          }
+        }
+
+        if (!hasAnyPerf) {
+          warnings.push('ไม่มีข้อมูล performance กรอกในแถวนี้ — จะข้าม (ไม่มีอะไรให้เขียน)');
+        } else {
+          if (!publicationDateRaw) {
+            warnings.push('publication_date ว่าง — ถ้าบันทึกจะล้างค่าที่มีอยู่เดิม (ถ้ามี)');
+          }
+          if (errors.length === 0) {
+            willWrite = {
+              publication_date: publicationDateNormalized,
+              post_url: postUrlRaw || null,
+              ...(payAmountRaw !== '' ? { pay_amount: parseOptionalDecimal(payAmountRaw, 'pay_amount', errors) } : {}),
+              ...(metrics.length > 0 ? { metrics } : {}),
+              ...(isOnline && p.utm ? {
+                ad_content_name: p.utm.adContentName?.trim() || null,
+                utm_campaign_name: p.utm.utmCampaignName?.trim() || null,
+                shopee_utm: p.utm.shopeeUtm?.trim() || null,
+                lazada_utm: p.utm.lazadaUtm?.trim() || null,
+                website_utm: p.utm.websiteUtm?.trim() || null,
+              } : {}),
+            };
+          }
+        }
+      }
+
+      return {
+        rowNumber: p.rowNumber,
+        placement_id: placementId,
+        brand,
+        kolHandle,
+        model,
+        currentStatus,
+        errors,
+        warnings,
+        willWrite: errors.length === 0 ? willWrite : null,
+      };
+    });
+
+    const errorsCount = rows.filter(r => r.errors.length > 0).length;
+    const willUpdateCount = rows.filter(r => r.errors.length === 0 && r.willWrite).length;
+    const skippedCount = rows.length - errorsCount - willUpdateCount;
+
+    return c.json({
+      summary: { total: rows.length, willUpdate: willUpdateCount, skipped: skippedCount, errors: errorsCount },
+      rows,
+    });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'ไม่สามารถอ่านไฟล์ได้ — ตรวจสอบว่าเป็นไฟล์ที่ดาวน์โหลดจากระบบ (.xlsx)' }, 400);
+  }
+});
+
+// ─── POST /performance/commit ───────────────────────────────────────────
+// Body: the rows the client got back from /performance/validate/:kind (only the
+// ones with willWrite + no errors are expected, but we never trust that
+// filtering — same principle as POST /commit re-resolving everything server-side
+// rather than trusting the client's prior /validate response). Brand access and
+// placement existence are re-checked per row here, and `isOnline` is re-derived
+// from the placement's actual placement_type (never trusted from the file/client).
+app.post('/performance/commit', async c => {
+  try {
+    const prisma = c.get('prisma');
+    const user = c.get('user');
+    const isAdmin = user.role === 'admin';
+
+    const body = await c.req.json() as {
+      rows?: { placement_id?: number; payload?: ApplyPerformancePayload }[];
+    };
+    const inputRows = Array.isArray(body.rows) ? body.rows : [];
+    if (inputRows.length === 0) return c.json({ error: 'ไม่มีแถวที่จะอัปเดต' }, 400);
+
+    let updated = 0;
+    const failed: { placement_id: number | null; error: string }[] = [];
+
+    for (const item of inputRows) {
+      const placementId = item.placement_id;
+      if (typeof placementId !== 'number' || !Number.isFinite(placementId)) {
+        failed.push({ placement_id: placementId ?? null, error: 'placement_id ไม่ถูกต้อง' });
+        continue;
+      }
+      try {
+        const existing = await prisma.placements.findUnique({
+          where: { id: placementId },
+          select: { brand_id: true, placement_type: true },
+        });
+        if (!existing) {
+          failed.push({ placement_id: placementId, error: 'ไม่พบ placement นี้ในระบบ' });
+          continue;
+        }
+        if (!isAdmin && !user.brandIds.includes(existing.brand_id)) {
+          failed.push({ placement_id: placementId, error: 'ไม่มีสิทธิ์เข้าถึงแบรนด์นี้' });
+          continue;
+        }
+        const isOnline = existing.placement_type === 'online';
+        await applyPerformance(prisma, placementId, isOnline, item.payload ?? {});
+        updated++;
+      } catch (err) {
+        console.error('[import/performance/commit] row failed', placementId, err);
+        failed.push({ placement_id: placementId, error: 'เกิดข้อผิดพลาดขณะบันทึก' });
+      }
+    }
+
+    return c.json({ updated, failed });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'failed to commit performance import' }, 500);
   }
 });
 

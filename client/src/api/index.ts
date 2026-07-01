@@ -909,6 +909,62 @@ export async function downloadImportFile(id: number, fallbackFilename = `import_
   URL.revokeObjectURL(url);
 }
 
+// Phase 7 — performance round-trip import: download a stored "as-committed"
+// file (Phase 6), fill in performance data offline, upload it back here to
+// match rows by placement_id and write via applyPerformance() server-side.
+// Payload shape mirrors updatePerformance()'s body (line ~292) exactly, since
+// the server's willWrite is built from the same ApplyPerformancePayload type.
+export type PerformancePayload = {
+  publication_date?: string | null;
+  post_url?: string | null;
+  pay_amount?: string | number | null;
+  metrics?: MetricEntry[];
+  ad_content_name?: string | null;
+  utm_campaign_name?: string | null;
+  shopee_utm?: string | null;
+  lazada_utm?: string | null;
+  website_utm?: string | null;
+};
+
+export type PerformancePreviewRow = {
+  rowNumber: number;
+  placement_id: number | null;
+  brand: string | null;
+  kolHandle: string | null;
+  model: string | null;
+  currentStatus: string | null;
+  errors: string[];
+  warnings: string[];
+  willWrite: PerformancePayload | null;
+};
+
+export type PerformanceValidateResponse = {
+  summary: { total: number; willUpdate: number; skipped: number; errors: number };
+  rows: PerformancePreviewRow[];
+};
+
+export type PerformanceCommitResponse = {
+  updated: number;
+  failed: { placement_id: number | null; error: string }[];
+};
+
+export async function validatePerformanceFile(file: File, kind: ImportKind) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
+  const res = await fetch(`${API_BASE_URL}/api/placements/import/performance/validate/${kind}`, { method: 'POST', headers: authHeader, body: fd });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? res.statusText);
+  }
+  return res.json() as Promise<PerformanceValidateResponse>;
+}
+
+export const commitPerformanceImport = (rows: { placement_id: number; payload: PerformancePayload }[]) =>
+  api<PerformanceCommitResponse>('/api/placements/import/performance/commit', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }),
+  });
+
 // Auth
 export const getMe = () => api<AppUser>('/api/auth/me');
 
