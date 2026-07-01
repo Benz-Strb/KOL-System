@@ -16,13 +16,16 @@ interface Props {
   productCategories: ProductCategory[];
   onCreated: (product: { id: number; model_code: string }) => void;
   isAdmin?: boolean;
+  // Phase 5 (bulk import "+ เพิ่ม Model" row action) — prefills the field with the raw
+  // text the user typed in the grid's Model cell, so they don't have to retype it.
+  initialModelCode?: string;
 }
 
-export default function AddModelModal({ onClose, brandId, productCategories, onCreated, isAdmin = false }: Props) {
+export default function AddModelModal({ onClose, brandId, productCategories, onCreated, isAdmin = false, initialModelCode = '' }: Props) {
   const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
 
-  const [modelCode, setModelCode] = useState('');
+  const [modelCode, setModelCode] = useState(initialModelCode);
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);

@@ -499,6 +499,8 @@ export const th = {
       storeNoResults: 'ไม่พบห้าง/สาขา',
       storeFreeTextHint: 'พิมพ์ห้าง / สาขาใหม่ได้ถ้ายังไม่มีในระบบ',
       revalidateFailed: 'ตรวจสอบข้อมูลไม่สำเร็จ — ลองแก้ไขเซลล์อีกครั้ง',
+      addModelButton: '+ เพิ่ม Model',
+      addKolButton: '+ เพิ่ม KOL',
     },
     bulk: {
       selectedCount: 'เลือกแล้ว {{count}} แถว',
@@ -607,6 +609,12 @@ export const th = {
     cancel: 'ยกเลิก',
     duplicateError: 'model code นี้มีอยู่แล้ว',
     addModelSuccess: 'เพิ่ม model เรียบร้อย',
+  },
+  addKol: {
+    addKolTitle: 'เพิ่ม KOL ใหม่',
+    duplicateError: 'KOL "{{handle}}" นี้มีอยู่แล้วในระบบ',
+    useExisting: 'ใช้ KOL ที่มีอยู่นี้แทน',
+    addKolSuccess: 'เพิ่ม KOL เรียบร้อย',
   },
   manageCategories: {
     title: 'จัดการหมวดหมู่สินค้า',

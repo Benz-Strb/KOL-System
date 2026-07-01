@@ -494,6 +494,8 @@ export const zh = {
       storeNoResults: '未找到商场/分店',
       storeFreeTextHint: '如果系统中还没有，可以直接输入新的商场 / 分店',
       revalidateFailed: '验证失败 — 请重新编辑该单元格',
+      addModelButton: '+ 添加 Model',
+      addKolButton: '+ 添加 KOL',
     },
     bulk: {
       selectedCount: '已选择 {{count}} 行',
@@ -602,6 +604,12 @@ export const zh = {
     cancel: '取消',
     duplicateError: '该 model code 已存在',
     addModelSuccess: '已添加 model',
+  },
+  addKol: {
+    addKolTitle: '添加新 KOL',
+    duplicateError: '该 KOL "{{handle}}" 已存在于系统中',
+    useExisting: '改用该已有 KOL',
+    addKolSuccess: '已添加 KOL',
   },
   manageCategories: {
     title: '管理产品类别',

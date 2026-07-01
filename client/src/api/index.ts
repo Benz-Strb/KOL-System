@@ -51,6 +51,22 @@ export function setAuthToken(token: string | null) { _token = token; }
 let _deactivatedHandler: (() => void) | null = null;
 export function setDeactivatedHandler(fn: () => void) { _deactivatedHandler = fn; }
 
+// Thrown by api() on any non-ok response. Extends Error so every existing
+// `err instanceof Error` / `err.message === 'duplicate'` call site keeps working
+// unchanged — `status`/`body` are additive, for callers that need the rest of the
+// JSON error body (e.g. POST /api/kols's 409 response also carries the existing
+// `kol` record, which AddKolModal.tsx surfaces to the user).
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const authHeader: Record<string, string> = _token ? { Authorization: `Bearer ${_token}` } : {};
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -62,7 +78,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     if (res.status === 403 && err.error === 'User not found or inactive') {
       _deactivatedHandler?.();
     }
-    throw new Error(err.error ?? res.statusText);
+    throw new ApiError(err.error ?? res.statusText, res.status, err);
   }
   return res.json();
 }

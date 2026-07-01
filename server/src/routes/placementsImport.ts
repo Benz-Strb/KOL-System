@@ -184,7 +184,7 @@ async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookup
   const seesAllBrands = isAdmin;
   const currentYear = new Date().getFullYear();
 
-  const [brands, platforms, campaigns, products, productBrandRows, stores, kols] = await Promise.all([
+  const [brands, platforms, campaigns, products, productBrandRows, productOwnBrandRows, stores, kols] = await Promise.all([
     prisma.brands.findMany({
       where: { active: true, ...(seesAllBrands ? {} : { id: { in: user.brandIds } }) },
       orderBy: { name: 'asc' },
@@ -193,10 +193,14 @@ async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookup
     prisma.platforms.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     prisma.campaigns.findMany({ where: { year: currentYear }, orderBy: { start_date: 'asc' }, select: { id: true, code: true, label: true } }),
     prisma.$queryRaw<{ id: number; model_code: string }[]>`SELECT id, model_code FROM products_dropdown ORDER BY model_code`,
-    // products has no brand column — derive product↔brand membership from placement history,
-    // same approach as GET /api/products?brand_id= used by the manual form (NewPlacementPage)
+    // Historic product↔brand membership derived from placement history, same approach
+    // as GET /api/products?brand_id= used by the manual form (NewPlacementPage).
     prisma.$queryRaw<{ product_id: number; brand_id: number }[]>`
       SELECT DISTINCT product_id, brand_id FROM placements WHERE product_id IS NOT NULL`,
+    // products.brand_id (Phase B, work item 56) — a product's "home" brand. Needed so a
+    // model just created via POST /api/products (no placements yet) doesn't get flagged
+    // as "wrong brand" on its very first import row (it'd have zero placement history).
+    prisma.$queryRaw<{ id: number; brand_id: number }[]>`SELECT id, brand_id FROM products WHERE brand_id IS NOT NULL`,
     prisma.stores.findMany({ where: { active: true }, orderBy: [{ name: 'asc' }, { branch: 'asc' }], select: { id: true, name: true, branch: true } }),
     // not filtered to is_primary: an Excel row's handle should resolve to
     // whichever specific platform account it actually matches, since a kol
@@ -212,6 +216,10 @@ async function loadLookups(prisma: PrismaClient, user: AuthUser): Promise<Lookup
   for (const row of productBrandRows) {
     if (!productBrandIds.has(row.product_id)) productBrandIds.set(row.product_id, new Set());
     productBrandIds.get(row.product_id)!.add(row.brand_id);
+  }
+  for (const row of productOwnBrandRows) {
+    if (!productBrandIds.has(row.id)) productBrandIds.set(row.id, new Set());
+    productBrandIds.get(row.id)!.add(row.brand_id);
   }
 
   return {

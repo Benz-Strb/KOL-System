@@ -2,10 +2,21 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, AlertTriangle, XCircle, Loader2, ChevronDown, ChevronRight, X } from 'lucide-react';
 import {
-  validateImportRows,
-  type ImportKind, type ImportLookups, type ImportRawRow, type ImportRowResult,
+  validateImportRows, getDropdowns,
+  type ImportKind, type ImportLookups, type ImportRawRow, type ImportRowResult, type ProductCategory,
 } from '../api/index.js';
 import Select, { DropdownPanel } from './Select.js';
+import AddModelModal from './AddModelModal.js';
+import AddKolModal, { type ExistingKol } from './AddKolModal.js';
+import Toast from './Toast.js';
+
+// Phase 5 — exact error-string prefixes resolveRow() (server/src/routes/placementsImport.ts)
+// pushes for "not found in system" so the grid can offer an inline "+ Add" button. Deliberately
+// distinct from the separate "wrong brand" Model error (`Model "x" ไม่ได้อยู่ในแบรนด์ "y"`),
+// which starts with `Model "` not `ไม่พบ Model "` — a wrong-brand row should NOT get an "add"
+// button since the model already exists (just under a different brand).
+const MODEL_NOT_FOUND_PREFIX = 'ไม่พบ Model "';
+const KOL_NOT_FOUND_PREFIX = 'ไม่พบ KOL "';
 
 // ─── Design note (Phase 4) ───────────────────────────────────────────────
 // No existing "editable Excel-like grid" or "bulk edit bar" pattern exists elsewhere
@@ -277,11 +288,26 @@ interface Props {
   onRowsChange: (rows: ImportRowResult[]) => void;
 }
 
-export default function ImportEditGrid({ rows: initialRows, lookups, kind, onRowsChange }: Props) {
+export default function ImportEditGrid({ rows: initialRows, lookups: initialLookups, kind, onRowsChange }: Props) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<ImportRowResult[]>(initialRows);
   const rowsRef = useRef(rows);
   useEffect(() => { rowsRef.current = rows; }, [rows]);
+
+  // Local mutable copy of the lookups prop — Phase 5's "+ เพิ่ม Model/KOL" flow merges a
+  // freshly created product/kol in here immediately (so dropdowns/autocomplete see it right
+  // away) while the real fix (clearing the row's error) comes from the full re-validate
+  // triggered right after, same as any other edit (see `revision` below).
+  const [lookups, setLookups] = useState<ImportLookups>(initialLookups);
+
+  // Phase 5 — "+ เพิ่ม Model" / "+ เพิ่ม KOL" row actions
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+  useEffect(() => {
+    getDropdowns().then(d => setProductCategories(d.productCategories)).catch(() => {});
+  }, []);
+  const [addModelState, setAddModelState] = useState<{ brandId: number; modelText: string } | null>(null);
+  const [addKolState, setAddKolState] = useState<{ handleText: string } | null>(null);
+  const [addToast, setAddToast] = useState('');
 
   // Bridge local row state back up to the parent page (source of truth for Commit) —
   // stored in a ref so the effect only depends on `rows`, not the parent's callback identity.
@@ -499,7 +525,25 @@ export default function ImportEditGrid({ rows: initialRows, lookups, kind, onRow
                       <td className={`${stickyTdCls}`} style={{ left: STICKY_LEFT.brand, width: STICKY_W.brand }} />
                       <td className={`${stickyTdCls} border-r border-hairline`} style={{ left: STICKY_LEFT.kol, width: STICKY_W.kol }} />
                       <td colSpan={totalCols - 5} className="py-1.5 px-2.5 text-xs">
-                        {row.errors.map((e, i) => <div key={`e${i}`} className="text-red-500">{e}</div>)}
+                        {row.errors.map((e, i) => (
+                          <div key={`e${i}`} className="text-red-500 flex items-center gap-2">
+                            <span>{e}</span>
+                            {e.startsWith(MODEL_NOT_FOUND_PREFIX) && brandId != null && (
+                              <button type="button"
+                                onClick={() => setAddModelState({ brandId, modelText: row.raw.model })}
+                                className="text-accent hover:text-accent-hover font-medium whitespace-nowrap transition-colors">
+                                {t('importPlacements.edit.addModelButton')}
+                              </button>
+                            )}
+                            {e.startsWith(KOL_NOT_FOUND_PREFIX) && (
+                              <button type="button"
+                                onClick={() => setAddKolState({ handleText: row.raw.kolHandle })}
+                                className="text-accent hover:text-accent-hover font-medium whitespace-nowrap transition-colors">
+                                {t('importPlacements.edit.addKolButton')}
+                              </button>
+                            )}
+                          </div>
+                        ))}
                         {row.warnings.map((w, i) => <div key={`w${i}`} className="text-yellow-600">{w}</div>)}
                       </td>
                     </tr>
@@ -559,6 +603,48 @@ export default function ImportEditGrid({ rows: initialRows, lookups, kind, onRow
             {t('importPlacements.bulk.clearSelection')}
           </button>
         </div>
+      )}
+
+      {addToast && <Toast message={addToast} onClose={() => setAddToast('')} />}
+
+      {addModelState && (
+        <AddModelModal
+          brandId={addModelState.brandId}
+          productCategories={productCategories}
+          initialModelCode={addModelState.modelText}
+          onClose={() => setAddModelState(null)}
+          onCreated={product => {
+            const brandId = addModelState.brandId;
+            setLookups(prev => ({
+              ...prev,
+              products: [...prev.products, { id: product.id, model_code: product.model_code, brandIds: [brandId] }],
+            }));
+            setRevision(v => v + 1); // re-validate every row — the same model text may appear on several rows
+            setAddToast(t('addModel.addModelSuccess'));
+          }}
+        />
+      )}
+
+      {addKolState && (
+        <AddKolModal
+          prefillHandle={addKolState.handleText}
+          platforms={lookups.platforms}
+          onClose={() => setAddKolState(null)}
+          onCreated={(kol: ExistingKol) => {
+            setLookups(prev => ({
+              ...prev,
+              kols: [...prev.kols, {
+                id: kol.id,
+                handle: kol.handle,
+                handle_normalized: normalizeHandle(kol.handle),
+                platform_id: null,
+                follower_count: kol.follower_count,
+              }],
+            }));
+            setRevision(v => v + 1); // re-validate every row — the same handle may appear on several rows
+            setAddToast(t('addKol.addKolSuccess'));
+          }}
+        />
       )}
     </div>
   );

@@ -494,6 +494,8 @@ export const en = {
       storeNoResults: 'No store/branch found',
       storeFreeTextHint: 'Type a new store / branch if it does not exist yet',
       revalidateFailed: 'Failed to validate — try editing the cell again',
+      addModelButton: '+ Add Model',
+      addKolButton: '+ Add KOL',
     },
     bulk: {
       selectedCount: '{{count}} row(s) selected',
@@ -602,6 +604,12 @@ export const en = {
     cancel: 'Cancel',
     duplicateError: 'This model code already exists',
     addModelSuccess: 'Model added',
+  },
+  addKol: {
+    addKolTitle: 'Add New KOL',
+    duplicateError: 'KOL "{{handle}}" already exists in the system',
+    useExisting: 'Use this existing KOL instead',
+    addKolSuccess: 'KOL added',
   },
   manageCategories: {
     title: 'Manage product categories',
