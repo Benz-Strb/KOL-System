@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import type { PlacementRow } from '../api/index.js';
-import { updatePerformance } from '../api/index.js';
+import { updatePerformance, getPlacementMetrics } from '../api/index.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
 
 type Props = { placement: PlacementRow; onClose: () => void; onSaved: () => void; };
@@ -23,6 +23,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
   const isYoutube = platformName === 'youtube';
   const isLamon8 = /lemon8|lamon8/i.test(platformName);
   const showManualMetrics = isYoutube || isLamon8;
+  const isOnline = placement.placement_type === 'online';
 
   const [form, setForm] = useState({
     publication_date: placement.publication_date?.slice(0, 10) ?? '',
@@ -35,6 +36,59 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
 
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }));
   const setM = (k: keyof ManualMetric, v: string) => setMetric(m => ({ ...m, [k]: v }));
+
+  const [utm, setUtm] = useState({
+    ad_content_name: placement.ad_content_name ?? '',
+    utm_campaign_name: placement.utm_campaign_name ?? '',
+    shopee_utm: placement.shopee_utm ?? '',
+    lazada_utm: placement.lazada_utm ?? '',
+    website_utm: placement.website_utm ?? '',
+  });
+  const setU = (k: keyof typeof utm, v: string) => setUtm(u => ({ ...u, [k]: v }));
+
+  type MpChannel = 'shopee' | 'lazada' | 'website';
+  type MpFields = { visits: string; atc: string; atc_value: string; orders: string; gmv: string };
+  const emptyMp: MpFields = { visits: '', atc: '', atc_value: '', orders: '', gmv: '' };
+  const [mp, setMp] = useState<Record<MpChannel, MpFields>>({
+    shopee: { ...emptyMp }, lazada: { ...emptyMp }, website: { ...emptyMp },
+  });
+  const setMpField = (ch: MpChannel, k: keyof MpFields, v: string) =>
+    setMp(prev => ({ ...prev, [ch]: { ...prev[ch], [k]: v } }));
+
+  // Prefill from existing metrics so editing a posted placement doesn't wipe data
+  useEffect(() => {
+    let alive = true;
+    getPlacementMetrics(placement.id).then(rows => {
+      if (!alive) return;
+      const ch = isYoutube ? 'youtube' : 'lamon8';
+      const m = rows.find(r => r.channel === ch);
+      if (m) {
+        setMetric({
+          vdo_view: m.vdo_view != null ? String(m.vdo_view) : '',
+          likes: m.likes != null ? String(m.likes) : '',
+          comments: m.comments != null ? String(m.comments) : '',
+          saves: m.saves != null ? String(m.saves) : '',
+          shares: m.shares != null ? String(m.shares) : '',
+        });
+      }
+      const next: Record<MpChannel, MpFields> = {
+        shopee: { ...emptyMp }, lazada: { ...emptyMp }, website: { ...emptyMp },
+      };
+      (['shopee', 'lazada', 'website'] as MpChannel[]).forEach(mpCh => {
+        const r = rows.find(x => x.channel === mpCh);
+        if (r) next[mpCh] = {
+          visits: r.visits != null ? String(r.visits) : '',
+          atc: r.atc != null ? String(r.atc) : '',
+          atc_value: r.atc_value != null ? String(r.atc_value) : '',
+          orders: r.orders != null ? String(r.orders) : '',
+          gmv: r.gmv != null ? String(r.gmv) : '',
+        };
+      });
+      setMp(next);
+    }).catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placement.id, isYoutube]);
 
   const kolName = placement.kols?.handle ?? '—';
   const platformLabel = placement.platforms?.name ?? '—';
@@ -50,6 +104,44 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
     try {
       const channel = isYoutube ? 'youtube' : 'lamon8';
       const hasMetric = showManualMetrics && (metric.vdo_view || metric.likes || metric.comments || metric.saves || metric.shares);
+      const measured_at = new Date().toISOString().slice(0, 10);
+
+      const engagementEntry = hasMetric ? [{
+        channel,
+        measured_at,
+        ...(isYoutube
+          ? {
+              vdo_view: metric.vdo_view ? Number(metric.vdo_view) : null,
+              likes: metric.likes ? Number(metric.likes) : null,
+              comments: metric.comments ? Number(metric.comments) : null,
+              shares: metric.shares ? Number(metric.shares) : null,
+            }
+          : {
+              likes: metric.likes ? Number(metric.likes) : null,
+              comments: metric.comments ? Number(metric.comments) : null,
+              saves: metric.saves ? Number(metric.saves) : null,
+            }),
+      }] : [];
+
+      // Marketplace: send only channels with at least one value (empty channel = keep existing)
+      const num = (v: string) => (v.trim() !== '' ? Number(v) : null);
+      const str = (v: string) => (v.trim() !== '' ? v.trim() : null);
+      const mpEntries = isOnline
+        ? (['shopee', 'lazada', 'website'] as MpChannel[]).flatMap(ch => {
+            const f = mp[ch];
+            const hasAny = Object.values(f).some(v => v.trim() !== '');
+            if (!hasAny) return [];
+            return [{
+              channel: ch,
+              measured_at,
+              visits: num(f.visits), atc: num(f.atc),
+              ...(ch === 'shopee' ? { atc_value: str(f.atc_value) } : {}),
+              orders: num(f.orders), gmv: str(f.gmv),
+            }];
+          })
+        : [];
+
+      const allMetrics = [...engagementEntry, ...mpEntries];
 
       await updatePerformance(placement.id, {
         publication_date: form.publication_date || null,
@@ -57,22 +149,14 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
         ...(placement.payment_type === 'paid' && form.pay_amount !== ''
           ? { pay_amount: form.pay_amount }
           : {}),
-        metrics: hasMetric ? [{
-          channel,
-          measured_at: new Date().toISOString().slice(0, 10),
-          ...(isYoutube
-            ? {
-                vdo_view: metric.vdo_view ? Number(metric.vdo_view) : null,
-                likes: metric.likes ? Number(metric.likes) : null,
-                comments: metric.comments ? Number(metric.comments) : null,
-                shares: metric.shares ? Number(metric.shares) : null,
-              }
-            : {
-                likes: metric.likes ? Number(metric.likes) : null,
-                comments: metric.comments ? Number(metric.comments) : null,
-                saves: metric.saves ? Number(metric.saves) : null,
-              }),
-        }] : undefined,
+        ...(isOnline ? {
+          ad_content_name: utm.ad_content_name.trim() || null,
+          utm_campaign_name: utm.utm_campaign_name.trim() || null,
+          shopee_utm: utm.shopee_utm.trim() || null,
+          lazada_utm: utm.lazada_utm.trim() || null,
+          website_utm: utm.website_utm.trim() || null,
+        } : {}),
+        metrics: allMetrics.length > 0 ? allMetrics : undefined,
       });
       onSaved();
     } catch (e: unknown) {
@@ -104,7 +188,7 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
             <div className="text-xs"><span className="text-muted">Campaign </span><span className="text-ink">{campaignLabel}</span></div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-0.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Publication Date</label>
@@ -127,6 +211,85 @@ export default function PerformanceModal({ placement, onClose, onSaved }: Props)
                 onChange={e => set('post_url', e.target.value)}
                 placeholder="https://..." className={inputCls} />
             </div>
+
+            {isOnline && (
+              <div>
+                <p className="text-xs font-medium text-muted uppercase tracking-wider mb-2">Marketplace Metrics</p>
+                <div className="space-y-3">
+                  {([
+                    { ch: 'shopee' as const, label: 'Shopee', hasAtcValue: true },
+                    { ch: 'lazada' as const, label: 'Lazada', hasAtcValue: false },
+                    { ch: 'website' as const, label: 'Website', hasAtcValue: false },
+                  ]).map(({ ch, label, hasAtcValue }) => (
+                    <div key={ch} className="border border-hairline rounded-xl p-3">
+                      <p className="text-xs font-semibold text-ink mb-2">{label}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className={labelCls}>Visits</label>
+                          <input type="number" min="0" value={mp[ch].visits}
+                            onChange={e => setMpField(ch, 'visits', e.target.value)} placeholder="0" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>ATC</label>
+                          <input type="number" min="0" value={mp[ch].atc}
+                            onChange={e => setMpField(ch, 'atc', e.target.value)} placeholder="0" className={inputCls} />
+                        </div>
+                        {hasAtcValue && (
+                          <div>
+                            <label className={labelCls}>ATC Value</label>
+                            <input type="number" min="0" value={mp[ch].atc_value}
+                              onChange={e => setMpField(ch, 'atc_value', e.target.value)} placeholder="0" className={inputCls} />
+                          </div>
+                        )}
+                        <div>
+                          <label className={labelCls}>Orders</label>
+                          <input type="number" min="0" value={mp[ch].orders}
+                            onChange={e => setMpField(ch, 'orders', e.target.value)} placeholder="0" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>GMV</label>
+                          <input type="number" min="0" value={mp[ch].gmv}
+                            onChange={e => setMpField(ch, 'gmv', e.target.value)} placeholder="0" className={inputCls} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isOnline && (
+              <div>
+                <p className="text-xs font-medium text-muted uppercase tracking-wider mb-2">Tracking / UTM</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className={labelCls}>Ad Content Name</label>
+                    <input type="text" value={utm.ad_content_name}
+                      onChange={e => setU('ad_content_name', e.target.value)} placeholder="2026-115-RB-..." className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>UTM Campaign Name</label>
+                    <input type="text" value={utm.utm_campaign_name}
+                      onChange={e => setU('utm_campaign_name', e.target.value)} placeholder="2026-115-RB-F20" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Shopee UTM</label>
+                    <input type="url" value={utm.shopee_utm}
+                      onChange={e => setU('shopee_utm', e.target.value)} placeholder="https://..." className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Lazada UTM</label>
+                    <input type="url" value={utm.lazada_utm}
+                      onChange={e => setU('lazada_utm', e.target.value)} placeholder="https://..." className={inputCls} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Website UTM</label>
+                    <input type="url" value={utm.website_utm}
+                      onChange={e => setU('website_utm', e.target.value)} placeholder="https://..." className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showManualMetrics && (
               <div>

@@ -246,16 +246,23 @@ app.patch('/:id/performance', async c => {
     const user = c.get('user');
     const id = Number(c.req.param('id'));
 
-    // Non-admin: check brand access before updating
-    if (user.role !== 'admin') {
-      const existing = await prisma.placements.findUnique({ where: { id }, select: { brand_id: true } });
-      if (!existing) return c.json({ error: 'Placement not found' }, 404);
-      if (!user.brandIds.includes(existing.brand_id)) {
-        return c.json({ error: 'No access to this placement' }, 403);
-      }
+    // Always load placement_type (needed to gate UTM writes) + brand for access check
+    const existing = await prisma.placements.findUnique({
+      where: { id },
+      select: { brand_id: true, placement_type: true },
+    });
+    if (!existing) return c.json({ error: 'Placement not found' }, 404);
+    if (user.role !== 'admin' && !user.brandIds.includes(existing.brand_id)) {
+      return c.json({ error: 'No access to this placement' }, 403);
     }
 
-    const { publication_date, post_url, pay_amount, metrics } = await c.req.json();
+    const {
+      publication_date, post_url, pay_amount, metrics,
+      ad_content_name, utm_campaign_name, shopee_utm, lazada_utm, website_utm,
+    } = await c.req.json();
+
+    const isOnline = existing.placement_type === 'online';
+    const trim = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
     await prisma.placements.update({
       where: { id },
@@ -266,12 +273,23 @@ app.patch('/:id/performance', async c => {
         ...(pay_amount !== undefined && pay_amount !== '' && pay_amount !== null
           ? { pay_amount: String(pay_amount) }
           : {}),
+        ...(isOnline ? {
+          ...(ad_content_name   !== undefined ? { ad_content_name:   trim(ad_content_name) }   : {}),
+          ...(utm_campaign_name !== undefined ? { utm_campaign_name: trim(utm_campaign_name) } : {}),
+          ...(shopee_utm        !== undefined ? { shopee_utm:        trim(shopee_utm) }        : {}),
+          ...(lazada_utm        !== undefined ? { lazada_utm:        trim(lazada_utm) }        : {}),
+          ...(website_utm       !== undefined ? { website_utm:       trim(website_utm) }       : {}),
+        } : {}),
       },
     });
 
+    const MARKETPLACE_CHANNELS = ['shopee', 'lazada', 'website'];
     if (Array.isArray(metrics) && metrics.length > 0) {
       for (const m of metrics) {
         const { channel = 'shopee', measured_at, vdo_view, clicks, orders, gmv, atc, atc_value, visits, ads_spend, likes, comments, saves, shares, impressions } = m;
+
+        // Marketplace metrics belong to online placements only — ignore if sent for offline
+        if (!isOnline && MARKETPLACE_CHANNELS.includes(channel)) continue;
 
         // Calculate engagement_rate when we have enough data
         let engagement_rate: string | null = null;
@@ -414,6 +432,13 @@ app.post('/', async c => {
         follower_at_time: b.follower_at_time ? Number(b.follower_at_time) : null,
         target_pub_date: b.target_pub_date ? new Date(b.target_pub_date) : null,
         notes: b.notes?.trim() || null,
+        ...(b.placement_type === 'online' ? {
+          ad_content_name:   b.ad_content_name?.trim()   || null,
+          utm_campaign_name: b.utm_campaign_name?.trim() || null,
+          shopee_utm:        b.shopee_utm?.trim()        || null,
+          lazada_utm:        b.lazada_utm?.trim()        || null,
+          website_utm:       b.website_utm?.trim()       || null,
+        } : {}),
         status: 'planned',
       },
     });

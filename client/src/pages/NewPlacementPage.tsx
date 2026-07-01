@@ -25,6 +25,8 @@ interface FormState {
   payment_type: PaymentType;
   final_price: string; ads_cost: string; follower_at_time: string;
   target_pub_date: string; notes: string;
+  ad_content_name: string; utm_campaign_name: string;
+  shopee_utm: string; lazada_utm: string; website_utm: string;
 }
 
 const initForm: FormState = {
@@ -35,6 +37,8 @@ const initForm: FormState = {
   payment_type: 'paid',
   final_price: '', ads_cost: '', follower_at_time: '',
   target_pub_date: '', notes: '',
+  ad_content_name: '', utm_campaign_name: '',
+  shopee_utm: '', lazada_utm: '', website_utm: '',
 };
 
 const inputCls = [
@@ -146,6 +150,13 @@ export default function NewPlacementPage() {
         follower_at_time: form.follower_at_time || kol.follower_count || null,
         target_pub_date: form.target_pub_date || null,
         notes: form.notes || null,
+        ...(form.placement_type === 'online' ? {
+          ad_content_name: form.ad_content_name.trim() || null,
+          utm_campaign_name: form.utm_campaign_name.trim() || null,
+          shopee_utm: form.shopee_utm.trim() || null,
+          lazada_utm: form.lazada_utm.trim() || null,
+          website_utm: form.website_utm.trim() || null,
+        } : {}),
       });
       setToast(t('newPlacement.saved'));
       setKol(null); setForm(initForm);
@@ -447,6 +458,45 @@ export default function NewPlacementPage() {
             </div>
           </div>
         </div>
+
+        {/* Tracking / UTM — online เท่านั้น */}
+        {form.placement_type === 'online' && (
+          <div className="bg-surface border border-hairline rounded-xl p-5">
+            <SectionHeader icon={<Tag size={15} />} title="Tracking / UTM" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Ad Content Name</label>
+                <input type="text" value={form.ad_content_name}
+                  onChange={e => set('ad_content_name', e.target.value)}
+                  placeholder="2026-115-RB-..." className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>UTM Campaign Name</label>
+                <input type="text" value={form.utm_campaign_name}
+                  onChange={e => set('utm_campaign_name', e.target.value)}
+                  placeholder="2026-115-RB-F20" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Shopee UTM</label>
+                <input type="url" value={form.shopee_utm}
+                  onChange={e => set('shopee_utm', e.target.value)}
+                  placeholder="https://..." className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Lazada UTM</label>
+                <input type="url" value={form.lazada_utm}
+                  onChange={e => set('lazada_utm', e.target.value)}
+                  placeholder="https://..." className={inputCls} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Website UTM</label>
+                <input type="url" value={form.website_utm}
+                  onChange={e => set('website_utm', e.target.value)}
+                  placeholder="https://..." className={inputCls} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* หมายเหตุ */}
         <div className="bg-surface border border-hairline rounded-xl p-5">

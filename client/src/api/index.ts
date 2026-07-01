@@ -278,6 +278,11 @@ export const updatePerformance = (id: number, body: {
   post_url?: string | null;
   pay_amount?: string | number;
   metrics?: MetricEntry[];
+  ad_content_name?: string | null;
+  utm_campaign_name?: string | null;
+  shopee_utm?: string | null;
+  lazada_utm?: string | null;
+  website_utm?: string | null;
 }) => api<{ ok: boolean }>(`/api/placements/${id}/performance`, {
   method: 'PATCH',
   headers: { 'Content-Type': 'application/json' },
