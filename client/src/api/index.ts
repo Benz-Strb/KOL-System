@@ -845,9 +845,9 @@ export async function validateImportFile(file: File, kind: ImportKind) {
   return res.json() as Promise<ImportValidateResponse>;
 }
 
-export const commitImport = (kind: ImportKind, rows: { rowNumber: number; raw: ImportRawRow }[]) =>
+export const commitImport = (kind: ImportKind, rows: { rowNumber: number; raw: ImportRawRow }[], originalFilename?: string) =>
   api<ImportCommitResponse>('/api/placements/import/commit', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, rows }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, rows, originalFilename }),
   });
 
 // Phase 4 — JSON-body re-validate (no file upload) used by the ImportEditGrid's debounced

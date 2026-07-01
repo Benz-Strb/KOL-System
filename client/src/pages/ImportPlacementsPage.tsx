@@ -162,7 +162,7 @@ export default function ImportPlacementsPage() {
     setError('');
     setCommitting(true);
     try {
-      const res = await commitImport(kind, validRows);
+      const res = await commitImport(kind, validRows, fileName);
       setCommitResult(res);
       setToast(t('importPlacements.commitSuccess', { count: res.created }));
     } catch (err: unknown) {

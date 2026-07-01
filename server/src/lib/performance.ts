@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { isSafeUrl } from './isSafeUrl.js';
 
 // Marketplace metrics (visits/atc/orders/gmv) only make sense for online placements —
 // PATCH /:id/performance in placements.ts has always gated these the same way.
@@ -50,6 +51,22 @@ export async function applyPerformance(
   } = payload;
 
   const trim = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+  // Re-validate UTM URL scheme here too, not just at resolveRow()/validate-time —
+  // this is the single write path shared by both PATCH /:id/performance and
+  // /performance/commit, so this closes the gap for any caller that could
+  // bypass/tamper with the preview step. Same error-message style as resolveRow().
+  if (isOnline) {
+    const checkUtm = (label: string, v: unknown) => {
+      const trimmed = trim(v);
+      if (trimmed && !isSafeUrl(trimmed)) {
+        throw new Error(`${label} UTM "${trimmed}" ต้องเป็น URL ที่ขึ้นต้นด้วย http:// หรือ https://`);
+      }
+    };
+    checkUtm('Shopee', shopee_utm);
+    checkUtm('Lazada', lazada_utm);
+    checkUtm('Website', website_utm);
+  }
 
   await prisma.placements.update({
     where: { id: placementId },
