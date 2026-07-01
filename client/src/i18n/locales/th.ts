@@ -199,7 +199,6 @@ export const th = {
     brandsPanelTitle: 'แบรนด์ ({{count}})',
     noBrandsYet: 'ยังไม่มีแบรนด์',
     brandNamePlaceholder: 'ชื่อแบรนด์',
-    logoUrlPlaceholder: 'URL โลโก้ (ไม่บังคับ)',
     brandOn: 'เปิด',
     brandOff: 'ปิด',
     newBrandNamePlaceholder: 'ชื่อแบรนด์ใหม่',

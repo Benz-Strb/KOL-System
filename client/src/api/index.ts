@@ -826,6 +826,12 @@ export const createAdminBrand = (name: string, logo_url?: string) =>
   api<Brand>('/api/admin/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, logo_url }) });
 export const updateAdminBrand = (id: number, body: { name?: string; active?: boolean; logo_url?: string | null }) =>
   api<Brand>(`/api/admin/brands/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+// อัปโหลดโลโก้แบรนด์ — อย่าตั้ง Content-Type เอง (ปล่อย browser ใส่ boundary)
+export const uploadBrandLogo = (file: File) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api<{ url: string }>('/api/admin/brands/logo', { method: 'POST', body: fd });
+};
 export const createAdminUser = (body: { email: string; full_name: string; role: string; password: string; brand_ids?: number[] }) =>
   api<AdminUser>('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 export const updateAdminUser = (id: number, body: { role?: string; is_active?: boolean; brand_ids?: number[]; email?: string; full_name?: string }) =>

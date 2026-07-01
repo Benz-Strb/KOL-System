@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Users, Plus, Copy, Check, Eye, EyeOff, RefreshCw, Pencil, Tag, X, Check as CheckIcon } from 'lucide-react';
+import { Users, Plus, Copy, Check, Eye, EyeOff, RefreshCw, Pencil, Tag, X, Check as CheckIcon, ImagePlus } from 'lucide-react';
 import {
   getAdminUsers, createAdminUser, updateAdminUser, resetUserPassword,
-  getAdminBrands, createAdminBrand, updateAdminBrand,
+  getAdminBrands, createAdminBrand, updateAdminBrand, uploadBrandLogo,
   clearDropdownCache,
   type AdminUser, type Brand,
 } from '../api/index.js';
@@ -28,6 +28,9 @@ const inputCls = [
   'bg-input-bg border border-input-border text-ink placeholder:text-muted',
   'focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30',
 ].join(' ');
+
+const ALLOWED_LOGO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_LOGO_SIZE = 2 * 1024 * 1024;
 
 function generatePassword() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -77,11 +80,17 @@ export default function AdminUsersPage() {
   const [newBrandLogoUrl, setNewBrandLogoUrl] = useState('');
   const [newBrandLoading, setNewBrandLoading] = useState(false);
   const [newBrandError, setNewBrandError] = useState('');
+  const [newLogoUploading, setNewLogoUploading] = useState(false);
+  const [newLogoError, setNewLogoError] = useState<string | null>(null);
   const [editingBrandId, setEditingBrandId] = useState<number | null>(null);
   const [editBrandName, setEditBrandName] = useState('');
   const [editBrandLogoUrl, setEditBrandLogoUrl] = useState('');
   const [editBrandLoading, setEditBrandLoading] = useState(false);
+  const [editLogoUploading, setEditLogoUploading] = useState(false);
+  const [editLogoError, setEditLogoError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const newLogoInputRef = useRef<HTMLInputElement>(null);
+  const editLogoInputRef = useRef<HTMLInputElement>(null);
 
   // Create user form state
   const [form, setForm] = useState({ email: '', full_name: '', role: 'marketing', password: generatePassword() });
@@ -244,6 +253,60 @@ export default function AdminUsersPage() {
   }
 
   // --- Brand handlers ---
+  async function handleNewLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    e.target.value = '';
+    if (!file) return;
+
+    setNewLogoError(null);
+    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
+      setNewLogoError(t('addModel.invalidImageType'));
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      setNewLogoError(t('addModel.imageTooLarge'));
+      return;
+    }
+
+    setNewLogoUploading(true);
+    try {
+      const { url } = await uploadBrandLogo(file);
+      setNewBrandLogoUrl(url);
+    } catch {
+      setNewLogoError(t('addModel.uploadError'));
+    } finally {
+      setNewLogoUploading(false);
+    }
+  }
+
+  async function handleEditLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    e.target.value = '';
+    if (!file) return;
+
+    setEditLogoError(null);
+    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
+      setEditLogoError(t('addModel.invalidImageType'));
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      setEditLogoError(t('addModel.imageTooLarge'));
+      return;
+    }
+
+    setEditLogoUploading(true);
+    try {
+      const { url } = await uploadBrandLogo(file);
+      setEditBrandLogoUrl(url);
+    } catch {
+      setEditLogoError(t('addModel.uploadError'));
+    } finally {
+      setEditLogoUploading(false);
+    }
+  }
+
   async function handleCreateBrand(e: React.FormEvent) {
     e.preventDefault();
     if (!newBrandName.trim()) return;
@@ -256,6 +319,7 @@ export default function AdminUsersPage() {
       setSelectedBrandIds([]);
       setNewBrandName('');
       setNewBrandLogoUrl('');
+      setNewLogoError(null);
       setToast(t('adminUsers.brandAdded', { name: brand.name }));
     } catch (err: unknown) {
       setNewBrandError(err instanceof Error ? err.message : t('common.error'));
@@ -474,7 +538,7 @@ export default function AdminUsersPage() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
               <span className="text-sm font-semibold text-ink">{t('adminUsers.brandsPanelTitle', { count: brands.length })}</span>
-              <button onClick={() => { setShowBrandsPanel(false); setEditingBrandId(null); }}
+              <button onClick={() => { setShowBrandsPanel(false); setEditingBrandId(null); setNewLogoError(null); }}
                 className="text-muted hover:text-ink transition-colors">
                 <X size={15} />
               </button>
@@ -496,27 +560,45 @@ export default function AdminUsersPage() {
                             onChange={e => setEditBrandName(e.target.value)}
                             onKeyDown={e => {
                               if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
-                              if (e.key === 'Escape') setEditingBrandId(null);
+                              if (e.key === 'Escape') { setEditingBrandId(null); setEditLogoError(null); }
                             }}
                             placeholder={t('adminUsers.brandNamePlaceholder')}
                             className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink focus:outline-none focus:ring-2 focus:ring-accent"
                           />
-                          <input
-                            value={editBrandLogoUrl}
-                            onChange={e => setEditBrandLogoUrl(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') { e.preventDefault(); handleSaveEditBrand(brand); }
-                              if (e.key === 'Escape') setEditingBrandId(null);
-                            }}
-                            placeholder={t('adminUsers.logoUrlPlaceholder')}
-                            className="px-2 py-1 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              ref={editLogoInputRef}
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              onChange={handleEditLogoChange}
+                              className="hidden"
+                            />
+                            {editLogoUploading ? (
+                              <div className="w-6 h-6 rounded border border-hairline flex items-center justify-center shrink-0">
+                                <div className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                              </div>
+                            ) : editBrandLogoUrl ? (
+                              <div className="flex items-center gap-1">
+                                <img src={editBrandLogoUrl} alt="" className="w-6 h-6 rounded object-cover border border-hairline shrink-0" />
+                                <button type="button" onClick={() => setEditBrandLogoUrl('')}
+                                  className="text-muted hover:text-red-500 transition-colors shrink-0">
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => editLogoInputRef.current?.click()}
+                                className="w-6 h-6 rounded border border-dashed border-input-border flex items-center justify-center text-muted hover:border-accent/40 hover:text-ink transition-colors shrink-0">
+                                <ImagePlus size={11} />
+                              </button>
+                            )}
+                            {editLogoError && <span className="text-[10px] text-red-500">{editLogoError}</span>}
+                          </div>
                         </div>
-                        <button onClick={() => handleSaveEditBrand(brand)} disabled={editBrandLoading}
+                        <button onClick={() => handleSaveEditBrand(brand)} disabled={editBrandLoading || editLogoUploading}
                           className="text-accent hover:text-accent-hover disabled:opacity-50 transition-colors shrink-0">
                           <CheckIcon size={13} />
                         </button>
-                        <button onClick={() => setEditingBrandId(null)} className="text-muted hover:text-ink transition-colors shrink-0">
+                        <button onClick={() => { setEditingBrandId(null); setEditLogoError(null); }} className="text-muted hover:text-ink transition-colors shrink-0">
                           <X size={13} />
                         </button>
                       </>
@@ -536,7 +618,7 @@ export default function AdminUsersPage() {
                           {brand.active ? t('adminUsers.brandOn') : t('adminUsers.brandOff')}
                         </button>
                         <button
-                          onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name); setEditBrandLogoUrl(brand.logo_url ?? ''); }}
+                          onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name); setEditBrandLogoUrl(brand.logo_url ?? ''); setEditLogoError(null); }}
                           className="text-muted hover:text-accent transition-colors flex-shrink-0">
                           <Pencil size={12} />
                         </button>
@@ -557,20 +639,35 @@ export default function AdminUsersPage() {
                   placeholder={t('adminUsers.newBrandNamePlaceholder')}
                   className="px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
                 />
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newBrandLogoUrl}
-                    onChange={e => setNewBrandLogoUrl(e.target.value)}
-                    placeholder={t('adminUsers.logoUrlPlaceholder')}
-                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-input-bg border border-input-border text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
-                  />
-                  <button type="submit" disabled={!newBrandName.trim() || newBrandLoading}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all shrink-0">
-                    <Plus size={11} />
-                    {t('adminUsers.add')}
+                <input
+                  ref={newLogoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleNewLogoChange}
+                  className="hidden"
+                />
+                {newBrandLogoUrl ? (
+                  <div className="flex items-center gap-2">
+                    <img src={newBrandLogoUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-hairline shrink-0" />
+                    <button type="button" onClick={() => { setNewBrandLogoUrl(''); setNewLogoError(null); }}
+                      className="text-xs text-muted hover:text-red-500 transition-colors flex items-center gap-1">
+                      <X size={11} />
+                      {t('addModel.removeImage')}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => newLogoInputRef.current?.click()} disabled={newLogoUploading}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-input-border text-xs text-muted hover:border-accent/40 hover:text-ink disabled:opacity-60 transition-colors">
+                    <ImagePlus size={12} />
+                    {newLogoUploading ? t('addModel.uploading') : t('addModel.chooseImage')}
                   </button>
-                </div>
+                )}
+                {newLogoError && <p className="text-xs text-red-500">{newLogoError}</p>}
+                <button type="submit" disabled={!newBrandName.trim() || newBrandLoading || newLogoUploading}
+                  className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 bg-accent text-white text-xs font-medium rounded-lg hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all">
+                  <Plus size={11} />
+                  {t('adminUsers.add')}
+                </button>
               </form>
               {newBrandError && <p className="text-xs text-red-500 mt-1">{newBrandError}</p>}
             </div>
@@ -579,7 +676,7 @@ export default function AdminUsersPage() {
 
         {/* FAB */}
         <button
-          onClick={() => { setShowBrandsPanel(v => !v); setEditingBrandId(null); setNewBrandName(''); setNewBrandError(''); }}
+          onClick={() => { setShowBrandsPanel(v => !v); setEditingBrandId(null); setNewBrandName(''); setNewBrandError(''); setNewLogoError(null); }}
           className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg text-sm font-medium transition-all active:scale-95 ${
             showBrandsPanel
               ? 'bg-purple-700 text-white'

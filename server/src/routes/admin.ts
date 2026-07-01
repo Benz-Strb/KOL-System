@@ -6,6 +6,9 @@ import type { AppEnv } from '../types.js';
 const app = new Hono<AppEnv>();
 app.use('*', requireAuth, requireRole('admin'));
 
+const ALLOWED_LOGO_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const LOGO_EXT_MAP: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
 app.get('/brands', async c => {
   try {
     const prisma = c.get('prisma');
@@ -35,6 +38,41 @@ app.post('/brands', async c => {
     if (e.code === 'P2002') return c.json({ error: 'ชื่อแบรนด์นี้มีอยู่แล้ว' }, 409);
     console.error(err);
     return c.json({ error: 'Database error' }, 500);
+  }
+});
+
+app.post('/brands/logo', async c => {
+  try {
+    const env = c.env;
+    const body = await c.req.parseBody();
+    const file = body['file'];
+    if (!(file instanceof File)) return c.json({ error: 'file_required' }, 400);
+    if (!ALLOWED_LOGO_MIME.has(file.type)) return c.json({ error: 'invalid_type' }, 400);
+    if (file.size > 2 * 1024 * 1024) return c.json({ error: 'too_large' }, 400);
+
+    const ext = LOGO_EXT_MAP[file.type];
+    const path = `logos/${crypto.randomUUID()}.${ext}`;
+    const upRes = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/brand-logos/${path}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': file.type,
+          'x-upsert': 'false',
+        },
+        body: await file.arrayBuffer(),
+      },
+    );
+    if (!upRes.ok) {
+      console.error('Storage upload failed', upRes.status, await upRes.text());
+      return c.json({ error: 'upload_failed' }, 502);
+    }
+    const publicUrl = `${env.SUPABASE_URL}/storage/v1/object/public/brand-logos/${path}`;
+    return c.json({ url: publicUrl }, 201);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: 'upload_error' }, 500);
   }
 });
 

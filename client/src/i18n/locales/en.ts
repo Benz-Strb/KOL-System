@@ -194,7 +194,6 @@ export const en = {
     brandsPanelTitle: 'Brands ({{count}})',
     noBrandsYet: 'No brands yet',
     brandNamePlaceholder: 'Brand name',
-    logoUrlPlaceholder: 'Logo URL (optional)',
     brandOn: 'On',
     brandOff: 'Off',
     newBrandNamePlaceholder: 'New brand name',

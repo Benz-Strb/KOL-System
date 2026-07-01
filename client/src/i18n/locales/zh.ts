@@ -194,7 +194,6 @@ export const zh = {
     brandsPanelTitle: '品牌({{count}})',
     noBrandsYet: '暂无品牌',
     brandNamePlaceholder: '品牌名称',
-    logoUrlPlaceholder: 'Logo URL(可选)',
     brandOn: '启用',
     brandOff: '停用',
     newBrandNamePlaceholder: '新品牌名称',
