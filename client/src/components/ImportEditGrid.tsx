@@ -64,12 +64,16 @@ const PAYMENT_OPTIONS = [
 // Column field configs — shared by the grid columns AND the bulk-edit "which column"
 // dropdown, so both stay in sync automatically when a column is added/removed.
 // `width` is unused for these two (they're rendered via the dedicated sticky columns,
-// not the colgroup loop) — kept only so STICKY_FIELDS satisfies FieldMeta for the
+// not the colgroup loop) — kept only so stickyFields() satisfies FieldMeta for the
 // bulk-edit "which column" dropdown, which shares this type with scrollFields/EXPAND_FIELDS.
-const STICKY_FIELDS: FieldMeta[] = [
-  { key: 'brand', type: 'brand', label: 'Brand', width: 0 },
-  { key: 'kolHandle', type: 'kol', label: 'KOL Handle', width: 0 },
-];
+// `colBrandLabel` is passed in (translated via t('importPlacements.colBrand')) since this
+// is a plain function, not a component — it can't call useTranslation() itself.
+function stickyFields(colBrandLabel: string): FieldMeta[] {
+  return [
+    { key: 'brand', type: 'brand', label: colBrandLabel, width: 0 },
+    { key: 'kolHandle', type: 'kol', label: 'KOL Handle', width: 0 },
+  ];
+}
 function onlineScrollFields(T: { colShopBranch: string; colTargetDate: string; colPaymentType: string }, notesLabel: string): FieldMeta[] {
   return [
     { key: 'platform', type: 'platform', label: 'Platform', width: 130 },
@@ -389,9 +393,10 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [kind, editT.colShopBranch, editT.colTargetDate, editT.colPaymentType, notesLabel],
   );
+  const colBrandLabel = t('importPlacements.colBrand');
   const bulkFields = useMemo(
-    () => [...STICKY_FIELDS, ...scrollFields, ...(kind === 'online' ? EXPAND_FIELDS : [])],
-    [scrollFields, kind],
+    () => [...stickyFields(colBrandLabel), ...scrollFields, ...(kind === 'online' ? EXPAND_FIELDS : [])],
+    [scrollFields, kind, colBrandLabel],
   );
   const totalCols = 5 + scrollFields.length + (kind === 'online' ? 1 : 0);
   // Explicit total px width for the <table> — with table-layout:fixed and no width set
@@ -459,7 +464,7 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
               </th>
               <th className={stickyThCls} style={{ left: STICKY_LEFT.row, width: STICKY_W.row }}>{t('importPlacements.colRow')}</th>
               <th className={stickyThCls} style={{ left: STICKY_LEFT.status, width: STICKY_W.status }}>{t('importPlacements.colStatus')}</th>
-              <th className={stickyThCls} style={{ left: STICKY_LEFT.brand, width: STICKY_W.brand }}>Brand</th>
+              <th className={stickyThCls} style={{ left: STICKY_LEFT.brand, width: STICKY_W.brand }}>{t('importPlacements.colBrand')}</th>
               <th className={`${stickyThCls} border-r border-hairline`} style={{ left: STICKY_LEFT.kol, width: STICKY_W.kol }}>KOL Handle</th>
               {scrollFields.map(f => (
                 <th key={f.key} className="py-2 px-2.5 text-left text-xs font-medium text-muted uppercase tracking-wide whitespace-nowrap overflow-hidden text-ellipsis">{f.label}</th>
