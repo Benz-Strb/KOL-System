@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   ChevronLeft, Download, Upload, CheckCircle2, AlertTriangle, XCircle,
-  FileSpreadsheet, Loader2, AlertCircle, X, Globe, Store, Tag,
+  FileSpreadsheet, Loader2, AlertCircle, X, Globe, Store,
 } from 'lucide-react';
 import {
-  getDropdowns, downloadImportTemplate, validateImportFile, commitImport,
-  type Brand, type ImportKind, type ImportRowResult, type ImportValidateResponse, type ImportCommitResponse,
+  downloadImportTemplate, validateImportFile, commitImport,
+  type ImportKind, type ImportRowResult, type ImportValidateResponse, type ImportCommitResponse,
 } from '../api/index.js';
 import Toast from '../components/Toast.js';
-import Select from '../components/Select.js';
 import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
 
 const cardCls = 'bg-surface border border-hairline rounded-xl p-5';
@@ -38,8 +37,7 @@ function rowDetail(r: ImportRowResult, kind: ImportKind) {
 export default function ImportPlacementsPage() {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [brandId, setBrandId] = useState('');
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
   const [kind, setKind] = useState<ImportKind>('online');
   const [fileName, setFileName] = useState('');
   const [validating, setValidating] = useState(false);
@@ -49,26 +47,12 @@ export default function ImportPlacementsPage() {
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    getDropdowns().then(d => {
-      setBrands(d.brands);
-      // Auto-select brand if user has exactly one — เลือกแบรนด์เองเฉพาะคนที่เข้าถึงได้หลายแบรนด์
-      if (d.brands.length === 1) setBrandId(String(d.brands[0].id));
-    }).catch(() => setError(t('importPlacements.loadError')));
-  }, [t]);
-
   function handleReset() {
     setFileName('');
     setResult(null);
     setCommitResult(null);
     setError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-
-  function handleBrandChange(next: string) {
-    if (next === brandId) return;
-    setBrandId(next);
-    handleReset();
   }
 
   function handleKindChange(next: ImportKind) {
@@ -144,21 +128,26 @@ export default function ImportPlacementsPage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {/* Brand — แสดงเฉพาะเมื่อ user มีหลาย brand */}
-        {brands.length > 1 && (
-          <div className={cardCls}>
-            <SectionHeader icon={<Tag size={15} />} title={t('importPlacements.selectBrandSection')} />
-            <p className="text-sm text-muted mb-3">{t('importPlacements.selectBrandHint')}</p>
-            <Select
-              options={brands.map(b => ({ id: b.id, label: b.name, iconUrl: b.logo_url }))}
-              value={brandId}
-              onChange={handleBrandChange}
-              placeholder={t('importPlacements.selectBrandPlaceholder')}
-            />
-          </div>
-        )}
+      {/* Tab bar — 2 tabs */}
+      <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 mb-6 w-fit">
+        {(
+          [
+            { id: 'new', label: t('importPlacements.tabNew') },
+            { id: 'history', label: t('importPlacements.tabHistory') },
+          ] as const
+        ).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
+      {activeTab === 'new' && (
+      <div className="space-y-3">
         {/* Step 0 — choose online/offline template */}
         <div className={cardCls}>
           <SectionHeader icon={kind === 'online' ? <Globe size={15} /> : <Store size={15} />} title={t('importPlacements.selectTypeSection')} />
@@ -185,21 +174,17 @@ export default function ImportPlacementsPage() {
           <ExportLangMenu
             label={t('importPlacements.downloadTemplate', { kind: kind === 'online' ? 'Online' : 'Offline' })}
             onPick={handleDownloadTemplate}
-            disabled={!brandId}
           />
-          {!brandId && brands.length > 1 && <p className="text-xs text-yellow-600 mt-2">{t('importPlacements.selectBrandFirst')}</p>}
         </div>
 
         {/* Step 2 */}
         <div className={cardCls}>
           <SectionHeader icon={<Upload size={15} />} title={t('importPlacements.step2Title')} />
           <div className="flex items-center gap-3">
-            <label className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full active:scale-95 transition-all cursor-pointer ${
-              brandId ? 'bg-accent text-white hover:bg-accent-hover' : 'bg-accent/40 text-white/70 cursor-not-allowed'
-            }`}>
+            <label className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full active:scale-95 transition-all cursor-pointer bg-accent text-white hover:bg-accent-hover">
               <FileSpreadsheet size={14} />
               {t('importPlacements.chooseFile')}
-              <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} disabled={!brandId} />
+              <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} />
             </label>
             {fileName && <span className="text-sm text-muted truncate max-w-xs">{fileName}</span>}
             {validating && <Loader2 size={16} className="animate-spin text-accent" />}
@@ -306,6 +291,15 @@ export default function ImportPlacementsPage() {
           </div>
         )}
       </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className={cardCls}>
+          <div className="text-center py-16">
+            <p className="text-sm font-medium text-ink">{t('importPlacements.historyEmptyTitle')}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
