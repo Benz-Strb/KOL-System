@@ -9,7 +9,7 @@ import {
 import { optimistic } from '../lib/optimistic.js';
 import { useAuth } from '../context/AuthContext.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh, invalidateCachePrefix } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
 import Toast from '../components/Toast.js';
@@ -288,6 +288,7 @@ export default function SamplesPage() {
       setRows(cached.rows);
       setTotal(cached.total);
       setLoading(false);
+      if (isFresh(cacheKey)) return; // data is still fresh — skip the background refetch
     } else {
       setLoading(true);
     }
@@ -325,6 +326,7 @@ export default function SamplesPage() {
       }).then(updated => setRows(prev => prev.map(r => r.id === sample.id ? updated : r))),
       onError: () => setSaveErrorMsg(t('common.saveFailed')),
     });
+    invalidateCachePrefix('samples:');
   }
 
   async function handleDelete(id: number) {
@@ -336,6 +338,7 @@ export default function SamplesPage() {
       request: () => deleteSample(id),
       onError: () => setSaveErrorMsg(t('common.saveFailed')),
     });
+    invalidateCachePrefix('samples:');
   }
 
   const totalPages = Math.ceil(total / LIMIT);
@@ -476,7 +479,7 @@ export default function SamplesPage() {
           availableBrands={userBrands}
           defaultBrandId={defaultBrandId}
           onClose={() => setShowCreate(false)}
-          onCreated={s => { setShowCreate(false); setRows(prev => [s, ...prev]); setTotal(t => t + 1); }}
+          onCreated={s => { setShowCreate(false); setRows(prev => [s, ...prev]); setTotal(t => t + 1); invalidateCachePrefix('samples:'); }}
         />
       )}
     </div>

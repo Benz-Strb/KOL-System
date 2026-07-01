@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, ChevronLeft, ChevronRight, X, Users, Briefcase } from 'lucide-react';
 import { getKolDirectory, getDropdowns, type KolDirectoryRow, type KolBrandRow, type KolPlatformAccount, type Platform, type ContentCategory } from '../api/index.js';
 import KolDetailModal from '../components/KolDetailModal.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh } from '../lib/swrCache.js';
 import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
@@ -299,6 +299,7 @@ export default function KolsPage() {
       setRows(cached.rows);
       setTotal(cached.total);
       setLoading(false);
+      if (isFresh(cacheKey)) return; // data is still fresh — skip the background refetch
     } else {
       setLoading(true);
     }

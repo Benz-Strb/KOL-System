@@ -4,7 +4,7 @@ import { TrendingUp, Wallet, Megaphone, Coins, MousePointerClick } from 'lucide-
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { getMarketingDashboard, getDropdowns, type MarketingDashboard, type Brand } from '../api/index.js';
 import Select from '../components/Select.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 
 const DONUT_COLORS = ['#f97316', '#3b82f6', '#8b5cf6', '#111827', '#ef4444', '#10b981', '#eab308', '#ec4899', '#06b6d4'];
@@ -87,7 +87,13 @@ export default function MarketingDashboardPage() {
     const params = { brand_id: brandId, date_from: dateFrom, date_to: dateTo };
     const cacheKey = `marketing:${JSON.stringify(params)}`;
     const cached = getCached<MarketingDashboard>(cacheKey);
-    if (cached) { setData(cached); setLoading(false); } else { setLoading(true); }
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      if (isFresh(cacheKey, 60_000)) return; // dashboard data is stable — skip the background refetch
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await getMarketingDashboard(params);
       if (loadSeq.current !== seq) return;

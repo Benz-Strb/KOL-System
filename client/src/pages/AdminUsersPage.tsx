@@ -12,7 +12,7 @@ import Toast from '../components/Toast.js';
 import Select from '../components/Select.js';
 import UserAvatar from '../components/UserAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh, invalidateCachePrefix } from '../lib/swrCache.js';
 import { roleLabel } from '../lib/roleLabels.js';
 
 const ROLE_ORDER: Record<string, number> = { admin: 0, manager: 1, marketing: 2 };
@@ -130,6 +130,7 @@ export default function AdminUsersPage() {
     if (cached) {
       setUsers(sortUsers(cached));
       setTableLoading(false);
+      if (isFresh(cacheKey)) return; // data is still fresh — skip the background refetch
     } else {
       setTableLoading(true);
     }
@@ -153,6 +154,7 @@ export default function AdminUsersPage() {
       setForm({ email: '', full_name: '', role: 'marketing', password: generatePassword() });
       setSelectedBrandIds([]);
       setUsers(prev => sortUsers([...prev, created]));
+      invalidateCachePrefix('admin-users');
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -171,6 +173,7 @@ export default function AdminUsersPage() {
     try {
       await updateAdminUser(user.id, { is_active: next });
       setToast(`${user.full_name}: ${next ? t('adminUsers.activated') : t('adminUsers.deactivated')}`);
+      invalidateCachePrefix('admin-users');
     } catch (err: unknown) {
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: user.is_active } : u));
       setToast(err instanceof Error ? err.message : t('common.saveFailed'));
@@ -210,6 +213,7 @@ export default function AdminUsersPage() {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, user_brands: updated.user_brands } : u));
       setToast(t('adminUsers.brandsUpdated'));
       setEditingUserBrandsId(null);
+      invalidateCachePrefix('admin-users');
     } catch (err: unknown) {
       setUsers(prevUsers);
       setToast(err instanceof Error ? err.message : t('common.saveFailed'));
@@ -229,6 +233,7 @@ export default function AdminUsersPage() {
     try {
       await updateAdminUser(userId, { email: trimmed });
       setToast(t('adminUsers.emailUpdated'));
+      invalidateCachePrefix('admin-users');
     } catch (err: unknown) {
       setUsers(prevUsers);
       setEditingEmailId(userId);

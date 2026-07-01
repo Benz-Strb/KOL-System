@@ -11,7 +11,7 @@ import Select from '../components/Select.js';
 import KolAvatar from '../components/KolAvatar.js';
 import BrandLogo from '../components/BrandLogo.js';
 import { getPlatformColor } from '../lib/platformColors.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh, invalidateCachePrefix } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 
 function statusOptions(t: (key: string) => string) {
@@ -202,6 +202,7 @@ export default function PlacementsPage() {
       setRows(cached.rows);
       setTotal(cached.total);
       setLoading(false);
+      if (isFresh(cacheKey)) return; // data is still fresh — skip the background refetch
     } else {
       setLoading(true);
     }
@@ -234,6 +235,7 @@ export default function PlacementsPage() {
     if (cached) {
       setKolGmv(cached);
       setGmvLoading(false);
+      if (isFresh(cacheKey)) return; // data is still fresh — skip the background refetch
     } else {
       setGmvLoading(true);
     }
@@ -712,7 +714,13 @@ export default function PlacementsPage() {
       <PerformanceModal
         placement={perfPlacement}
         onClose={() => setPerfPlacement(null)}
-        onSaved={() => { setPerfPlacement(null); load(); }}
+        onSaved={() => {
+          setPerfPlacement(null);
+          invalidateCachePrefix('placements:');
+          invalidateCachePrefix('kol-gmv:');
+          load();
+          loadGmv();
+        }}
       />
     )}
     {metricsPlacement && (

@@ -10,7 +10,7 @@ import Toast from '../components/Toast.js';
 import ProductTrendModal from '../components/ProductTrendModal.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 
 function formatMoney(n: number) {
@@ -158,6 +158,7 @@ export default function ProductDashboardPage() {
     if (cached) {
       setData(cached);
       setLoading(false);
+      if (isFresh(cacheKey, 60_000)) return; // dashboard data is stable — skip the background refetch
     } else {
       setLoading(true);
     }

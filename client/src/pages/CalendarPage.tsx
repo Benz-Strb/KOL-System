@@ -8,7 +8,7 @@ import {
 import { ChevronLeft, ChevronRight, CalendarDays, List, X, ExternalLink, AlertCircle, CalendarClock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 import { getCalendar, getCalendarKolLatest, getDropdowns, searchKols, reschedulePlacement, type CalendarEvent, type CalendarResponse, type Brand, type KolResult } from '../api/index.js';
-import { getCached, setCached, invalidateCachePrefix } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh, invalidateCachePrefix } from '../lib/swrCache.js';
 import KolAvatar from '../components/KolAvatar.js';
 import PlatformLogo from '../components/PlatformLogo.js';
 import Toast from '../components/Toast.js';
@@ -532,6 +532,7 @@ export default function CalendarPage() {
       setEvents(cached.events);
       setNoDateCount(cached.meta.no_date_count);
       setLoading(false);
+      if (isFresh(cacheKey)) return; // data is still fresh — skip the background refetch
     } else {
       setLoading(true);
     }

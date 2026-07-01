@@ -21,7 +21,7 @@ import Toast from '../components/Toast.js';
 import Paginator from '../components/Paginator.js';
 import ChartTableCard from '../components/ChartTableCard.js';
 import ExportLangMenu, { type ExportLang } from '../components/ExportLangMenu.js';
-import { getCached, setCached } from '../lib/swrCache.js';
+import { getCached, setCached, isFresh } from '../lib/swrCache.js';
 import { numberLocale } from '../i18n/locale.js';
 import { todayStr, exportTableToExcel, type ExportColumn } from '../lib/exportTable.js';
 import i18n from '../i18n/index.js';
@@ -939,6 +939,7 @@ export default function DashboardPage() {
     if (cached) {
       setData(cached);
       setLoading(false);
+      if (isFresh(cacheKey, 60_000)) return; // dashboard data is stable — skip the background refetch
     } else {
       setLoading(true);
     }
@@ -985,15 +986,17 @@ export default function DashboardPage() {
     const mKey = `marketing:${JSON.stringify(params)}`;
     const cachedP = getCached<ProductDashboardOverview>(pKey);
     const cachedM = getCached<MarketingDashboard>(mKey);
+    const freshP = !!cachedP && isFresh(pKey, 60_000);
+    const freshM = !!cachedM && isFresh(mKey, 60_000);
     if (cachedP) setProductData(cachedP);
     if (cachedM) setMarketingData(cachedM);
-    if (cachedP && cachedM) return;
-    if (!cachedP) setProductLoading(true);
-    if (!cachedM) setMarketingLoading(true);
+    if (freshP && freshM) return; // both still fresh — skip the background refetch
+    if (!freshP) setProductLoading(true);
+    if (!freshM) setMarketingLoading(true);
     try {
       const [pd, md] = await Promise.all([
-        cachedP ? Promise.resolve(null) : getProductDashboard(params),
-        cachedM ? Promise.resolve(null) : getMarketingDashboard(params),
+        freshP ? Promise.resolve(null) : getProductDashboard(params),
+        freshM ? Promise.resolve(null) : getMarketingDashboard(params),
       ]);
       if (productSeq.current !== seq) return;
       if (pd) { setCached(pKey, pd); setProductData(pd); }
