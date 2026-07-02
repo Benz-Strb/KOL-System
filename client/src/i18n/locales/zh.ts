@@ -162,6 +162,8 @@ export const zh = {
     productsWithSales: '有成效的产品',
     rankingTitle: '产品 Ranking',
     byOrders: '按 Orders',
+    byAdsSpent: '按广告花费',
+    byVisit: '按访问量',
     clickToViewKols: '点击查看曾经评测过此产品的 KOL',
   },
   productTrend: {

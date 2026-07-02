@@ -12,7 +12,7 @@ import {
   getProductDashboard, getMarketingDashboard,
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
   type OffplatformTraffic, type ProductDashboardOverview, type MarketingDashboard,
-  type DashboardPlatformRow, type DashboardCategoryRow,
+  type DashboardPlatformRow, type DashboardCategoryRow, type ProductRankRow,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import ProductTrendModal from '../components/ProductTrendModal.js';
@@ -908,6 +908,7 @@ export default function DashboardPage() {
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
   const [rankChannel, setRankChannel] = useState<string>('all');
+  const [productRankMode, setProductRankMode] = useState<'gmv' | 'ads_cost' | 'visits' | 'orders'>('gmv');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -1058,6 +1059,19 @@ export default function DashboardPage() {
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? t('kolTrend.noCampaign') }))
     : [];
+
+  const sortedProductRanking = useMemo(() => {
+    if (!productData) return [];
+    const key = productRankMode === 'gmv' ? 'total_gmv' : productRankMode === 'ads_cost' ? 'total_ads_cost' : productRankMode === 'visits' ? 'total_visits' : 'total_orders';
+    return [...productData.ranking].sort((a, b) => b[key] - a[key]);
+  }, [productData, productRankMode]);
+
+  function productRankValue(p: ProductRankRow): string {
+    if (productRankMode === 'gmv') return formatMoney(p.total_gmv);
+    if (productRankMode === 'ads_cost') return formatMoney(p.total_ads_cost);
+    if (productRankMode === 'visits') return p.total_visits.toLocaleString(numberLocale());
+    return p.total_orders.toLocaleString(numberLocale());
+  }
 
   const kolMap = useMemo(() => {
     const m = new Map<number, DashboardKolRow>();
@@ -1620,26 +1634,33 @@ export default function DashboardPage() {
           {productData && (
             <ChartTableCard
               title={t('productDashboard.rankingTitle')}
+              headerRight={
+                <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+                  <button onClick={() => setProductRankMode('gmv')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>GMV</button>
+                  <button onClick={() => setProductRankMode('ads_cost')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'ads_cost' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('productDashboard.byAdsSpent')}</button>
+                  <button onClick={() => setProductRankMode('visits')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'visits' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('productDashboard.byVisit')}</button>
+                  <button onClick={() => setProductRankMode('orders')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'orders' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('productDashboard.byOrders')}</button>
+                </div>
+              }
               chart={
-                productData.ranking.length === 0 ? (
+                sortedProductRanking.length === 0 ? (
                   <p className="text-sm text-muted">{t('dashboard.noData')}</p>
                 ) : (
-                  <div className="flex flex-col gap-1">
-                    {productData.ranking.map((p, i) => (
+                  <div className="flex flex-col divide-y divide-hairline">
+                    {sortedProductRanking.map((p, i) => (
                       <button
                         key={p.canonical_id}
                         onClick={() => setTrendProductId(p.canonical_id)}
-                        className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-canvas transition-colors text-left w-full"
+                        className="flex items-center gap-3 py-2 px-2 hover:bg-canvas transition-colors text-left w-full"
                       >
-                        <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                        <RankBadge rank={i + 1} />
                         <ProductImage url={p.image_url} />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-ink truncate">{p.model_code}</div>
                           {p.category_name && <div className="text-[11px] text-muted truncate">{p.category_name}</div>}
                         </div>
                         <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{p.placement_count} {t('dashboard.colPlacements')}</span>
-                        <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{p.total_orders} {t('dashboard.colOrders')}</span>
-                        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(p.total_gmv)}</span>
+                        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{productRankValue(p)}</span>
                       </button>
                     ))}
                   </div>
@@ -1653,8 +1674,10 @@ export default function DashboardPage() {
                   { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
                   { key: 'total_orders', headerKey: 'dashboard.colOrders', align: 'right' as const },
                   { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                  { key: 'total_ads_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                  { key: 'total_visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                 ],
-                rows: productData.ranking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—' } as Record<string, unknown>)),
+                rows: sortedProductRanking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—' } as Record<string, unknown>)),
               }}
               exportFilename={`product_ranking_${todayStr()}.xlsx`}
               emptyMessage={t('dashboard.noData')}

@@ -167,6 +167,8 @@ export const th = {
     productsWithSales: 'สินค้าที่มีผลงาน',
     rankingTitle: 'Ranking สินค้า',
     byOrders: 'ตาม Orders',
+    byAdsSpent: 'ตาม Ads Spent',
+    byVisit: 'ตาม Visit',
     clickToViewKols: 'คลิกเพื่อดู KOL ที่เคยรีวิวสินค้านี้',
   },
   productTrend: {

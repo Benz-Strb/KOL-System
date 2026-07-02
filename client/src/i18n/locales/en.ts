@@ -162,6 +162,8 @@ export const en = {
     productsWithSales: 'Products with sales',
     rankingTitle: 'Product Ranking',
     byOrders: 'By Orders',
+    byAdsSpent: 'By Ads Spent',
+    byVisit: 'By Visit',
     clickToViewKols: 'Click to see KOLs who reviewed this product',
   },
   productTrend: {
