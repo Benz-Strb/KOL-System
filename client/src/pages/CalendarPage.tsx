@@ -13,6 +13,7 @@ import KolAvatar from '../components/KolAvatar.js';
 import PlatformLogo from '../components/PlatformLogo.js';
 import Toast from '../components/Toast.js';
 import { useModalTransition } from '../hooks/useModalTransition.js';
+import { numberLocale } from '../i18n/locale.js';
 
 // ─── date helpers ────────────────────────────────────────────────────────────
 
@@ -522,7 +523,10 @@ export default function CalendarPage() {
   const from = formatDate(grid[0]);
   const to = formatDate(grid[grid.length - 1]);
 
-  const locale = document.documentElement.lang || 'th';
+  // ตามภาษา UI ปัจจุบัน (re-render อัตโนมัติเมื่อเปลี่ยนภาษา เพราะ component ใช้
+  // useTranslation อยู่แล้ว) — ห้ามอ่าน document.documentElement.lang ตรงๆ เพราะ
+  // ไม่มีใคร set ค่าไว้ จะ fallback เป็น 'th' เสมอ
+  const locale = numberLocale();
 
   const load = useCallback(async () => {
     const mySeq = ++seqRef.current;
