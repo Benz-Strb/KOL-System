@@ -597,7 +597,7 @@ function CategoryBreakdownCard({
               <span className="text-[11px] text-muted tabular-nums w-14 text-right shrink-0">{t('dashboard.kolCountLabel', { count: r.kol_count })}</span>
               <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">{formatMoney(r.gmv)}</span>
               <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{formatMoney(r.spend + r.ads_cost)}</span>
-              <span className="text-xs text-muted tabular-nums font-mono w-16 text-right shrink-0">{r.visits.toLocaleString()}</span>
+              <span className="text-xs text-muted tabular-nums font-mono w-16 text-right shrink-0">{r.visits.toLocaleString(numberLocale())}</span>
             </div>
           ))}
         </div>
@@ -1674,10 +1674,10 @@ export default function DashboardPage() {
                   { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
                   { key: 'total_orders', headerKey: 'dashboard.colOrders', align: 'right' as const },
                   { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
-                  { key: 'total_ads_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                  { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                   { key: 'total_visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                 ],
-                rows: sortedProductRanking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—' } as Record<string, unknown>)),
+                rows: sortedProductRanking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—', total_cost: p.total_spend + p.total_ads_cost } as Record<string, unknown>)),
               }}
               exportFilename={`product_ranking_${todayStr()}.xlsx`}
               emptyMessage={t('dashboard.noData')}
@@ -1712,7 +1712,7 @@ export default function DashboardPage() {
                             <span className="font-medium text-ink truncate flex-1 min-w-0">{r.category_name ?? '—'}</span>
                             <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
                             <span className="text-xs text-muted tabular-nums font-mono shrink-0">{formatMoney(r.total_cost)}</span>
-                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{r.visits.toLocaleString()}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{r.visits.toLocaleString(numberLocale())}</span>
                             <span className="w-12 text-right text-muted tabular-nums shrink-0">{catTotal > 0 ? ((r.gmv / catTotal) * 100).toFixed(1) : '0.0'}%</span>
                           </div>
                         ))}
