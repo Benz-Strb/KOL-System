@@ -17,6 +17,7 @@ function buildDashboardBrandFilter(role: string, brandIds: number[], brand_id?: 
 const EMPTY_RESPONSE = {
   summary: {
     total_placements: 0,
+    total_kol_count: 0,
     posted_count: 0,
     planned_count: 0,
     cancelled_count: 0,
@@ -46,6 +47,7 @@ const EMPTY_RESPONSE = {
     gmv: number;
     spend: number;
     orders: number;
+    visits: number;
   }[],
   paymentTypeBreakdown: [] as PaymentTypeRow[],
   tierBreakdown: [] as TierRow[],
@@ -82,6 +84,7 @@ type PlatformRow = {
   total_gmv: number;
   total_orders: number;
   total_spend: number;
+  total_ads_cost: number;
 };
 
 // monthly GMV/orders/placement trend (A) — the only "over time" view; campaign
@@ -103,6 +106,8 @@ type CategoryRow = {
   gmv: number;
   orders: number;
   spend: number;
+  ads_cost: number;
+  visits: number;
 };
 
 type PlacementDetailRow = {
@@ -146,10 +151,8 @@ type GmvSlice = { platform_id?: number; category_id?: number | null; canonical_i
 
 const EMPTY_MARKETING = {
   summary: { total_gmv: 0, kol_cost: 0, ads_cost: 0, total_cost: 0, visits_shopee: 0, visits_lazada: 0, total_visits: 0 },
-  byPlatform: [] as { platform_id: number; platform_name: string; gmv: number }[],
-  byProductCategory: [] as { category_id: number | null; category_name: string | null; gmv: number }[],
-  byProductSku: [] as { canonical_id: number; model_code: string | null; gmv: number }[],
-  byContentCategory: [] as { category_id: number; category_name: string; gmv: number }[],
+  byProductCategory: [] as { category_id: number | null; category_name: string | null; gmv: number; total_cost: number; visits: number }[],
+  byProductSku: [] as { canonical_id: number; model_code: string | null; gmv: number; total_cost: number }[],
 };
 
 // barter-vs-paid is most useful in this fixed order; alphabetical (from a
@@ -184,6 +187,8 @@ type ProductRankRow = {
   total_gmv: number;
   total_orders: number;
   total_spend: number;
+  total_ads_cost: number;
+  total_visits: number;
 };
 
 type ProductKolRow = {
@@ -222,7 +227,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
 
     const matched = await prisma.placements.findMany({
       where,
-      select: { id: true, final_price: true, pay_amount: true, ads_cost: true, status: true },
+      select: { id: true, final_price: true, pay_amount: true, ads_cost: true, status: true, kol_id: true },
     });
 
     if (matched.length === 0) {
@@ -236,13 +241,16 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     let postedCount = 0;
     let plannedCount = 0;
     let cancelledCount = 0;
+    const kolIds = new Set<number>();
     for (const p of matched) {
       totalSpend += Number(p.pay_amount ?? p.final_price ?? 0);
       totalAdsCost += Number(p.ads_cost ?? 0);
       if (p.status === 'posted') postedCount++;
       else if (p.status === 'planned') plannedCount++;
       else if (p.status === 'cancelled') cancelledCount++;
+      if (p.kol_id != null) kolIds.add(p.kol_id);
     }
+    const totalKolCount = kolIds.size;
 
     const [gmvRow] = await prisma.$queryRaw<{ total_gmv: number; total_orders: number; total_visits: number; total_atc: number }[]>`
       SELECT
@@ -406,9 +414,11 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     // hiring distribution by KOL platform (Facebook/Instagram/TikTok/YouTube etc.)
     // — groups by placements.platform_id (the channel the KOL posts on), not
     // placement_metrics.channel (the sales channel that tracks actual GMV)
-    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number; total_orders: number; total_spend: number }[]>`
+    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number; total_orders: number; total_spend: number; total_ads_cost: number }[]>`
       WITH placement_spend AS (
-        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        SELECT id,
+               COALESCE(pay_amount, final_price, 0)::numeric AS spend,
+               COALESCE(ads_cost, 0)::numeric                AS ads_cost
         FROM placements WHERE id IN (${Prisma.join(ids)})
       ),
       metric_agg AS (
@@ -424,7 +434,8 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.kol_id)::int               AS kol_count,
         COALESCE(SUM(ma.gmv), 0)::float             AS total_gmv,
         COALESCE(SUM(ma.orders), 0)::int            AS total_orders,
-        COALESCE(SUM(ps.spend), 0)::float           AS total_spend
+        COALESCE(SUM(ps.spend), 0)::float           AS total_spend,
+        COALESCE(SUM(ps.ads_cost), 0)::float        AS total_ads_cost
       FROM placements p
       JOIN platforms pt ON pt.id = p.platform_id
       LEFT JOIN placement_spend ps ON ps.id = p.id
@@ -508,6 +519,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       gmv: number;
       spend: number;
       orders: number;
+      visits: number;
     }[]>`
       SELECT
         c.id                                                       AS campaign_id,
@@ -517,11 +529,12 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.id)::int                                  AS placement_count,
         COALESCE(SUM(pm.gmv::numeric), 0)::float                   AS gmv,
         COALESCE(SUM(COALESCE(p.pay_amount, p.final_price, 0)), 0)::float AS spend,
-        COALESCE(SUM(pm.orders), 0)::int                           AS orders
+        COALESCE(SUM(pm.orders), 0)::int                           AS orders,
+        COALESCE(SUM(pm.visits), 0)::int                           AS visits
       FROM placements p
       LEFT JOIN campaigns c ON p.campaign_id = c.id
       LEFT JOIN (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders, SUM(visits) AS visits
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -561,11 +574,13 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     // GMV by content category (C) — categories live on the KOL, not the placement
     const categoryBreakdown = await prisma.$queryRaw<CategoryRow[]>`
       WITH placement_spend AS (
-        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        SELECT id,
+               COALESCE(pay_amount, final_price, 0)::numeric AS spend,
+               COALESCE(ads_cost, 0)::numeric                AS ads_cost
         FROM placements WHERE id IN (${Prisma.join(ids)})
       ),
       metric_agg AS (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders, SUM(visits) AS visits
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -577,7 +592,9 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.id)::int               AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float         AS gmv,
         COALESCE(SUM(ma.orders), 0)::int        AS orders,
-        COALESCE(SUM(ps.spend), 0)::float       AS spend
+        COALESCE(SUM(ps.spend), 0)::float       AS spend,
+        COALESCE(SUM(ps.ads_cost), 0)::float    AS ads_cost,
+        COALESCE(SUM(ma.visits), 0)::int        AS visits
       FROM placements p
       JOIN kols k ON k.id = p.kol_id
       JOIN content_categories cc ON cc.id = k.content_category_id
@@ -648,6 +665,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     return {
       summary: {
         total_placements: matched.length,
+        total_kol_count: totalKolCount,
         posted_count: postedCount,
         planned_count: plannedCount,
         cancelled_count: cancelledCount,
@@ -1343,7 +1361,7 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
 
     if (matched.length === 0) {
       return {
-        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0 },
+        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0, total_ads_cost: 0, total_visits: 0 },
         ranking: [] as ProductRankRow[],
       };
     }
@@ -1362,11 +1380,13 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         WHERE pl.id IN (${Prisma.join(ids)})
       ),
       placement_spend AS (
-        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        SELECT id,
+               COALESCE(pay_amount, final_price, 0)::numeric AS spend,
+               COALESCE(ads_cost, 0)::numeric                AS ads_cost
         FROM placements WHERE id IN (${Prisma.join(ids)})
       ),
       metric_agg AS (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders, SUM(visits) AS visits
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -1380,7 +1400,9 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         COUNT(DISTINCT r.placement_id)::int AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float     AS total_gmv,
         COALESCE(SUM(ma.orders), 0)::int    AS total_orders,
-        COALESCE(SUM(ps.spend), 0)::float   AS total_spend
+        COALESCE(SUM(ps.spend), 0)::float   AS total_spend,
+        COALESCE(SUM(ps.ads_cost), 0)::float AS total_ads_cost,
+        COALESCE(SUM(ma.visits), 0)::int    AS total_visits
       FROM resolved r
       JOIN products c ON c.id = r.canonical_id
       LEFT JOIN product_categories pc ON pc.id = c.product_category_id
@@ -1398,8 +1420,10 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         total_placements: acc.total_placements + r.placement_count,
         product_count: acc.product_count + 1,
         total_spend: acc.total_spend + r.total_spend,
+        total_ads_cost: acc.total_ads_cost + r.total_ads_cost,
+        total_visits: acc.total_visits + r.total_visits,
       }),
-      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0 },
+      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0, total_ads_cost: 0, total_visits: 0 },
     );
 
     return { summary, ranking };
@@ -1806,83 +1830,66 @@ async function buildMarketingDashboard(prisma: PrismaClient, user: AuthUser, que
     if (r.channel === 'lazada') visitsLazada = r.visits;
   }
 
-  // GMV by KOL posting platform
-  const byPlatform = await prisma.$queryRaw<{ platform_id: number; platform_name: string; gmv: number }[]>`
-    WITH metric_agg AS (
-      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
-      WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
-    )
-    SELECT pt.id::int AS platform_id, pt.name AS platform_name,
-           COALESCE(SUM(ma.gmv), 0)::float AS gmv
-    FROM placements p
-    JOIN platforms pt ON pt.id = p.platform_id
-    LEFT JOIN metric_agg ma ON ma.placement_id = p.id
-    WHERE p.id IN (${Prisma.join(ids)})
-    GROUP BY pt.id, pt.name
-    ORDER BY gmv DESC
-  `;
-
-  // GMV by KOL content category
-  const byContentCategory = await prisma.$queryRaw<{ category_id: number; category_name: string; gmv: number }[]>`
-    WITH metric_agg AS (
-      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
-      WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
-    )
-    SELECT cc.id::int AS category_id, cc.name AS category_name,
-           COALESCE(SUM(ma.gmv), 0)::float AS gmv
-    FROM placements p
-    JOIN kols k ON k.id = p.kol_id
-    JOIN content_categories cc ON cc.id = k.content_category_id
-    LEFT JOIN metric_agg ma ON ma.placement_id = p.id
-    WHERE p.id IN (${Prisma.join(ids)})
-    GROUP BY cc.id, cc.name
-    ORDER BY gmv DESC
-  `;
-
   // GMV by product category (canonical resolve — see buildProductDashboard)
-  const byProductCategory = await prisma.$queryRaw<{ category_id: number | null; category_name: string | null; gmv: number }[]>`
+  const byProductCategory = await prisma.$queryRaw<{ category_id: number | null; category_name: string | null; gmv: number; total_cost: number; visits: number }[]>`
     WITH resolved AS (
       SELECT pl.id AS placement_id, COALESCE(pr.canonical_product_id, pr.id) AS canonical_id
       FROM placements pl JOIN products pr ON pr.id = pl.product_id
       WHERE pl.id IN (${Prisma.join(ids)})
     ),
+    placement_spend AS (
+      SELECT id,
+             (COALESCE(pay_amount, final_price, 0) + COALESCE(ads_cost, 0))::numeric AS total_cost
+      FROM placements WHERE id IN (${Prisma.join(ids)})
+    ),
     metric_agg AS (
-      SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
+      SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(visits) AS visits FROM placement_metrics
       WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
     )
     SELECT pc.id::int AS category_id, pc.name AS category_name,
-           COALESCE(SUM(ma.gmv), 0)::float AS gmv
+           COALESCE(SUM(ma.gmv), 0)::float AS gmv,
+           COALESCE(SUM(ps.total_cost), 0)::float AS total_cost,
+           COALESCE(SUM(ma.visits), 0)::int AS visits
     FROM resolved r
     JOIN products c ON c.id = r.canonical_id
     LEFT JOIN product_categories pc ON pc.id = c.product_category_id
+    LEFT JOIN placement_spend ps ON ps.id = r.placement_id
     LEFT JOIN metric_agg ma ON ma.placement_id = r.placement_id
     GROUP BY pc.id, pc.name
     ORDER BY gmv DESC
   `;
 
   // GMV by product SKU (canonical), top 8 + others
-  const skuRows = await prisma.$queryRaw<{ canonical_id: number; model_code: string; gmv: number }[]>`
+  const skuRows = await prisma.$queryRaw<{ canonical_id: number; model_code: string; gmv: number; total_cost: number }[]>`
     WITH resolved AS (
       SELECT pl.id AS placement_id, COALESCE(pr.canonical_product_id, pr.id) AS canonical_id
       FROM placements pl JOIN products pr ON pr.id = pl.product_id
       WHERE pl.id IN (${Prisma.join(ids)})
+    ),
+    placement_spend AS (
+      SELECT id,
+             (COALESCE(pay_amount, final_price, 0) + COALESCE(ads_cost, 0))::numeric AS total_cost
+      FROM placements WHERE id IN (${Prisma.join(ids)})
     ),
     metric_agg AS (
       SELECT placement_id, SUM(gmv::numeric) AS gmv FROM placement_metrics
       WHERE placement_id IN (${Prisma.join(ids)}) GROUP BY placement_id
     )
     SELECT c.id::int AS canonical_id, c.model_code,
-           COALESCE(SUM(ma.gmv), 0)::float AS gmv
+           COALESCE(SUM(ma.gmv), 0)::float AS gmv,
+           COALESCE(SUM(ps.total_cost), 0)::float AS total_cost
     FROM resolved r
     JOIN products c ON c.id = r.canonical_id
+    LEFT JOIN placement_spend ps ON ps.id = r.placement_id
     LEFT JOIN metric_agg ma ON ma.placement_id = r.placement_id
     GROUP BY c.id, c.model_code
     ORDER BY gmv DESC
   `;
-  const top = skuRows.slice(0, SKU_TOP_N).map(r => ({ canonical_id: r.canonical_id, model_code: r.model_code, gmv: r.gmv }));
+  const top = skuRows.slice(0, SKU_TOP_N).map(r => ({ canonical_id: r.canonical_id, model_code: r.model_code, gmv: r.gmv, total_cost: r.total_cost }));
   const restGmv = skuRows.slice(SKU_TOP_N).reduce((s, r) => s + r.gmv, 0);
+  const restCost = skuRows.slice(SKU_TOP_N).reduce((s, r) => s + r.total_cost, 0);
   const byProductSku = restGmv > 0
-    ? [...top, { canonical_id: -1, model_code: null as string | null, gmv: restGmv }]
+    ? [...top, { canonical_id: -1, model_code: null as string | null, gmv: restGmv, total_cost: restCost }]
     : top;
 
   return {
@@ -1890,7 +1897,7 @@ async function buildMarketingDashboard(prisma: PrismaClient, user: AuthUser, que
       total_gmv: totalGmv, kol_cost: kolCost, ads_cost: adsCost, total_cost: kolCost + adsCost,
       visits_shopee: visitsShopee, visits_lazada: visitsLazada, total_visits: totalVisits,
     },
-    byPlatform, byProductCategory, byProductSku, byContentCategory,
+    byProductCategory, byProductSku,
   };
 }
 

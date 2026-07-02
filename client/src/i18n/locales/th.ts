@@ -71,6 +71,7 @@ export const th = {
     colVisits: 'Visits',
     colPlacements: 'Placements',
     colSpend: 'KOL Spend',
+    colCost: 'Cost',
     colPercent: '%',
     colRoi: 'ROI',
     colStage: 'Stage',
@@ -146,6 +147,9 @@ export const th = {
     categoryDesc: 'ผลงานแยกตามสายคอนเทนต์ของ KOL',
     visitsShopee: 'Visits Shopee',
     visitsLazada: 'Visits Lazada',
+    totalExpenses: 'ค่าใช้จ่ายรวม',
+    totalVisit: 'Visit รวม',
+    totalKol: 'KOL ทั้งหมด',
     othersLabel: 'อื่นๆ',
   },
   marketing: {
@@ -163,6 +167,8 @@ export const th = {
     productsWithSales: 'สินค้าที่มีผลงาน',
     rankingTitle: 'Ranking สินค้า',
     byOrders: 'ตาม Orders',
+    byAdsSpent: 'ตาม Ads Spent',
+    byVisit: 'ตาม Visit',
     clickToViewKols: 'คลิกเพื่อดู KOL ที่เคยรีวิวสินค้านี้',
   },
   productTrend: {

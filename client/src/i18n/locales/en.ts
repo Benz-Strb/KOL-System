@@ -66,6 +66,7 @@ export const en = {
     colVisits: 'Visits',
     colPlacements: 'Placements',
     colSpend: 'KOL Spend',
+    colCost: 'Cost',
     colPercent: '%',
     colRoi: 'ROI',
     colStage: 'Stage',
@@ -141,6 +142,9 @@ export const en = {
     categoryDesc: 'Performance by the KOL\'s content niche',
     visitsShopee: 'Visits Shopee',
     visitsLazada: 'Visits Lazada',
+    totalExpenses: 'Total Expenses',
+    totalVisit: 'Total Visit',
+    totalKol: 'Total KOL',
     othersLabel: 'Others',
   },
   marketing: {
@@ -158,6 +162,8 @@ export const en = {
     productsWithSales: 'Products with sales',
     rankingTitle: 'Product Ranking',
     byOrders: 'By Orders',
+    byAdsSpent: 'By Ads Spent',
+    byVisit: 'By Visit',
     clickToViewKols: 'Click to see KOLs who reviewed this product',
   },
   productTrend: {

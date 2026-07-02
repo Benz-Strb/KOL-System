@@ -12,10 +12,12 @@ import {
   getProductDashboard, getMarketingDashboard,
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
   type OffplatformTraffic, type ProductDashboardOverview, type MarketingDashboard,
+  type DashboardPlatformRow, type DashboardCategoryRow, type ProductRankRow,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import ProductTrendModal from '../components/ProductTrendModal.js';
 import PlatformLogo from '../components/PlatformLogo.js';
+import RankBadge from '../components/RankBadge.js';
 import Select from '../components/Select.js';
 import Toast from '../components/Toast.js';
 import Paginator from '../components/Paginator.js';
@@ -269,7 +271,7 @@ function KolsByGroupCard({
 function PlatformBreakdownCard({
   rows,
 }: {
-  rows: { platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number }[];
+  rows: DashboardPlatformRow[];
 }) {
   const { t } = useTranslation();
   const total = rows.reduce((s, r) => s + r.placement_count, 0);
@@ -295,6 +297,9 @@ function PlatformBreakdownCard({
                   <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">
                     {formatMoney(r.total_gmv)}
                   </span>
+                  <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">
+                    {formatMoney(r.total_spend + r.total_ads_cost)}
+                  </span>
                   <span className="text-[11px] text-muted tabular-nums w-9 text-right shrink-0">{pct.toFixed(0)}%</span>
                 </div>
               );
@@ -308,8 +313,9 @@ function PlatformBreakdownCard({
           { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
           { key: 'kol_count', headerKey: 'dashboard.colKolCount', align: 'right' as const },
           { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+          { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
         ],
-        rows: rows as unknown as Record<string, unknown>[],
+        rows: rows.map(r => ({ ...r, total_cost: r.total_spend + r.total_ads_cost })) as unknown as Record<string, unknown>[],
       }}
       exportFilename={`platform_breakdown_${todayStr()}.xlsx`}
       emptyMessage={t('dashboard.noData')}
@@ -567,7 +573,7 @@ function FunnelCard({
 function CategoryBreakdownCard({
   rows,
 }: {
-  rows: { category_id: number; category_name: string; kol_count: number; placement_count: number; gmv: number; orders: number }[];
+  rows: DashboardCategoryRow[];
 }) {
   const { t } = useTranslation();
   const maxGmv = Math.max(...rows.map(r => r.gmv), 1);
@@ -590,6 +596,8 @@ function CategoryBreakdownCard({
               </div>
               <span className="text-[11px] text-muted tabular-nums w-14 text-right shrink-0">{t('dashboard.kolCountLabel', { count: r.kol_count })}</span>
               <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">{formatMoney(r.gmv)}</span>
+              <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{formatMoney(r.spend + r.ads_cost)}</span>
+              <span className="text-xs text-muted tabular-nums font-mono w-16 text-right shrink-0">{r.visits.toLocaleString(numberLocale())}</span>
             </div>
           ))}
         </div>
@@ -682,7 +690,7 @@ function KolRankRow({ k, rank, mode, channel, onSelect }: {
       }`}
     >
       <div className="flex items-center gap-3 py-2 px-2">
-        <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{rank}</span>
+        <RankBadge rank={rank} />
         <RankAvatar handle={k.handle} avatarUrl={k.avatar_url} />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-ink truncate">{k.handle}</div>
@@ -900,6 +908,7 @@ export default function DashboardPage() {
   const [dateTo, setDateTo] = useState('');
   const [rankMode, setRankMode] = useState<'gmv' | 'roi'>('gmv');
   const [rankChannel, setRankChannel] = useState<string>('all');
+  const [productRankMode, setProductRankMode] = useState<'gmv' | 'ads_cost' | 'visits' | 'orders'>('gmv');
   const [trendKolId, setTrendKolId] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -1050,6 +1059,19 @@ export default function DashboardPage() {
   const campaignTrendData = data
     ? data.campaignTrend.map(c => ({ ...c, name: c.code ?? t('kolTrend.noCampaign') }))
     : [];
+
+  const sortedProductRanking = useMemo(() => {
+    if (!productData) return [];
+    const key = productRankMode === 'gmv' ? 'total_gmv' : productRankMode === 'ads_cost' ? 'total_ads_cost' : productRankMode === 'visits' ? 'total_visits' : 'total_orders';
+    return [...productData.ranking].sort((a, b) => b[key] - a[key]);
+  }, [productData, productRankMode]);
+
+  function productRankValue(p: ProductRankRow): string {
+    if (productRankMode === 'gmv') return formatMoney(p.total_gmv);
+    if (productRankMode === 'ads_cost') return formatMoney(p.total_ads_cost);
+    if (productRankMode === 'visits') return p.total_visits.toLocaleString(numberLocale());
+    return p.total_orders.toLocaleString(numberLocale());
+  }
 
   const kolMap = useMemo(() => {
     const m = new Map<number, DashboardKolRow>();
@@ -1225,9 +1247,9 @@ export default function DashboardPage() {
               <div className="flex-1 h-px bg-hairline" />
             </div>
             <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
-              {/* Row 1: 7 absolute-number KPIs — no inner card borders */}
+              {/* Row 1: 10 absolute-number KPIs, split 5+5 to avoid column overflow at normal desktop width */}
               <div className="overflow-x-auto">
-                <div className="grid grid-cols-7 min-w-[700px]">
+                <div className="grid grid-cols-5 min-w-[600px]">
                   <SlabCell icon={<TrendingUp size={12} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
                   <SlabCell icon={<Wallet size={12} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
                   <SlabCell icon={<ShoppingCart size={12} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
@@ -1238,8 +1260,14 @@ export default function DashboardPage() {
                     sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
                   />
                   <SlabCell icon={<Megaphone size={12} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
+                </div>
+                <div className="h-px bg-hairline" />
+                <div className="grid grid-cols-5 min-w-[600px]">
                   <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsShopee')} value={visitsShopee.toLocaleString(numberLocale())} />
                   <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsLazada')} value={visitsLazada.toLocaleString(numberLocale())} />
+                  <SlabCell icon={<Wallet size={12} />} label={t('dashboard.totalExpenses')} value={formatMoney(data.summary.total_spend + data.summary.total_ads_cost)} />
+                  <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.totalVisit')} value={data.summary.total_visits.toLocaleString(numberLocale())} />
+                  <SlabCell icon={<ListChecks size={12} />} label={t('dashboard.totalKol')} value={data.summary.total_kol_count.toLocaleString(numberLocale())} />
                 </div>
               </div>
               {/* Hairline divider between the two rows */}
@@ -1362,18 +1390,23 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted">{t('dashboard.noData')}</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={224}>
-                      <BarChart data={campaignTrendData} margin={{ left: -16 }}>
+                      <BarChart data={campaignTrendData} margin={{ left: -16, right: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                        <YAxis yAxisId="money" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                        <YAxis yAxisId="visits" orientation="right" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
                         <Tooltip
                           contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
                           labelStyle={{ color: 'var(--ink)' }}
-                          formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
+                          formatter={(v, n) => {
+                            if (n === 'visits') return [Number(v ?? 0).toLocaleString(numberLocale()), t('dashboard.colVisits')];
+                            return [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')];
+                          }}
                         />
-                        <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
-                        <Bar dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : v === 'spend' ? t('kolTrend.spend') : t('dashboard.colVisits'))} wrapperStyle={{ fontSize: 11 }} />
+                        <Bar yAxisId="money" dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Bar yAxisId="money" dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Bar yAxisId="visits" dataKey="visits" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={500} />
                       </BarChart>
                     </ResponsiveContainer>
                   )
@@ -1383,6 +1416,7 @@ export default function DashboardPage() {
                     { key: 'name', headerKey: 'dashboard.colCampaign' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                     { key: 'spend', headerKey: 'dashboard.colSpend', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                   ],
                   rows: campaignTrendData as unknown as Record<string, unknown>[],
                 }}
@@ -1572,7 +1606,7 @@ export default function DashboardPage() {
             {rankedKols.length === 0 ? (
               <p className="text-sm text-muted">{rankMode === 'roi' && rankChannel === 'all' ? t('dashboard.noDataRoi') : t('dashboard.noDataGmv')}</p>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col divide-y divide-hairline">
                 {rankedKols.map((k, i) => <KolRankRow key={k.kol_id} k={k} rank={i + 1} mode={rankMode} channel={rankChannel} onSelect={setTrendKolId} />)}
               </div>
             )}
@@ -1600,26 +1634,33 @@ export default function DashboardPage() {
           {productData && (
             <ChartTableCard
               title={t('productDashboard.rankingTitle')}
+              headerRight={
+                <div className="flex items-center gap-1 bg-canvas rounded-lg p-1 shrink-0">
+                  <button onClick={() => setProductRankMode('gmv')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'gmv' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>GMV</button>
+                  <button onClick={() => setProductRankMode('ads_cost')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'ads_cost' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('productDashboard.byAdsSpent')}</button>
+                  <button onClick={() => setProductRankMode('visits')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'visits' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('productDashboard.byVisit')}</button>
+                  <button onClick={() => setProductRankMode('orders')} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${productRankMode === 'orders' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}>{t('productDashboard.byOrders')}</button>
+                </div>
+              }
               chart={
-                productData.ranking.length === 0 ? (
+                sortedProductRanking.length === 0 ? (
                   <p className="text-sm text-muted">{t('dashboard.noData')}</p>
                 ) : (
-                  <div className="flex flex-col gap-1">
-                    {productData.ranking.map((p, i) => (
+                  <div className="flex flex-col divide-y divide-hairline">
+                    {sortedProductRanking.map((p, i) => (
                       <button
                         key={p.canonical_id}
                         onClick={() => setTrendProductId(p.canonical_id)}
-                        className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-canvas transition-colors text-left w-full"
+                        className="flex items-center gap-3 py-2 px-2 hover:bg-canvas transition-colors text-left w-full"
                       >
-                        <span className="w-5 text-xs font-semibold text-muted text-center shrink-0">{i + 1}</span>
+                        <RankBadge rank={i + 1} />
                         <ProductImage url={p.image_url} />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-ink truncate">{p.model_code}</div>
                           {p.category_name && <div className="text-[11px] text-muted truncate">{p.category_name}</div>}
                         </div>
                         <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{p.placement_count} {t('dashboard.colPlacements')}</span>
-                        <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{p.total_orders} {t('dashboard.colOrders')}</span>
-                        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{formatMoney(p.total_gmv)}</span>
+                        <span className="text-sm font-semibold text-ink tabular-nums font-mono w-28 text-right shrink-0">{productRankValue(p)}</span>
                       </button>
                     ))}
                   </div>
@@ -1633,8 +1674,10 @@ export default function DashboardPage() {
                   { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
                   { key: 'total_orders', headerKey: 'dashboard.colOrders', align: 'right' as const },
                   { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                  { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                  { key: 'total_visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                 ],
-                rows: productData.ranking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—' } as Record<string, unknown>)),
+                rows: sortedProductRanking.map((p, i) => ({ ...p, rank: i + 1, category_name: p.category_name ?? '—', total_cost: p.total_spend + p.total_ads_cost } as Record<string, unknown>)),
               }}
               exportFilename={`product_ranking_${todayStr()}.xlsx`}
               emptyMessage={t('dashboard.noData')}
@@ -1668,6 +1711,8 @@ export default function DashboardPage() {
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length] }} />
                             <span className="font-medium text-ink truncate flex-1 min-w-0">{r.category_name ?? '—'}</span>
                             <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{formatMoney(r.total_cost)}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{r.visits.toLocaleString(numberLocale())}</span>
                             <span className="w-12 text-right text-muted tabular-nums shrink-0">{catTotal > 0 ? ((r.gmv / catTotal) * 100).toFixed(1) : '0.0'}%</span>
                           </div>
                         ))}
@@ -1679,6 +1724,8 @@ export default function DashboardPage() {
                   columns: [
                     { key: 'category_name', headerKey: 'dashboard.colCategory' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                     { key: 'pct', header: '%', align: 'right' as const },
                   ],
                   rows: (() => {
@@ -1715,6 +1762,7 @@ export default function DashboardPage() {
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length] }} />
                             <span className="font-medium text-ink truncate flex-1 min-w-0">{r.model_code ?? '—'}</span>
                             <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{formatMoney(r.total_cost)}</span>
                             <span className="w-12 text-right text-muted tabular-nums shrink-0">{skuTotal > 0 ? ((r.gmv / skuTotal) * 100).toFixed(1) : '0.0'}%</span>
                           </div>
                         ))}
@@ -1727,6 +1775,7 @@ export default function DashboardPage() {
                   columns: [
                     { key: 'model_code', headerKey: 'dashboard.colSku' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                     { key: 'pct', header: '%', align: 'right' as const },
                   ],
                   rows: (() => {

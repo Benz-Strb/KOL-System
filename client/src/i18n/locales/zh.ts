@@ -66,6 +66,7 @@ export const zh = {
     colVisits: 'Visits',
     colPlacements: 'Placements',
     colSpend: 'KOL Spend',
+    colCost: '费用',
     colPercent: '%',
     colRoi: 'ROI',
     colStage: '阶段',
@@ -141,6 +142,9 @@ export const zh = {
     categoryDesc: '按 KOL 内容类型划分的表现',
     visitsShopee: 'Visits Shopee',
     visitsLazada: 'Visits Lazada',
+    totalExpenses: '总支出',
+    totalVisit: '总访问量',
+    totalKol: 'KOL 总数',
     othersLabel: '其他',
   },
   marketing: {
@@ -158,6 +162,8 @@ export const zh = {
     productsWithSales: '有成效的产品',
     rankingTitle: '产品 Ranking',
     byOrders: '按 Orders',
+    byAdsSpent: '按广告花费',
+    byVisit: '按访问量',
     clickToViewKols: '点击查看曾经评测过此产品的 KOL',
   },
   productTrend: {
