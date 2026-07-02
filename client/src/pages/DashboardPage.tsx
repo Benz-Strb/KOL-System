@@ -1688,6 +1688,8 @@ export default function DashboardPage() {
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length] }} />
                             <span className="font-medium text-ink truncate flex-1 min-w-0">{r.category_name ?? '—'}</span>
                             <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{formatMoney(r.total_cost)}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{r.visits.toLocaleString()}</span>
                             <span className="w-12 text-right text-muted tabular-nums shrink-0">{catTotal > 0 ? ((r.gmv / catTotal) * 100).toFixed(1) : '0.0'}%</span>
                           </div>
                         ))}
@@ -1699,6 +1701,8 @@ export default function DashboardPage() {
                   columns: [
                     { key: 'category_name', headerKey: 'dashboard.colCategory' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                     { key: 'pct', header: '%', align: 'right' as const },
                   ],
                   rows: (() => {
@@ -1735,6 +1739,7 @@ export default function DashboardPage() {
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PRODUCT_DONUT_COLORS[i % PRODUCT_DONUT_COLORS.length] }} />
                             <span className="font-medium text-ink truncate flex-1 min-w-0">{r.model_code ?? '—'}</span>
                             <span className="text-ink tabular-nums font-mono shrink-0">{formatMoney(r.gmv)}</span>
+                            <span className="text-xs text-muted tabular-nums font-mono shrink-0">{formatMoney(r.total_cost)}</span>
                             <span className="w-12 text-right text-muted tabular-nums shrink-0">{skuTotal > 0 ? ((r.gmv / skuTotal) * 100).toFixed(1) : '0.0'}%</span>
                           </div>
                         ))}
@@ -1747,6 +1752,7 @@ export default function DashboardPage() {
                   columns: [
                     { key: 'model_code', headerKey: 'dashboard.colSku' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                     { key: 'pct', header: '%', align: 'right' as const },
                   ],
                   rows: (() => {
