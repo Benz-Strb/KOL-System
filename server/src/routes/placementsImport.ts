@@ -307,7 +307,7 @@ function resolveRow(
     if (existingKol) {
       kol_id = existingKol.id;
     } else {
-      errors.push(`ไม่พบ KOL "${raw.kolHandle.trim()}" ในระบบ — กรุณาเพิ่ม KOL นี้ในเว็บก่อน (หน้า "เพิ่ม Placement" หรือ KOL Directory) แล้วนำเข้าไฟล์นี้อีกครั้ง`);
+      errors.push(`ไม่พบ KOL "${raw.kolHandle.trim()}" ในระบบ`);
     }
   }
 
@@ -712,12 +712,12 @@ type ColCategory = 'strict' | 'soft' | 'auto' | 'free' | 'date' | 'locked' | 'pe
 // | 7 วันที่ | 8 จ่ายเงิน | 9 Final Price | 10 Ads Cost | 11 Ad Content Name | 12 UTM Campaign Name
 // | 13 Shopee UTM | 14 Lazada UTM | 15 Website UTM | 16 หมายเหตุ
 const ONLINE_CATEGORIES: ColCategory[] = [
-  'strict', 'strict', 'auto', 'auto', 'strict', 'strict', 'date', 'strict', 'free', 'free',
+  'strict', 'soft', 'auto', 'auto', 'strict', 'strict', 'date', 'strict', 'free', 'free',
   'free', 'free', 'free', 'free', 'free', 'free',
 ];
 // Offline, 11 cols: 1 แบรนด์ | 2 KOL Handle | 3 Platform | 4 Follower | 5 ห้าง/สาขา | 6 Campaign
 // | 7 วันที่ | 8 จ่ายเงิน | 9 Final Price | 10 Ads Cost | 11 หมายเหตุ
-const OFFLINE_CATEGORIES: ColCategory[] = ['strict', 'strict', 'auto', 'auto', 'soft', 'strict', 'date', 'strict', 'free', 'free', 'free'];
+const OFFLINE_CATEGORIES: ColCategory[] = ['strict', 'soft', 'auto', 'auto', 'soft', 'strict', 'date', 'strict', 'free', 'free', 'free'];
 
 const CATEGORY_COLOR: Record<ColCategory, string> = {
   strict: 'FF2563EB', // น้ำเงิน — ต้องเลือกจาก dropdown เท่านั้น
@@ -811,7 +811,7 @@ app.get('/template/:kind', async c => {
     // Column order offline (11): same through col 8, then 9 Final Price | 10 Ads Cost | 11 Notes
     // — column 5 is ห้าง/สาขา (soft, non-dependent) instead of Model; no UTM columns offline.
     applyListValidation(ws, 1, refRange('A', ranges.brandEnd, T.sheetRef), T.hdrBrand, true, T);
-    applyListValidation(ws, 2, refRange('F', ranges.kolEnd, T.sheetRef), 'KOL Handle', true, T);
+    applyListValidation(ws, 2, refRange('F', ranges.kolEnd, T.sheetRef), 'KOL Handle', false, T);
     applyListValidation(ws, 3, refRange('B', ranges.platformEnd, T.sheetRef), 'Platform', true, T);
     if (kind === 'online' && ranges.dependentModel) {
       const helperCol = 30; // well past all 16 real columns; hidden, excluded from ONLINE_RAW_KEYS

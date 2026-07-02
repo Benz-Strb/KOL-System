@@ -17,6 +17,11 @@ export type CreatedKol = ExistingKol & { platform_id: number | null };
 interface Props {
   onClose: () => void;
   prefillHandle: string;
+  // Platform/Follower the user already typed on the import row this modal was opened
+  // from — carried over so they don't have to retype data they already entered in Excel.
+  // Both optional since the modal is also reachable from contexts with no source row.
+  prefillPlatformId?: string;
+  prefillFollowerCount?: string;
   platforms: { id: number; name: string }[];
   // Fires both on a fresh create AND when the user picks "use existing" after a
   // duplicate-handle conflict — either way the caller gets back a kol to merge
@@ -31,14 +36,14 @@ interface Props {
 // scope trim, see CLAUDE.md/plan §8.2): KolPicker's own add-KOL form doesn't plumb it
 // either, and adding a dedicated lookup fetch just for this one optional field wasn't
 // worth the extra scope for the import-grid flow.
-export default function AddKolModal({ onClose, prefillHandle, platforms, onCreated }: Props) {
+export default function AddKolModal({ onClose, prefillHandle, prefillPlatformId, prefillFollowerCount, platforms, onCreated }: Props) {
   const { t } = useTranslation();
   const { closed, requestClose } = useModalTransition(onClose);
 
   const [handle, setHandle] = useState(prefillHandle);
   const [genName, setGenName] = useState('');
-  const [platformId, setPlatformId] = useState('');
-  const [followerCount, setFollowerCount] = useState('');
+  const [platformId, setPlatformId] = useState(prefillPlatformId ?? '');
+  const [followerCount, setFollowerCount] = useState(prefillFollowerCount ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [duplicateKol, setDuplicateKol] = useState<ExistingKol | null>(null);

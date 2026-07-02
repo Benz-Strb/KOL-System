@@ -5,7 +5,7 @@ import {
   validateImportRows, getDropdowns,
   type ImportKind, type ImportLookups, type ImportRawRow, type ImportRowResult, type ProductCategory,
 } from '../api/index.js';
-import Select, { DropdownPanel } from './Select.js';
+import Select, { PortalDropdownPanel } from './Select.js';
 import AddModelModal from './AddModelModal.js';
 import AddKolModal, { type CreatedKol } from './AddKolModal.js';
 import Toast from './Toast.js';
@@ -126,40 +126,44 @@ const stickyTdCls = 'sticky z-10 bg-surface py-2 px-2 align-top';
 const stickyThCls = 'sticky z-20 bg-canvas py-2 px-2 text-left text-xs font-medium text-muted uppercase tracking-wide';
 
 // ─── Generic cell controls (id-based lookups <-> raw display strings) ──────
-function BrandCell({ value, brands, onChange }: { value: string; brands: ImportLookups['brands']; onChange: (v: string) => void }) {
+// `usePortal` — forwarded to Select so its dropdown escapes this grid's overflow-x-auto
+// table wrapper (see PortalDropdownPanel's doc-comment in Select.tsx); the two call sites
+// inside the table (main row + expanded "more fields" row) pass true, the bulk-edit bar
+// (which sits outside the table) doesn't need it and leaves it at Select's default false.
+function BrandCell({ value, brands, onChange, usePortal }: { value: string; brands: ImportLookups['brands']; onChange: (v: string) => void; usePortal?: boolean }) {
   const matched = matchByName(brands, value);
   return (
-    <Select size="sm" options={brands.map(b => ({ id: b.id, label: b.name }))}
+    <Select size="sm" usePortal={usePortal} options={brands.map(b => ({ id: b.id, label: b.name }))}
       value={matched ? String(matched.id) : ''}
       onChange={id => { const b = brands.find(x => String(x.id) === id); onChange(b ? b.name : ''); }} />
   );
 }
-function PlatformCell({ value, platforms, onChange }: { value: string; platforms: ImportLookups['platforms']; onChange: (v: string) => void }) {
+function PlatformCell({ value, platforms, onChange, usePortal }: { value: string; platforms: ImportLookups['platforms']; onChange: (v: string) => void; usePortal?: boolean }) {
   const matched = matchByName(platforms, value);
   return (
-    <Select size="sm" options={platforms.map(p => ({ id: p.id, label: p.name }))}
+    <Select size="sm" usePortal={usePortal} options={platforms.map(p => ({ id: p.id, label: p.name }))}
       value={matched ? String(matched.id) : ''}
       onChange={id => { const p = platforms.find(x => String(x.id) === id); onChange(p ? p.name : ''); }} />
   );
 }
-function CampaignCell({ value, campaigns, onChange }: { value: string; campaigns: ImportLookups['campaigns']; onChange: (v: string) => void }) {
+function CampaignCell({ value, campaigns, onChange, usePortal }: { value: string; campaigns: ImportLookups['campaigns']; onChange: (v: string) => void; usePortal?: boolean }) {
   const norm = value.trim().toLowerCase();
   const matched = campaigns.find(c => c.code.trim().toLowerCase() === norm || (c.label ?? '').trim().toLowerCase() === norm);
   return (
-    <Select size="sm" options={campaigns.map(c => ({ id: c.id, label: c.label ? `${c.code} — ${c.label}` : c.code }))}
+    <Select size="sm" usePortal={usePortal} options={campaigns.map(c => ({ id: c.id, label: c.label ? `${c.code} — ${c.label}` : c.code }))}
       value={matched ? String(matched.id) : ''}
       onChange={id => { const c = campaigns.find(x => String(x.id) === id); onChange(c ? c.code : ''); }} />
   );
 }
-function PaymentCell({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PaymentCell({ value, onChange, usePortal }: { value: string; onChange: (v: string) => void; usePortal?: boolean }) {
   const norm = value.trim().toLowerCase();
   const current = norm === 'จ่ายเงิน' ? 'paid' : (PAYMENT_OPTIONS.find(o => o.id === norm)?.id ?? '');
   return (
-    <Select size="sm" options={PAYMENT_OPTIONS} value={current}
+    <Select size="sm" usePortal={usePortal} options={PAYMENT_OPTIONS} value={current}
       onChange={id => { const o = PAYMENT_OPTIONS.find(x => x.id === id); onChange(o ? o.label : ''); }} />
   );
 }
-function ModelCell({ value, products, brandId, onChange }: { value: string; products: ImportLookups['products']; brandId: number | null; onChange: (v: string) => void }) {
+function ModelCell({ value, products, brandId, onChange, usePortal }: { value: string; products: ImportLookups['products']; brandId: number | null; onChange: (v: string) => void; usePortal?: boolean }) {
   const options = useMemo(() => {
     const filtered = brandId != null ? products.filter(p => p.brandIds.includes(brandId)) : products;
     return filtered.map(p => ({ id: p.id, label: p.model_code }));
@@ -167,7 +171,7 @@ function ModelCell({ value, products, brandId, onChange }: { value: string; prod
   const norm = value.trim().toLowerCase();
   const matched = products.find(p => p.model_code.trim().toLowerCase() === norm);
   return (
-    <Select size="sm" options={options} value={matched ? String(matched.id) : ''}
+    <Select size="sm" usePortal={usePortal} options={options} value={matched ? String(matched.id) : ''}
       onChange={id => { const p = products.find(x => String(x.id) === id); onChange(p ? p.model_code : ''); }} />
   );
 }
@@ -179,7 +183,12 @@ function StoreBranchCell({ value, stores, onChange }: { value: string; stores: I
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    // See PortalDropdownPanel's data-import-dropdown-portal comment — the panel now
+    // renders outside `ref`'s subtree, so a click inside it must not count as "outside".
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (ref.current && !ref.current.contains(target) && !target.closest('[data-import-dropdown-portal]')) setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -193,7 +202,7 @@ function StoreBranchCell({ value, stores, onChange }: { value: string; stores: I
       <input type="text" value={value} placeholder={t('importPlacements.edit.storeFreeTextHint')}
         onChange={e => onChange(e.target.value)} onFocus={() => setOpen(true)} className={cellInputCls} />
       {open && (
-        <DropdownPanel className="w-64 mt-1 origin-top">
+        <PortalDropdownPanel anchorRef={ref} width={256}>
           <div className="overflow-y-auto flex-1 max-h-56">
             {filtered.length === 0 && <div className="px-3 py-2.5 text-sm text-muted">{t('importPlacements.edit.storeNoResults')}</div>}
             {filtered.map(s => (
@@ -204,7 +213,7 @@ function StoreBranchCell({ value, stores, onChange }: { value: string; stores: I
               </button>
             ))}
           </div>
-        </DropdownPanel>
+        </PortalDropdownPanel>
       )}
     </div>
   );
@@ -223,7 +232,12 @@ function KolHandleCell({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    // See PortalDropdownPanel's data-import-dropdown-portal comment — the panel now
+    // renders outside `ref`'s subtree, so a click inside it must not count as "outside".
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (ref.current && !ref.current.contains(target) && !target.closest('[data-import-dropdown-portal]')) setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -238,7 +252,7 @@ function KolHandleCell({
       <input type="text" value={value} onChange={e => { onTextChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} className={cellInputCls} />
       {open && (
-        <DropdownPanel className="w-64 mt-1 origin-top">
+        <PortalDropdownPanel anchorRef={ref} width={256}>
           <div className="overflow-y-auto flex-1 max-h-56">
             {filtered.length === 0 && <div className="px-3 py-2.5 text-sm text-muted">{t('importPlacements.edit.kolNoResults')}</div>}
             {filtered.map(k => (
@@ -251,7 +265,7 @@ function KolHandleCell({
               </button>
             ))}
           </div>
-        </DropdownPanel>
+        </PortalDropdownPanel>
       )}
     </div>
   );
@@ -260,16 +274,16 @@ function KolHandleCell({
 // Dispatches to the right control for every field type except 'kol' (handled
 // separately at the call site since it needs the extra platform/follower autofill).
 function FieldControl({
-  meta, value, onChange, lookups, brandId,
+  meta, value, onChange, lookups, brandId, usePortal,
 }: {
-  meta: FieldMeta; value: string; onChange: (v: string) => void; lookups: ImportLookups; brandId: number | null;
+  meta: FieldMeta; value: string; onChange: (v: string) => void; lookups: ImportLookups; brandId: number | null; usePortal?: boolean;
 }) {
   switch (meta.type) {
-    case 'brand': return <BrandCell value={value} brands={lookups.brands} onChange={onChange} />;
-    case 'platform': return <PlatformCell value={value} platforms={lookups.platforms} onChange={onChange} />;
-    case 'campaign': return <CampaignCell value={value} campaigns={lookups.campaigns} onChange={onChange} />;
-    case 'payment': return <PaymentCell value={value} onChange={onChange} />;
-    case 'model': return <ModelCell value={value} products={lookups.products} brandId={brandId} onChange={onChange} />;
+    case 'brand': return <BrandCell value={value} brands={lookups.brands} onChange={onChange} usePortal={usePortal} />;
+    case 'platform': return <PlatformCell value={value} platforms={lookups.platforms} onChange={onChange} usePortal={usePortal} />;
+    case 'campaign': return <CampaignCell value={value} campaigns={lookups.campaigns} onChange={onChange} usePortal={usePortal} />;
+    case 'payment': return <PaymentCell value={value} onChange={onChange} usePortal={usePortal} />;
+    case 'model': return <ModelCell value={value} products={lookups.products} brandId={brandId} onChange={onChange} usePortal={usePortal} />;
     case 'store': return <StoreBranchCell value={value} stores={lookups.stores} onChange={onChange} />;
     case 'date': return <input type="date" value={value} onChange={e => onChange(e.target.value)} className={cellInputCls} />;
     case 'number': return <input type="number" value={value.replace(/,/g, '')} onChange={e => onChange(e.target.value)} className={cellInputCls} />;
@@ -310,7 +324,7 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
     getDropdowns().then(d => setProductCategories(d.productCategories)).catch(() => {});
   }, []);
   const [addModelState, setAddModelState] = useState<{ brandId: number; modelText: string } | null>(null);
-  const [addKolState, setAddKolState] = useState<{ handleText: string } | null>(null);
+  const [addKolState, setAddKolState] = useState<{ handleText: string; platformText: string; followerText: string } | null>(null);
   const [addToast, setAddToast] = useState('');
 
   // Bridge local row state back up to the parent page (source of truth for Commit) —
@@ -508,7 +522,7 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
                     </td>
                     {scrollFields.map(f => (
                       <td key={f.key} className={`py-2 px-2.5 align-top overflow-hidden ${tint}`}>
-                        <FieldControl meta={f} value={row.raw[f.key]} lookups={lookups} brandId={brandId}
+                        <FieldControl meta={f} value={row.raw[f.key]} lookups={lookups} brandId={brandId} usePortal
                           onChange={v => applyPatch([row.rowNumber], { [f.key]: v })} />
                       </td>
                     ))}
@@ -542,7 +556,11 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
                             )}
                             {e.startsWith(KOL_NOT_FOUND_PREFIX) && (
                               <button type="button"
-                                onClick={() => setAddKolState({ handleText: row.raw.kolHandle })}
+                                onClick={() => setAddKolState({
+                                  handleText: row.raw.kolHandle,
+                                  platformText: row.raw.platform,
+                                  followerText: row.raw.follower,
+                                })}
                                 className="text-accent hover:text-accent-hover font-medium whitespace-nowrap transition-colors">
                                 {t('importPlacements.edit.addKolButton')}
                               </button>
@@ -565,7 +583,7 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
                           {EXPAND_FIELDS.map(f => (
                             <div key={f.key}>
                               <label className="block text-[11px] font-medium text-muted mb-1 tracking-wide uppercase">{f.label}</label>
-                              <FieldControl meta={f} value={row.raw[f.key]} lookups={lookups} brandId={brandId}
+                              <FieldControl meta={f} value={row.raw[f.key]} lookups={lookups} brandId={brandId} usePortal
                                 onChange={v => applyPatch([row.rowNumber], { [f.key]: v })} />
                             </div>
                           ))}
@@ -633,6 +651,11 @@ export default function ImportEditGrid({ rows: initialRows, lookups: initialLook
       {addKolState && (
         <AddKolModal
           prefillHandle={addKolState.handleText}
+          prefillPlatformId={(() => {
+            const p = matchByName(lookups.platforms, addKolState.platformText);
+            return p ? String(p.id) : undefined;
+          })()}
+          prefillFollowerCount={addKolState.followerText.trim() || undefined}
           platforms={lookups.platforms}
           onClose={() => setAddKolState(null)}
           onCreated={(kol: CreatedKol) => {
