@@ -17,6 +17,7 @@ function buildDashboardBrandFilter(role: string, brandIds: number[], brand_id?: 
 const EMPTY_RESPONSE = {
   summary: {
     total_placements: 0,
+    total_kol_count: 0,
     posted_count: 0,
     planned_count: 0,
     cancelled_count: 0,
@@ -46,6 +47,7 @@ const EMPTY_RESPONSE = {
     gmv: number;
     spend: number;
     orders: number;
+    visits: number;
   }[],
   paymentTypeBreakdown: [] as PaymentTypeRow[],
   tierBreakdown: [] as TierRow[],
@@ -82,6 +84,7 @@ type PlatformRow = {
   total_gmv: number;
   total_orders: number;
   total_spend: number;
+  total_ads_cost: number;
 };
 
 // monthly GMV/orders/placement trend (A) — the only "over time" view; campaign
@@ -103,6 +106,8 @@ type CategoryRow = {
   gmv: number;
   orders: number;
   spend: number;
+  ads_cost: number;
+  visits: number;
 };
 
 type PlacementDetailRow = {
@@ -222,7 +227,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
 
     const matched = await prisma.placements.findMany({
       where,
-      select: { id: true, final_price: true, pay_amount: true, ads_cost: true, status: true },
+      select: { id: true, final_price: true, pay_amount: true, ads_cost: true, status: true, kol_id: true },
     });
 
     if (matched.length === 0) {
@@ -236,13 +241,16 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     let postedCount = 0;
     let plannedCount = 0;
     let cancelledCount = 0;
+    const kolIds = new Set<number>();
     for (const p of matched) {
       totalSpend += Number(p.pay_amount ?? p.final_price ?? 0);
       totalAdsCost += Number(p.ads_cost ?? 0);
       if (p.status === 'posted') postedCount++;
       else if (p.status === 'planned') plannedCount++;
       else if (p.status === 'cancelled') cancelledCount++;
+      if (p.kol_id != null) kolIds.add(p.kol_id);
     }
+    const totalKolCount = kolIds.size;
 
     const [gmvRow] = await prisma.$queryRaw<{ total_gmv: number; total_orders: number; total_visits: number; total_atc: number }[]>`
       SELECT
@@ -406,9 +414,11 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     // hiring distribution by KOL platform (Facebook/Instagram/TikTok/YouTube etc.)
     // — groups by placements.platform_id (the channel the KOL posts on), not
     // placement_metrics.channel (the sales channel that tracks actual GMV)
-    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number; total_orders: number; total_spend: number }[]>`
+    const platformAgg = await prisma.$queryRaw<{ platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number; total_orders: number; total_spend: number; total_ads_cost: number }[]>`
       WITH placement_spend AS (
-        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        SELECT id,
+               COALESCE(pay_amount, final_price, 0)::numeric AS spend,
+               COALESCE(ads_cost, 0)::numeric                AS ads_cost
         FROM placements WHERE id IN (${Prisma.join(ids)})
       ),
       metric_agg AS (
@@ -424,7 +434,8 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.kol_id)::int               AS kol_count,
         COALESCE(SUM(ma.gmv), 0)::float             AS total_gmv,
         COALESCE(SUM(ma.orders), 0)::int            AS total_orders,
-        COALESCE(SUM(ps.spend), 0)::float           AS total_spend
+        COALESCE(SUM(ps.spend), 0)::float           AS total_spend,
+        COALESCE(SUM(ps.ads_cost), 0)::float        AS total_ads_cost
       FROM placements p
       JOIN platforms pt ON pt.id = p.platform_id
       LEFT JOIN placement_spend ps ON ps.id = p.id
@@ -508,6 +519,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
       gmv: number;
       spend: number;
       orders: number;
+      visits: number;
     }[]>`
       SELECT
         c.id                                                       AS campaign_id,
@@ -517,11 +529,12 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.id)::int                                  AS placement_count,
         COALESCE(SUM(pm.gmv::numeric), 0)::float                   AS gmv,
         COALESCE(SUM(COALESCE(p.pay_amount, p.final_price, 0)), 0)::float AS spend,
-        COALESCE(SUM(pm.orders), 0)::int                           AS orders
+        COALESCE(SUM(pm.orders), 0)::int                           AS orders,
+        COALESCE(SUM(pm.visits), 0)::int                           AS visits
       FROM placements p
       LEFT JOIN campaigns c ON p.campaign_id = c.id
       LEFT JOIN (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders, SUM(visits) AS visits
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -561,11 +574,13 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     // GMV by content category (C) — categories live on the KOL, not the placement
     const categoryBreakdown = await prisma.$queryRaw<CategoryRow[]>`
       WITH placement_spend AS (
-        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        SELECT id,
+               COALESCE(pay_amount, final_price, 0)::numeric AS spend,
+               COALESCE(ads_cost, 0)::numeric                AS ads_cost
         FROM placements WHERE id IN (${Prisma.join(ids)})
       ),
       metric_agg AS (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders, SUM(visits) AS visits
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -577,7 +592,9 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
         COUNT(DISTINCT p.id)::int               AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float         AS gmv,
         COALESCE(SUM(ma.orders), 0)::int        AS orders,
-        COALESCE(SUM(ps.spend), 0)::float       AS spend
+        COALESCE(SUM(ps.spend), 0)::float       AS spend,
+        COALESCE(SUM(ps.ads_cost), 0)::float    AS ads_cost,
+        COALESCE(SUM(ma.visits), 0)::int        AS visits
       FROM placements p
       JOIN kols k ON k.id = p.kol_id
       JOIN content_categories cc ON cc.id = k.content_category_id
@@ -648,6 +665,7 @@ async function buildDashboardOverview(prisma: PrismaClient, user: AuthUser, quer
     return {
       summary: {
         total_placements: matched.length,
+        total_kol_count: totalKolCount,
         posted_count: postedCount,
         planned_count: plannedCount,
         cancelled_count: cancelledCount,
