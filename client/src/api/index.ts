@@ -495,6 +495,7 @@ export const deleteSample = (id: number) =>
 // Dashboard
 export type DashboardSummary = {
   total_placements: number;
+  total_kol_count: number;
   posted_count: number;
   planned_count: number;
   cancelled_count: number;
@@ -509,7 +510,7 @@ export type DashboardSummary = {
 export type DashboardChannelCampaignRow = { campaign_id: number | null; code: string | null; label: string | null; gmv: number };
 export type DashboardChannelRow = { channel: string; gmv: number; orders: number; visits: number; atc: number; byCampaign: DashboardChannelCampaignRow[] };
 export type DashboardMonthlyRow = { month: string; placement_count: number; gmv: number; orders: number };
-export type DashboardCategoryRow = { category_id: number; category_name: string; kol_count: number; placement_count: number; gmv: number; orders: number };
+export type DashboardCategoryRow = { category_id: number; category_name: string; kol_count: number; placement_count: number; gmv: number; orders: number; spend: number; ads_cost: number; visits: number };
 export type DashboardKolChannelRow = { channel: string; gmv: number };
 export type DashboardKolRow = {
   kol_id: number;
@@ -536,10 +537,11 @@ export type DashboardCampaignTrendRow = {
   placement_count: number;
   gmv: number;
   spend: number;
+  visits: number;
 };
 export type DashboardPaymentTypeRow = { payment_type: string; placement_count: number; total_gmv: number; avg_gmv: number };
 export type DashboardTierRow = { tier_id: number; tier_name: string; kol_count: number; placement_count: number; total_gmv: number; avg_gmv_per_kol: number };
-export type DashboardPlatformRow = { platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number };
+export type DashboardPlatformRow = { platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number; total_spend: number; total_ads_cost: number };
 export type DashboardOverview = {
   summary: DashboardSummary;
   channelBreakdown: DashboardChannelRow[];
@@ -571,10 +573,8 @@ export type MarketingSummary = {
 };
 export type MarketingDashboard = {
   summary: MarketingSummary;
-  byPlatform: { platform_id: number; platform_name: string; gmv: number }[];
-  byProductCategory: { category_id: number | null; category_name: string | null; gmv: number }[];
-  byProductSku: { canonical_id: number; model_code: string | null; gmv: number }[];
-  byContentCategory: { category_id: number; category_name: string; gmv: number }[];
+  byProductCategory: { category_id: number | null; category_name: string | null; gmv: number; total_cost: number; visits: number }[];
+  byProductSku: { canonical_id: number; model_code: string | null; gmv: number; total_cost: number }[];
 };
 
 export const getMarketingDashboard = (params: { brand_id?: string; date_from?: string; date_to?: string }) => {
@@ -664,9 +664,12 @@ export type ProductRankRow = {
   placement_count: number;
   total_gmv: number;
   total_orders: number;
+  total_spend: number;
+  total_ads_cost: number;
+  total_visits: number;
 };
 export type ProductDashboardOverview = {
-  summary: { total_gmv: number; total_orders: number; total_placements: number; product_count: number };
+  summary: { total_gmv: number; total_orders: number; total_placements: number; product_count: number; total_spend: number; total_ads_cost: number; total_visits: number };
   ranking: ProductRankRow[];
 };
 
