@@ -1225,9 +1225,9 @@ export default function DashboardPage() {
               <div className="flex-1 h-px bg-hairline" />
             </div>
             <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
-              {/* Row 1: 7 absolute-number KPIs — no inner card borders */}
+              {/* Row 1: 10 absolute-number KPIs, split 5+5 to avoid column overflow at normal desktop width */}
               <div className="overflow-x-auto">
-                <div className="grid grid-cols-10 min-w-[1000px]">
+                <div className="grid grid-cols-5 min-w-[600px]">
                   <SlabCell icon={<TrendingUp size={12} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
                   <SlabCell icon={<Wallet size={12} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
                   <SlabCell icon={<ShoppingCart size={12} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
@@ -1238,6 +1238,9 @@ export default function DashboardPage() {
                     sub={t('dashboard.placementsSub', { posted: data.summary.posted_count, planned: data.summary.planned_count, cancelled: data.summary.cancelled_count })}
                   />
                   <SlabCell icon={<Megaphone size={12} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
+                </div>
+                <div className="h-px bg-hairline" />
+                <div className="grid grid-cols-5 min-w-[600px]">
                   <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsShopee')} value={visitsShopee.toLocaleString(numberLocale())} />
                   <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsLazada')} value={visitsLazada.toLocaleString(numberLocale())} />
                   <SlabCell icon={<Wallet size={12} />} label={t('dashboard.totalExpenses')} value={formatMoney(data.summary.total_spend + data.summary.total_ads_cost)} />
