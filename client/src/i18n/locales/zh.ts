@@ -66,6 +66,7 @@ export const zh = {
     colVisits: 'Visits',
     colPlacements: 'Placements',
     colSpend: 'KOL Spend',
+    colCost: '费用',
     colPercent: '%',
     colRoi: 'ROI',
     colStage: '阶段',

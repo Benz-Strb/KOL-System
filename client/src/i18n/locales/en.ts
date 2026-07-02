@@ -66,6 +66,7 @@ export const en = {
     colVisits: 'Visits',
     colPlacements: 'Placements',
     colSpend: 'KOL Spend',
+    colCost: 'Cost',
     colPercent: '%',
     colRoi: 'ROI',
     colStage: 'Stage',

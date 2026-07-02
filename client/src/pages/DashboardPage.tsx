@@ -12,6 +12,7 @@ import {
   getProductDashboard, getMarketingDashboard,
   type DashboardOverview, type DashboardKolRow, type DashboardChannelRow, type Campaign, type Brand, type ContentCategory, type KolResult,
   type OffplatformTraffic, type ProductDashboardOverview, type MarketingDashboard,
+  type DashboardPlatformRow, type DashboardCategoryRow,
 } from '../api/index.js';
 import KolTrendModal from '../components/KolTrendModal.js';
 import ProductTrendModal from '../components/ProductTrendModal.js';
@@ -269,7 +270,7 @@ function KolsByGroupCard({
 function PlatformBreakdownCard({
   rows,
 }: {
-  rows: { platform_id: number; platform_name: string; placement_count: number; kol_count: number; total_gmv: number }[];
+  rows: DashboardPlatformRow[];
 }) {
   const { t } = useTranslation();
   const total = rows.reduce((s, r) => s + r.placement_count, 0);
@@ -295,6 +296,9 @@ function PlatformBreakdownCard({
                   <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">
                     {formatMoney(r.total_gmv)}
                   </span>
+                  <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">
+                    {formatMoney(r.total_spend + r.total_ads_cost)}
+                  </span>
                   <span className="text-[11px] text-muted tabular-nums w-9 text-right shrink-0">{pct.toFixed(0)}%</span>
                 </div>
               );
@@ -308,8 +312,9 @@ function PlatformBreakdownCard({
           { key: 'placement_count', headerKey: 'dashboard.colPlacements', align: 'right' as const },
           { key: 'kol_count', headerKey: 'dashboard.colKolCount', align: 'right' as const },
           { key: 'total_gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+          { key: 'total_cost', headerKey: 'dashboard.colCost', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
         ],
-        rows: rows as unknown as Record<string, unknown>[],
+        rows: rows.map(r => ({ ...r, total_cost: r.total_spend + r.total_ads_cost })) as unknown as Record<string, unknown>[],
       }}
       exportFilename={`platform_breakdown_${todayStr()}.xlsx`}
       emptyMessage={t('dashboard.noData')}
@@ -567,7 +572,7 @@ function FunnelCard({
 function CategoryBreakdownCard({
   rows,
 }: {
-  rows: { category_id: number; category_name: string; kol_count: number; placement_count: number; gmv: number; orders: number }[];
+  rows: DashboardCategoryRow[];
 }) {
   const { t } = useTranslation();
   const maxGmv = Math.max(...rows.map(r => r.gmv), 1);
@@ -590,6 +595,8 @@ function CategoryBreakdownCard({
               </div>
               <span className="text-[11px] text-muted tabular-nums w-14 text-right shrink-0">{t('dashboard.kolCountLabel', { count: r.kol_count })}</span>
               <span className="text-sm font-semibold text-ink tabular-nums font-mono w-24 text-right shrink-0">{formatMoney(r.gmv)}</span>
+              <span className="text-xs text-muted tabular-nums font-mono w-20 text-right shrink-0">{formatMoney(r.spend + r.ads_cost)}</span>
+              <span className="text-xs text-muted tabular-nums font-mono w-16 text-right shrink-0">{r.visits.toLocaleString()}</span>
             </div>
           ))}
         </div>
