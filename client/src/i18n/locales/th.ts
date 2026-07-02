@@ -146,6 +146,9 @@ export const th = {
     categoryDesc: 'ผลงานแยกตามสายคอนเทนต์ของ KOL',
     visitsShopee: 'Visits Shopee',
     visitsLazada: 'Visits Lazada',
+    totalExpenses: 'ค่าใช้จ่ายรวม',
+    totalVisit: 'Visit รวม',
+    totalKol: 'KOL ทั้งหมด',
     othersLabel: 'อื่นๆ',
   },
   marketing: {

@@ -1227,7 +1227,7 @@ export default function DashboardPage() {
             <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
               {/* Row 1: 7 absolute-number KPIs — no inner card borders */}
               <div className="overflow-x-auto">
-                <div className="grid grid-cols-7 min-w-[700px]">
+                <div className="grid grid-cols-10 min-w-[1000px]">
                   <SlabCell icon={<TrendingUp size={12} />} label={t('dashboard.totalGmv')} value={formatMoney(data.summary.total_gmv)} />
                   <SlabCell icon={<Wallet size={12} />} label={t('dashboard.kolSpend')} value={formatMoney(data.summary.total_spend)} />
                   <SlabCell icon={<ShoppingCart size={12} />} label={t('dashboard.totalOrders')} value={data.summary.total_orders.toLocaleString(numberLocale())} />
@@ -1240,6 +1240,9 @@ export default function DashboardPage() {
                   <SlabCell icon={<Megaphone size={12} />} label="Ads Cost" value={formatMoney(data.summary.total_ads_cost)} />
                   <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsShopee')} value={visitsShopee.toLocaleString(numberLocale())} />
                   <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.visitsLazada')} value={visitsLazada.toLocaleString(numberLocale())} />
+                  <SlabCell icon={<Wallet size={12} />} label={t('dashboard.totalExpenses')} value={formatMoney(data.summary.total_spend + data.summary.total_ads_cost)} />
+                  <SlabCell icon={<MousePointerClick size={12} />} label={t('dashboard.totalVisit')} value={data.summary.total_visits.toLocaleString(numberLocale())} />
+                  <SlabCell icon={<ListChecks size={12} />} label={t('dashboard.totalKol')} value={data.summary.total_kol_count.toLocaleString(numberLocale())} />
                 </div>
               </div>
               {/* Hairline divider between the two rows */}
@@ -1362,18 +1365,23 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted">{t('dashboard.noData')}</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={224}>
-                      <BarChart data={campaignTrendData} margin={{ left: -16 }}>
+                      <BarChart data={campaignTrendData} margin={{ left: -16, right: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--hairline, #e5e7eb)" />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={50} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                        <YAxis yAxisId="money" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
+                        <YAxis yAxisId="visits" orientation="right" tick={{ fontSize: 11 }} tickFormatter={formatAxisMoney} />
                         <Tooltip
                           contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--hairline)', borderRadius: 12 }}
                           labelStyle={{ color: 'var(--ink)' }}
-                          formatter={(v, n) => [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')]}
+                          formatter={(v, n) => {
+                            if (n === 'visits') return [Number(v ?? 0).toLocaleString(numberLocale()), t('dashboard.colVisits')];
+                            return [formatMoney(Number(v ?? 0)), n === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend')];
+                          }}
                         />
-                        <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : t('kolTrend.spend'))} wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
-                        <Bar dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Legend formatter={(v: string) => (v === 'gmv' ? t('kolTrend.gmv') : v === 'spend' ? t('kolTrend.spend') : t('dashboard.colVisits'))} wrapperStyle={{ fontSize: 11 }} />
+                        <Bar yAxisId="money" dataKey="gmv" fill="#0066cc" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Bar yAxisId="money" dataKey="spend" fill="#f59e0b" radius={[4, 4, 0, 0]} animationDuration={500} />
+                        <Bar yAxisId="visits" dataKey="visits" fill="#10b981" radius={[4, 4, 0, 0]} animationDuration={500} />
                       </BarChart>
                     </ResponsiveContainer>
                   )
@@ -1383,6 +1391,7 @@ export default function DashboardPage() {
                     { key: 'name', headerKey: 'dashboard.colCampaign' },
                     { key: 'gmv', header: 'GMV', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
                     { key: 'spend', headerKey: 'dashboard.colSpend', align: 'right' as const, render: (v) => formatMoney(Number(v ?? 0)), exportFormat: (v) => Number(v ?? 0) },
+                    { key: 'visits', headerKey: 'dashboard.colVisits', align: 'right' as const },
                   ],
                   rows: campaignTrendData as unknown as Record<string, unknown>[],
                 }}

@@ -141,6 +141,9 @@ export const zh = {
     categoryDesc: '按 KOL 内容类型划分的表现',
     visitsShopee: 'Visits Shopee',
     visitsLazada: 'Visits Lazada',
+    totalExpenses: '总支出',
+    totalVisit: '总访问量',
+    totalKol: 'KOL 总数',
     othersLabel: '其他',
   },
   marketing: {

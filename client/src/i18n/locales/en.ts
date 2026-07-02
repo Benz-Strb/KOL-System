@@ -141,6 +141,9 @@ export const en = {
     categoryDesc: 'Performance by the KOL\'s content niche',
     visitsShopee: 'Visits Shopee',
     visitsLazada: 'Visits Lazada',
+    totalExpenses: 'Total Expenses',
+    totalVisit: 'Total Visit',
+    totalKol: 'Total KOL',
     othersLabel: 'Others',
   },
   marketing: {
