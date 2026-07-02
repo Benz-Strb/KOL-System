@@ -172,6 +172,8 @@ export const en = {
   adminUsers: {
     copy: 'Copy',
     brandRequired: 'Please select at least 1 brand',
+    allBrands: 'All brands',
+    managerAllBrandsHint: 'A manager with no brands selected can see data for every brand',
     activated: 'activated',
     deactivated: 'deactivated',
     passwordResetFor: 'Password reset for {{name}}',

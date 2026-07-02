@@ -172,6 +172,8 @@ export const zh = {
   adminUsers: {
     copy: '复制',
     brandRequired: '请至少选择 1 个品牌',
+    allBrands: '所有品牌',
+    managerAllBrandsHint: '未选择品牌的 manager 可以查看所有品牌的数据',
     activated: '已启用',
     deactivated: '已停用',
     passwordResetFor: '已重置 {{name}} 的密码',

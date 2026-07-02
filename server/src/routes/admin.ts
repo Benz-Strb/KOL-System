@@ -128,6 +128,10 @@ app.post('/users', async c => {
   if (password.length < 6) {
     return c.json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' }, 400);
   }
+  // marketing ต้องมีแบรนด์เสมอ; manager ไม่ผูก = เห็นทุกแบรนด์ (มติ 2026-07-02)
+  if (role === 'marketing' && (!Array.isArray(brand_ids) || brand_ids.length === 0)) {
+    return c.json({ error: 'marketing ต้องเลือกอย่างน้อย 1 แบรนด์' }, 400);
+  }
 
   const supabaseAdmin = getSupabaseAdmin(c.env);
   const { error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -149,11 +153,14 @@ app.post('/users', async c => {
       select: { id: true, full_name: true, email: true, role: true, is_active: true },
     });
 
-    const brandIdsToAssign = Array.isArray(brand_ids) && brand_ids.length > 0 ? brand_ids : [1];
-    await prisma.user_brands.createMany({
-      data: brandIdsToAssign.map(bid => ({ user_id: user.id, brand_id: Number(bid) })),
-      skipDuplicates: true,
-    });
+    // ไม่ default เป็นแบรนด์ 1 อีกต่อไป — manager/admin สร้างแบบไม่ผูกแบรนด์ได้
+    // (manager ว่าง = เห็นทุกแบรนด์; marketing ถูกบังคับ ≥1 แบรนด์ด้านบนแล้ว)
+    if (Array.isArray(brand_ids) && brand_ids.length > 0) {
+      await prisma.user_brands.createMany({
+        data: brand_ids.map(bid => ({ user_id: user.id, brand_id: Number(bid) })),
+        skipDuplicates: true,
+      });
+    }
 
     return c.json(user);
   } catch (err) {
@@ -170,6 +177,21 @@ app.patch('/users/:id', async c => {
   };
 
   try {
+    // marketing ต้องมีแบรนด์เสมอ — เช็คจากสถานะสุดท้ายหลัง update (role/brand_ids
+    // เปลี่ยนแยกกันได้ เช่น สลับ role เป็น marketing ทั้งที่ user ไม่มีแบรนด์ผูกอยู่)
+    if (role !== undefined || brand_ids !== undefined) {
+      const current = await prisma.users.findUnique({
+        where: { id },
+        select: { role: true, user_brands: { select: { brand_id: true } } },
+      });
+      if (!current) return c.json({ error: 'ไม่พบผู้ใช้' }, 404);
+      const finalRole = role ?? current.role;
+      const finalBrandCount = brand_ids !== undefined ? brand_ids.length : current.user_brands.length;
+      if (finalRole === 'marketing' && finalBrandCount === 0) {
+        return c.json({ error: 'marketing ต้องเลือกอย่างน้อย 1 แบรนด์' }, 400);
+      }
+    }
+
     // Email update: sync to Supabase auth first
     if (email !== undefined) {
       const newEmail = email.trim().toLowerCase();
@@ -220,11 +242,12 @@ app.patch('/users/:id', async c => {
           user_brands: { select: { brands: { select: { id: true, name: true } } } },
         },
       });
-      if (is_active === false) invalidateAuthCache(id);
+      // brand/role เปลี่ยน → ล้าง auth cache ให้สิทธิ์ใหม่มีผลทันที (ไม่ต้องรอ TTL 60s)
+      invalidateAuthCache(id);
       return c.json(refreshed);
     }
 
-    if (is_active === false) invalidateAuthCache(id);
+    if (is_active === false || role !== undefined) invalidateAuthCache(id);
     return c.json(user);
   } catch (err) {
     console.error(err);

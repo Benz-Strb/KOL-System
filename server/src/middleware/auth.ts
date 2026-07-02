@@ -52,13 +52,22 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
       return c.json({ error: 'User not found or inactive' }, 403);
     }
 
+    // manager ที่ไม่ผูกแบรนด์ = เห็นทุกแบรนด์ (มติ 2026-07-02) — เติม brandIds เป็นทุก
+    // active brand ที่นี่จุดเดียว ให้ทุก route ที่ filter ด้วย { in: brandIds } ทำงานเหมือนเดิม
+    // (marketing ต้องมีแบรนด์เสมอ — บังคับที่ admin create/update user)
+    let brandIds = dbUser.user_brands.map(ub => ub.brand_id);
+    if (dbUser.role === 'manager' && brandIds.length === 0) {
+      const allBrands = await prisma.brands.findMany({ where: { active: true }, select: { id: true } });
+      brandIds = allBrands.map(b => b.id);
+    }
+
     const authUser: AuthUser = {
       id: dbUser.id,
       full_name: dbUser.full_name,
       email: dbUser.email,
       role: dbUser.role,
       supabaseId: supaUser.id,
-      brandIds: dbUser.user_brands.map(ub => ub.brand_id),
+      brandIds,
     };
 
     authCache.set(token, { user: authUser, exp: Date.now() + AUTH_CACHE_TTL });

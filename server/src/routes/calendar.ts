@@ -49,6 +49,12 @@ app.get('/', async c => {
       allowedBrandIds = [bid];
     }
 
+    // brandIds ว่าง (เช่น marketing ที่ยังไม่ถูกผูกแบรนด์) — ห้ามปล่อยถึง SQL:
+    // `IN ()` เป็น syntax error ใน Postgres
+    if (allowedBrandIds && allowedBrandIds.length === 0) {
+      return c.json({ events: [], meta: { no_date_count: 0 } });
+    }
+
     // Display date = the field the calendar drag edits, chosen by status:
     //   posted  → publication_date (actual post day; fallback target if null)
     //   else    → target_pub_date  (planned/cancelled keep the intended day)

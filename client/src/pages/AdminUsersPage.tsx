@@ -37,6 +37,35 @@ function generatePassword() {
   return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+const brandChipCls = 'inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-canvas border border-hairline text-ink whitespace-nowrap';
+
+// "+N" chip ท้ายรายการแบรนด์ — hover แล้วโชว์ชื่อแบรนด์ทั้งหมด
+// ใช้ position:fixed (ไม่ใช่ absolute) เพราะตาราง users ครอบด้วย overflow-hidden/auto
+// popover แบบ absolute จะโดน clip ที่ขอบตาราง
+function OverflowBrands({ names, shown }: { names: string[]; shown: number }) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  return (
+    <span
+      className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-canvas border border-hairline text-muted cursor-default whitespace-nowrap"
+      onMouseEnter={e => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setPos({ x: r.left, y: r.bottom + 4 });
+      }}
+      onMouseLeave={() => setPos(null)}
+    >
+      +{names.length - shown}
+      {pos && (
+        <span
+          className="fixed z-50 flex flex-col gap-1 bg-surface border border-hairline rounded-xl shadow-lg px-3 py-2"
+          style={{ left: pos.x, top: pos.y }}
+        >
+          {names.map(n => <span key={n} className="text-xs text-ink whitespace-nowrap">{n}</span>)}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function CopyButton({ text, copyKey }: { text: string; copyKey: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -155,7 +184,8 @@ export default function AdminUsersPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreateError('');
-    if (selectedBrandIds.length === 0) { setCreateError(t('adminUsers.brandRequired')); return; }
+    // marketing ต้องมีแบรนด์เสมอ — manager/admin ว่างได้ (manager ว่าง = เห็นทุกแบรนด์)
+    if (form.role === 'marketing' && selectedBrandIds.length === 0) { setCreateError(t('adminUsers.brandRequired')); return; }
     setCreateLoading(true);
     try {
       const created = await createAdminUser({ ...form, brand_ids: selectedBrandIds });
@@ -215,6 +245,11 @@ export default function AdminUsersPage() {
   }
 
   async function handleSaveUserBrands(userId: number) {
+    const target = users.find(u => u.id === userId);
+    if (target?.role === 'marketing' && editingUserBrandIds.length === 0) {
+      setToast(t('adminUsers.brandRequired'));
+      return;
+    }
     const prevUsers = users;
     setSavingUserBrands(true);
     try {
@@ -460,7 +495,7 @@ export default function AdminUsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {user.role !== 'marketing' ? <span className="text-xs text-muted">—</span> : editingUserBrandsId === user.id ? (
+                    {user.role === 'admin' ? <span className="text-xs text-muted">—</span> : editingUserBrandsId === user.id ? (
                       <div className="flex flex-wrap items-center gap-1.5">
                         {brands.filter(b => b.active).map(b => (
                           <label key={b.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium cursor-pointer transition-all ${
@@ -487,12 +522,19 @@ export default function AdminUsersPage() {
                     ) : (
                       <div className="flex flex-wrap items-center gap-1 group">
                         {user.user_brands.length === 0
-                          ? <span className="text-xs text-muted">—</span>
-                          : user.user_brands.map(ub => (
-                            <span key={ub.brands.id} className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-canvas border border-hairline text-ink">
-                              {ub.brands.name}
-                            </span>
-                          ))
+                          ? <span className="text-xs text-muted">{user.role === 'manager' ? t('adminUsers.allBrands') : '—'}</span>
+                          : (
+                            <>
+                              {user.user_brands.slice(0, 2).map(ub => (
+                                <span key={ub.brands.id} className={brandChipCls}>
+                                  {ub.brands.name}
+                                </span>
+                              ))}
+                              {user.user_brands.length > 2 && (
+                                <OverflowBrands names={user.user_brands.map(ub => ub.brands.name)} shown={2} />
+                              )}
+                            </>
+                          )
                         }
                         <button
                           onClick={() => {
@@ -739,7 +781,7 @@ export default function AdminUsersPage() {
               </div>
               {brands.filter(b => b.active).length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('adminUsers.accessibleBrands')} <span className="text-red-400 normal-case">*</span></label>
+                  <label className="block text-xs font-medium text-muted mb-1.5 tracking-wide uppercase">{t('adminUsers.accessibleBrands')} {form.role === 'marketing' && <span className="text-red-400 normal-case">*</span>}</label>
                   <div className="flex flex-wrap gap-2">
                     {brands.filter(b => b.active).map(b => (
                       <label key={b.id} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition-all ${
@@ -754,6 +796,9 @@ export default function AdminUsersPage() {
                       </label>
                     ))}
                   </div>
+                  {form.role === 'manager' && (
+                    <p className="text-xs text-muted mt-1.5">{t('adminUsers.managerAllBrandsHint')}</p>
+                  )}
                 </div>
               )}
               <div>

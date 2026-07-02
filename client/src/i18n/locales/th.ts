@@ -177,6 +177,8 @@ export const th = {
   adminUsers: {
     copy: 'คัดลอก',
     brandRequired: 'กรุณาเลือกอย่างน้อย 1 แบรนด์',
+    allBrands: 'ทุกแบรนด์',
+    managerAllBrandsHint: 'Manager ที่ไม่เลือกแบรนด์จะเห็นข้อมูลทุกแบรนด์',
     activated: 'เปิดใช้งานแล้ว',
     deactivated: 'ปิดใช้งานแล้ว',
     passwordResetFor: 'รีเซ็ตรหัสผ่านของ {{name}} แล้ว',
