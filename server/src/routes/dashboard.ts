@@ -189,6 +189,8 @@ type ProductRankRow = {
   total_gmv: number;
   total_orders: number;
   total_spend: number;
+  total_ads_cost: number;
+  total_visits: number;
 };
 
 type ProductKolRow = {
@@ -1361,7 +1363,7 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
 
     if (matched.length === 0) {
       return {
-        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0 },
+        summary: { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0, total_ads_cost: 0, total_visits: 0 },
         ranking: [] as ProductRankRow[],
       };
     }
@@ -1380,11 +1382,13 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         WHERE pl.id IN (${Prisma.join(ids)})
       ),
       placement_spend AS (
-        SELECT id, COALESCE(pay_amount, final_price, 0)::numeric AS spend
+        SELECT id,
+               COALESCE(pay_amount, final_price, 0)::numeric AS spend,
+               COALESCE(ads_cost, 0)::numeric                AS ads_cost
         FROM placements WHERE id IN (${Prisma.join(ids)})
       ),
       metric_agg AS (
-        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders
+        SELECT placement_id, SUM(gmv::numeric) AS gmv, SUM(orders) AS orders, SUM(visits) AS visits
         FROM placement_metrics
         WHERE placement_id IN (${Prisma.join(ids)})
         GROUP BY placement_id
@@ -1398,7 +1402,9 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         COUNT(DISTINCT r.placement_id)::int AS placement_count,
         COALESCE(SUM(ma.gmv), 0)::float     AS total_gmv,
         COALESCE(SUM(ma.orders), 0)::int    AS total_orders,
-        COALESCE(SUM(ps.spend), 0)::float   AS total_spend
+        COALESCE(SUM(ps.spend), 0)::float   AS total_spend,
+        COALESCE(SUM(ps.ads_cost), 0)::float AS total_ads_cost,
+        COALESCE(SUM(ma.visits), 0)::int    AS total_visits
       FROM resolved r
       JOIN products c ON c.id = r.canonical_id
       LEFT JOIN product_categories pc ON pc.id = c.product_category_id
@@ -1416,8 +1422,10 @@ async function buildProductDashboard(prisma: PrismaClient, user: AuthUser, query
         total_placements: acc.total_placements + r.placement_count,
         product_count: acc.product_count + 1,
         total_spend: acc.total_spend + r.total_spend,
+        total_ads_cost: acc.total_ads_cost + r.total_ads_cost,
+        total_visits: acc.total_visits + r.total_visits,
       }),
-      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0 },
+      { total_gmv: 0, total_orders: 0, total_placements: 0, product_count: 0, total_spend: 0, total_ads_cost: 0, total_visits: 0 },
     );
 
     return { summary, ranking };
