@@ -338,6 +338,8 @@ export const zh = {
     viewResult: '查看成效',
     noDateChip: '无日期',
     paginationLabel: '共 {{total}} 项 · 第 {{page}}/{{totalPages}} 页',
+    goToPage: '跳转到',
+    goToPageAria: '输入页码后按 Enter',
   },
   placementDetail: {
     back: '返回',

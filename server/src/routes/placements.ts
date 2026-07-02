@@ -209,7 +209,14 @@ app.get('/', async c => {
           brands: { select: { id: true, name: true, logo_url: true } },
           users_placements_person_in_charge_idTousers: { select: { full_name: true } },
         },
-        orderBy: { created_at: 'desc' },
+        // เรียงตาม "แคมเปญล่าสุด" ก่อน (ไม่ใช่วันที่แถวถูกสร้าง) — ไม่งั้น import
+        // placement ของแคมเปญเก่าวันนี้จะโผล่ปนบนสุด ทั้งที่แคมเปญเก่ากว่ามาก
+        // ไม่มีแคมเปญ (campaign_id null) ให้ตกไปท้ายสุด; ภายในแคมเปญเดียวกัน
+        // เรียง created_at desc ต่อ (แถวที่เพิ่งเพิ่มอยู่บนสุดของกลุ่มนั้น)
+        orderBy: [
+          { campaigns: { start_date: { sort: 'desc', nulls: 'last' } } },
+          { created_at: 'desc' },
+        ],
         take,
         skip,
       }),

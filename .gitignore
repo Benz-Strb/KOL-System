@@ -11,3 +11,4 @@ dist/
 CLAUDE.md
 .dev.vars
 .wrangler/
+.superpowers/

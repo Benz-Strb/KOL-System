@@ -343,6 +343,8 @@ export const th = {
     viewResult: 'ดูผล',
     noDateChip: 'ไม่มีวันที่',
     paginationLabel: '{{total}} รายการ · หน้า {{page}}/{{totalPages}}',
+    goToPage: 'ไปหน้า',
+    goToPageAria: 'พิมพ์เลขหน้าที่ต้องการแล้วกด Enter',
   },
   placementDetail: {
     back: 'กลับ',

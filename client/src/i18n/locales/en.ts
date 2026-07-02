@@ -338,6 +338,8 @@ export const en = {
     viewResult: 'View result',
     noDateChip: 'No date',
     paginationLabel: '{{total}} item(s) · page {{page}}/{{totalPages}}',
+    goToPage: 'Go to page',
+    goToPageAria: 'Type a page number and press Enter',
   },
   placementDetail: {
     back: 'Back',

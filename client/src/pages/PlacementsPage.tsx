@@ -117,6 +117,7 @@ export default function PlacementsPage() {
   const [rows, setRows] = useState<PlacementRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [kolGmv, setKolGmv] = useState<KolGmvRow[]>([]);
   const [gmvLoading, setGmvLoading] = useState(false);
@@ -704,6 +705,24 @@ export default function PlacementsPage() {
               >
                 <ChevronRight size={13} />
               </button>
+              <div className="flex items-center gap-1.5 ml-1.5 pl-2.5 border-l border-hairline">
+                <span className="text-xs text-muted whitespace-nowrap">{t('placements.goToPage')}</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={pageInput}
+                  onChange={e => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter') return;
+                    const n = Number(pageInput);
+                    if (n >= 1 && n <= totalPages) setPage(n);
+                    setPageInput('');
+                  }}
+                  aria-label={t('placements.goToPageAria')}
+                  placeholder={String(page)}
+                  className="w-11 h-7 px-1.5 rounded-lg border border-hairline bg-input-bg text-ink text-xs text-center tabular-nums placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent hover:border-accent/30 transition-colors"
+                />
+              </div>
             </div>
           </div>
         )}
